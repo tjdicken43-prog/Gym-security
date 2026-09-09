@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<link rel="icon" type="image/svg+xml" href="logo.svg">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Checkout — SecurityAI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#14171A; --panel:#1C2124; --panel-2:#22282C; --line:#31383D;
+    --text:#EDEFF1; --muted:#8B939B; --green:#3FCF8E; --red:#FF5A5A; --amber:#FFB020;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:'IBM Plex Sans',sans-serif;line-height:1.55;}
+  h1,h2,h3{font-family:'Oswald',sans-serif;font-weight:600;margin:0;}
+  .mono{font-family:'IBM Plex Mono',monospace;}
+  a{color:inherit;}
+  .wrap{max-width:1000px;margin:0 auto;padding:0 28px;}
+
+  nav{border-bottom:1px solid var(--line);}
+  nav .wrap{display:flex;align-items:center;justify-content:space-between;height:64px;}
+  .brand{display:flex;align-items:center;gap:10px;font-family:'Oswald';font-size:19px;font-weight:600;text-decoration:none;}
+  
+  .back{color:var(--muted);font-size:14px;text-decoration:none;}
+  .back:hover{color:var(--text);}
+
+  main{padding:52px 0 90px;}
+  .head{margin-bottom:36px;}
+  .head .tag{color:var(--green);font-size:13px;font-family:'IBM Plex Mono';margin-bottom:10px;}
+  .head h1{font-size:30px;}
+
+  .layout{display:grid;grid-template-columns:1fr 380px;gap:40px;align-items:start;}
+  @media(max-width:820px){.layout{grid-template-columns:1fr;}}
+
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:28px;}
+  .card + .card{margin-top:20px;}
+  .card h3{font-size:15px;color:var(--muted);font-weight:500;font-family:'IBM Plex Sans';margin-bottom:18px;letter-spacing:0.2px;}
+
+  label{display:block;font-size:13px;color:var(--muted);margin-bottom:6px;}
+  input[type=text], input[type=email]{
+    width:100%;background:#0F1214;border:1px solid var(--line);border-radius:4px;
+    color:var(--text);font-size:14.5px;padding:11px 12px;font-family:'IBM Plex Sans';
+    margin-bottom:16px;
+  }
+  input:focus{outline:none;border-color:var(--green);}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+  .row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;}
+
+  .consent{display:flex;gap:12px;align-items:flex-start;padding:14px 0;border-top:1px solid var(--line);}
+  .consent:first-of-type{border-top:none;}
+  .consent input[type=checkbox]{
+    margin-top:3px;width:16px;height:16px;flex-shrink:0;accent-color:var(--green);cursor:pointer;
+  }
+  .consent p{margin:0;font-size:13.5px;color:var(--muted);}
+  .consent p a{color:var(--text);text-decoration:underline;}
+  .consent.optional p{color:#767e85;}
+
+  .summary-line{display:flex;justify-content:space-between;font-size:14px;color:var(--muted);padding:9px 0;border-bottom:1px solid var(--line);}
+  .summary-line:last-of-type{border-bottom:none;}
+  .summary-total{display:flex;justify-content:space-between;font-family:'Oswald';font-size:22px;padding-top:14px;margin-top:6px;border-top:1px solid var(--line);}
+  .summary-total span:last-child{color:var(--green);}
+
+  .btn-primary{
+    width:100%;background:var(--green);color:#0C1512;font-weight:600;font-size:15px;
+    padding:14px 22px;border-radius:4px;border:none;cursor:pointer;margin-top:22px;
+  }
+  .btn-primary:disabled{background:#31383D;color:#6b7278;cursor:not-allowed;}
+  .fineprint{font-size:12px;color:#6b7278;margin-top:12px;text-align:center;}
+
+  .disclosure{
+    background:var(--panel-2);border:1px solid var(--line);border-radius:6px;
+    padding:16px 18px;display:flex;gap:12px;margin-bottom:28px;
+  }
+  .disclosure .mark{font-family:'IBM Plex Mono';color:var(--amber);font-size:12px;flex-shrink:0;margin-top:2px;}
+  .disclosure p{margin:0;font-size:13.5px;color:var(--muted);}
+
+  .success{display:none;text-align:center;padding:60px 20px;}
+  .success.show{display:block;}
+  .success .check{
+    width:56px;height:56px;border-radius:50%;background:rgba(63,207,142,0.14);
+    display:flex;align-items:center;justify-content:center;margin:0 auto 22px;
+    color:var(--green);font-size:26px;font-family:'IBM Plex Mono';
+  }
+  .success h2{font-size:26px;margin-bottom:10px;}
+  .success p{color:var(--muted);font-size:14.5px;max-width:420px;margin:0 auto;}
+  .formstate{display:block;}
+  .formstate.hide{display:none;}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="wrap">
+    <a class="brand" href="securityai.html"><svg class="logo-mark" width="22" height="22" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" style="flex-shrink:0;">
+        <path d="M4 18V6a2 2 0 0 1 2-2h12" stroke="currentColor" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M44 18V6a2 2 0 0 0-2-2H30" stroke="currentColor" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M4 30v12a2 2 0 0 0 2 2h12" stroke="currentColor" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M44 30v12a2 2 0 0 1-2 2H30" stroke="currentColor" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/>
+        <line x1="10" y1="24" x2="38" y2="24" stroke="#3FCF8E" stroke-width="2.4" stroke-opacity="0.4" stroke-linecap="round"/>
+        <circle cx="24" cy="24" r="5.5" fill="#3FCF8E"/>
+      </svg>SecurityAI</a>
+    <a class="back" href="securityai.html">← Back to pricing</a>
+  </div>
+</nav>
+
+<main>
+  <div class="wrap">
+
+    <div class="formstate" id="formstate">
+      <div class="head">
+        <div class="tag mono">CHECKOUT</div>
+        <h1>Set up your subscription</h1>
+      </div>
+
+      <div class="disclosure">
+        <div class="mark">HOW THIS WORKS</div>
+        <p><strong style="color:var(--text);">Card details are never entered on this page.</strong> "Start subscription" calls a real backend (<span class="mono">server.js</span>) that opens an actual Stripe Checkout session — Stripe's own hosted page collects the card. That's what keeps this PCI-compliant: card numbers never touch this site's server or front end. This page needs to be served by that backend to work — see the included README.</p>
+      </div>
+
+      <div class="layout">
+        <div>
+          <div class="card">
+            <h3>CONTACT</h3>
+            <div class="row2">
+              <div><label>Full name</label><input type="text" placeholder="Jordan Lee"></div>
+              <div><label>Email</label><input type="email" placeholder="jordan@yourgym.com"></div>
+            </div>
+            <label>Gym / business name</label>
+            <input type="text" placeholder="Iron & Oak Fitness">
+          </div>
+
+          <div class="card">
+            <h3>PAYMENT DETAILS</h3>
+            <p style="font-size:13.5px;color:var(--muted);margin:0;">You'll enter your card on Stripe's secure checkout page after this step — nothing to fill in here.</p>
+          </div>
+
+          <div class="card">
+            <h3>REQUIRED CONSENT</h3>
+            <div class="consent">
+              <input type="checkbox" id="c1" class="required-consent">
+              <p>I agree to SecurityAI's <a href="#">Terms of Service</a> and <a href="#">Privacy Policy</a>.</p>
+            </div>
+            <div class="consent">
+              <input type="checkbox" id="c2" class="required-consent">
+              <p>I authorize SecurityAI to charge the card above <strong>$<span class="pr">99</span> per month</strong>, on a recurring basis, until I cancel.</p>
+            </div>
+            <div class="consent">
+              <input type="checkbox" id="c3" class="required-consent">
+              <p>I understand entrance footage will be analyzed to match entries against check-ins, that SecurityAI retains alert logs rather than raw video, and that I'm responsible for any camera signage or consent required under my local surveillance laws.</p>
+            </div>
+            <div class="consent optional">
+              <input type="checkbox" id="c4">
+              <p>Send me occasional product updates. Optional — unchecked by default.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="card" style="position:sticky;top:24px;">
+          <h3>ORDER SUMMARY</h3>
+          <div class="summary-line"><span class="plan-name-line">One entrance</span><span>$<span class="pr">99</span>/month</span></div>
+          <div class="summary-line"><span>Gyms on this plan</span><span>1</span></div>
+          <div class="summary-line"><span>Billing cycle</span><span>Monthly</span></div>
+          <div class="summary-total"><span>Due today</span><span>$<span class="pr">99</span></span></div>
+          <button class="btn-primary" id="submitBtn" disabled onclick="submitCheckout()">Start subscription</button>
+          <div class="fineprint" id="checkoutStatus" style="display:none;color:var(--red);"></div>
+          <div class="fineprint">You'll enter your card on Stripe's secure checkout page next. You can cancel anytime from your account settings.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="success" id="success">
+      <div class="check">✓</div>
+      <h2>You're set up</h2>
+      <p>This is a demo confirmation — no real subscription was created and no card was charged. In a live version, a receipt would go to the email you entered and setup instructions would follow.</p>
+      <div class="hero-ctas" style="margin-top:26px;">
+        <a href="securityai.html" class="back" style="border:1px solid var(--line);padding:11px 20px;border-radius:4px;text-decoration:none;">Back to site</a>
+      </div>
+    </div>
+
+  </div>
+</main>
+
+<script>
+  // Populate plan + price from query string
+  const params = new URLSearchParams(window.location.search);
+  const PLAN_NAMES = {
+    'single-door': 'One entrance',
+    'gym': 'Whole gym — unlimited entrances',
+    'multi': 'Multi-gym contract (per gym)',
+  };
+  const plan = PLAN_NAMES[params.get('plan')] || 'One entrance';
+  const price = params.get('price') || '99';
+  document.querySelectorAll('.pr').forEach(el => el.textContent = price);
+  document.querySelector('.plan-name-line').textContent = plan;
+
+  // Enable submit only once all required consent is checked
+  const requiredBoxes = document.querySelectorAll('.required-consent');
+  const submitBtn = document.getElementById('submitBtn');
+  function checkConsent(){
+    const allChecked = Array.from(requiredBoxes).every(b => b.checked);
+    submitBtn.disabled = !allChecked;
+  }
+  requiredBoxes.forEach(b => b.addEventListener('change', checkConsent));
+
+  async function submitCheckout(){
+    const btn = document.getElementById('submitBtn');
+    const statusEl = document.getElementById('checkoutStatus');
+    btn.disabled = true;
+    btn.textContent = 'Contacting payment server...';
+
+    try{
+      const res = await fetch('/create-checkout-session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          planName: plan,
+          unitAmountCents: parseInt(price, 10) * 100,
+          gyms: 1
+        })
+      });
+
+      if(!res.ok) throw new Error('Server responded with ' + res.status);
+      const data = await res.json();
+      if(!data.url) throw new Error('No checkout URL returned');
+
+      // Real Stripe-hosted checkout — this is where card details are
+      // actually entered, never on this page.
+      window.location.href = data.url;
+    } catch(err){
+      btn.disabled = false;
+      btn.textContent = 'Start subscription';
+      statusEl.textContent = 'Could not reach the payment server (' + err.message + '). This page needs to be served by server.js, not opened as a local file — see the README.';
+      statusEl.style.display = 'block';
+    }
+  }
+</script>
+
+</body>
+</html>

@@ -1,0 +1,18 @@
+<svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Four viewfinder corner brackets — the same camera-framing motif used
+       throughout the site (the hero's camera wall, the demo feed frames).
+       The logo is built from the product's own visual vocabulary rather
+       than a generic shield/padlock, which is what most security-brand
+       marks default to. -->
+  <path d="M4 18V6a2 2 0 0 1 2-2h12" stroke="#EDEFF1" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M44 18V6a2 2 0 0 0-2-2H30" stroke="#EDEFF1" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M4 30v12a2 2 0 0 0 2 2h12" stroke="#EDEFF1" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M44 30v12a2 2 0 0 1-2 2H30" stroke="#EDEFF1" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- The scan line and center dot double as the brand's existing "live"
+       indicator (the pulsing green dot already used next to the
+       wordmark, and the camera wall's REC light) — so the mark reads as
+       "a viewfinder, actively watching" rather than a static icon. -->
+  <line x1="10" y1="24" x2="38" y2="24" stroke="#3FCF8E" stroke-width="2" stroke-opacity="0.4" stroke-linecap="round"/>
+  <circle cx="24" cy="24" r="5" fill="#3FCF8E"/>
+</svg>

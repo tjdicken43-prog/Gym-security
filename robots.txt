@@ -1,0 +1,11 @@
+User-agent: *
+Allow: /securityai.html
+Allow: /checkout.html
+Allow: /success.html
+Disallow: /monitor.html
+Disallow: /monitor/
+Disallow: /support/
+Disallow: /create-checkout-session
+Disallow: /webhook
+
+Sitemap: https://your-domain-goes-here.com/sitemap.xml

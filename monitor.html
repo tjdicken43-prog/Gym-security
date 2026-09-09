@@ -1,0 +1,918 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<link rel="icon" type="image/svg+xml" href="logo.svg">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Live Monitor — SecurityAI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#14171A; --panel:#1C2124; --panel-2:#22282C; --line:#31383D;
+    --text:#EDEFF1; --muted:#8B939B; --green:#3FCF8E; --red:#FF5A5A; --amber:#FFB020;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:'IBM Plex Sans',sans-serif;line-height:1.55;}
+  h1,h2,h3{font-family:'Oswald',sans-serif;font-weight:600;margin:0;}
+  .mono{font-family:'IBM Plex Mono',monospace;}
+  a{color:inherit;}
+  .wrap{max-width:760px;margin:0 auto;padding:0 20px;}
+
+  nav{border-bottom:1px solid var(--line);position:sticky;top:0;background:rgba(20,23,26,.95);backdrop-filter:blur(8px);z-index:40;}
+  nav .wrap{display:flex;align-items:center;justify-content:space-between;height:58px;}
+  .brand{display:flex;align-items:center;gap:9px;font-family:'Oswald';font-size:18px;font-weight:600;text-decoration:none;color:var(--text);}
+  .back{color:var(--muted);font-size:13.5px;text-decoration:none;}
+
+  main{padding:26px 0 80px;}
+
+  /* Status strip */
+  .statusbar{display:flex;align-items:center;gap:11px;background:var(--panel);border:1px solid var(--line);
+    border-radius:8px;padding:14px 16px;margin-bottom:22px;flex-wrap:wrap;}
+  .status-dot{width:9px;height:9px;border-radius:50%;background:var(--muted);flex-shrink:0;}
+  .status-dot.running{background:var(--green);animation:pulse 1.6s infinite;}
+  .status-dot.idle{background:var(--amber);}
+  @keyframes pulse{50%{opacity:.4;}}
+  .statusbar .main{font-size:14px;font-weight:500;}
+  .statusbar .sub{color:var(--muted);font-size:12px;margin-left:auto;text-align:right;}
+  .status-line{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted);}
+
+  /* Steps */
+  .step{background:var(--panel);border:1px solid var(--line);border-radius:8px;margin-bottom:14px;overflow:hidden;}
+  .step-head{display:flex;align-items:center;gap:12px;padding:16px 18px;}
+  .step-num{width:26px;height:26px;border-radius:50%;background:var(--panel-2);border:1px solid var(--line);
+    display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;color:var(--muted);flex-shrink:0;}
+  .step.done .step-num{background:var(--green);border-color:var(--green);color:#0C1512;}
+  .step-title{font-family:'Oswald';font-size:17px;}
+  .step-hint{color:var(--muted);font-size:12.5px;margin-left:auto;text-align:right;}
+  .step-body{padding:0 18px 18px;}
+
+  label{display:block;font-size:12.5px;color:var(--muted);margin-bottom:5px;}
+  input[type=text],input[type=email],input[type=tel],input[type=time],select{
+    width:100%;background:#0F1214;border:1px solid var(--line);border-radius:5px;color:var(--text);
+    font-size:15px;padding:11px 12px;font-family:'IBM Plex Sans';margin-bottom:12px;}
+  input[type=time]{color-scheme:dark;}
+  input:focus,select:focus{outline:none;border-color:var(--green);}
+  input:disabled,select:disabled{opacity:.5;}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+  @media(max-width:600px){.row2{grid-template-columns:1fr;}}
+
+  .btn-primary{background:var(--green);color:#0C1512;font-weight:600;font-size:15px;padding:13px 22px;border-radius:6px;border:none;cursor:pointer;}
+  .btn-primary:disabled{background:#31383D;color:#6b7278;cursor:not-allowed;}
+  .btn-danger{background:transparent;color:var(--red);font-weight:600;font-size:15px;padding:13px 22px;border-radius:6px;border:1px solid var(--red);cursor:pointer;}
+  .btn-ghost-sm{background:transparent;color:var(--text);font-weight:500;font-size:13px;padding:9px 14px;border-radius:5px;border:1px solid var(--line);cursor:pointer;}
+  .btn-ghost-sm:hover{border-color:#4a545b;}
+  .fineprint{font-size:12px;color:#6b7278;margin-top:4px;}
+
+  .tip{background:var(--panel-2);border-left:2px solid var(--amber);border-radius:0 5px 5px 0;padding:11px 13px;font-size:12.5px;color:var(--muted);margin:10px 0;}
+  .tip strong{color:var(--text);}
+
+  details.more{margin-top:10px;}
+  details.more summary{cursor:pointer;font-size:13px;color:var(--muted);list-style:none;display:flex;align-items:center;gap:7px;padding:8px 0;}
+  details.more summary::-webkit-details-marker{display:none;}
+  details.more summary::before{content:"▸";color:var(--green);font-size:11px;transition:transform .15s;}
+  details.more[open] summary::before{transform:rotate(90deg);}
+  details.more summary:hover{color:var(--text);}
+
+  .log-list{display:flex;flex-direction:column;max-height:440px;overflow-y:auto;}
+  .log-item{display:flex;justify-content:space-between;gap:11px;padding:11px 0;border-bottom:1px solid var(--line);font-size:13.5px;align-items:center;}
+  .log-item:last-child{border-bottom:none;}
+  .log-item .t{color:var(--muted);font-family:'IBM Plex Mono';font-size:11.5px;}
+  .badge{font-size:11px;padding:2px 8px;border-radius:20px;font-weight:600;height:fit-content;flex-shrink:0;}
+  .badge.ok{background:rgba(63,207,142,.14);color:var(--green);}
+  .badge.bad{background:rgba(255,90,90,.14);color:var(--red);}
+  .badge.warn{background:rgba(255,176,32,.14);color:var(--amber);}
+  .log-empty{color:var(--muted);font-size:13px;padding:8px 0;}
+  .evidence{width:80px;height:56px;object-fit:cover;border-radius:4px;border:1px solid var(--line);flex-shrink:0;background:#0F1214;}
+  .evidence:hover{border-color:var(--green);}
+  .zone-remove{background:transparent;border:1px solid var(--line);color:var(--red);border-radius:4px;padding:5px 10px;cursor:pointer;font-size:12px;}
+
+  .disclosure{background:var(--panel-2);border:1px solid var(--line);border-radius:8px;padding:14px 16px;display:flex;gap:11px;margin-bottom:14px;}
+  .disclosure .mark{font-family:'IBM Plex Mono';color:var(--amber);font-size:11px;flex-shrink:0;margin-top:2px;}
+  .disclosure p{margin:0;font-size:13px;color:var(--muted);}
+
+  .startbar{position:sticky;bottom:0;background:rgba(20,23,26,.96);backdrop-filter:blur(8px);
+    border-top:1px solid var(--line);padding:14px 0;margin-top:8px;z-index:30;}
+  .startbar .wrap{display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
+  .consent{display:flex;gap:10px;align-items:flex-start;margin-bottom:12px;}
+  .consent input{margin-top:3px;width:16px;height:16px;flex-shrink:0;accent-color:var(--green);cursor:pointer;}
+  .consent p{margin:0;font-size:12.5px;color:var(--muted);}
+</style>
+</head>
+<body>
+
+<nav><div class="wrap">
+  <a class="brand" href="securityai.html">
+    <svg width="21" height="21" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" style="flex-shrink:0;">
+      <path d="M4 18V6a2 2 0 0 1 2-2h12" stroke="currentColor" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M44 18V6a2 2 0 0 0-2-2H30" stroke="currentColor" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M4 30v12a2 2 0 0 0 2 2h12" stroke="currentColor" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M44 30v12a2 2 0 0 1-2 2H30" stroke="currentColor" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/>
+      <line x1="10" y1="24" x2="38" y2="24" stroke="#3FCF8E" stroke-width="2.4" stroke-opacity=".4" stroke-linecap="round"/>
+      <circle cx="24" cy="24" r="5.5" fill="#3FCF8E"/>
+    </svg>SecurityAI
+  </a>
+  <a class="back" href="securityai.html">← Site</a>
+</div></nav>
+
+<main><div class="wrap">
+
+  <div class="statusbar">
+    <span class="status-dot" id="statusDot"></span>
+    <span class="main" id="statusMain">Checking…</span>
+    <span class="sub" id="statusSub"></span>
+  </div>
+
+  <!-- STEP 1 -->
+  <div class="step" id="stepScreen">
+    <div class="step-head">
+      <div class="step-num">1</div>
+      <div class="step-title">Connect your cameras</div>
+      <div class="step-hint">Screen share, or a capture device</div>
+    </div>
+    <div class="step-body">
+      <div class="status-line" style="margin-bottom:12px;"><span class="status-dot" id="screenStatusDot"></span><span id="screenStatusText">Not connected yet</span></div>
+
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;">
+        <button type="button" class="btn-ghost-sm" id="screenShareBtn" onclick="toggleScreenCapture()">Share a screen or window</button>
+        <button type="button" class="btn-ghost-sm" id="webcamBtn" onclick="toggleWebcam()">Use a camera or capture device</button>
+      </div>
+
+      <div id="webcamPicker" style="display:none;margin-bottom:12px;">
+        <label>Which device?</label>
+        <select id="webcamSelect" onchange="switchWebcam()"><option>Looking for devices…</option></select>
+        <p class="fineprint" style="margin-top:-6px;">An HDMI capture stick plugged into your NVR shows up here like any other camera. If the list is empty, allow camera access when your browser asks.</p>
+      </div>
+
+      <video id="screenVideo" autoplay playsinline muted style="display:none;"></video>
+      <video id="camVideo" autoplay playsinline muted style="display:none;"></video>
+
+      <div class="tip"><strong>Screen share:</strong> pick <strong>Entire Screen</strong>, not "This Tab" — otherwise it records this page instead of your cameras.<br><br><strong>Camera or capture device:</strong> use this if your cameras run on a dedicated NVR box you can't open a browser on. A ~$20 USB HDMI capture stick plugged into the NVR's spare output makes the whole camera wall appear here as a camera.</div>
+    </div>
+  </div>
+
+  <!-- STEP 2 -->
+  <div class="step" id="stepZones">
+    <div class="step-head">
+      <div class="step-num">2</div>
+      <div class="step-title">Draw your entrances</div>
+      <div class="step-hint" id="zoneCount">none yet</div>
+    </div>
+    <div class="step-body">
+      <button type="button" class="btn-ghost-sm" onclick="captureReferenceFrame()">Take a picture of my screen</button>
+      <p class="fineprint" style="margin-bottom:10px;">Then drag a box around each doorway you want watched. Only those boxes are ever looked at.</p>
+      <div class="tip"><strong>Draw tight around the doorway.</strong> Whether someone registers depends on how much of your box they fill — so a box drawn around the whole camera tile makes people look small and easy to miss, while one drawn snugly around the door catches even a child. Include the door plus a step or two of floor either side, and nothing more.</div>
+      <canvas id="zoneDrawCanvas" style="max-width:100%;border:1px solid var(--line);border-radius:5px;cursor:crosshair;display:block;"></canvas>
+      <div id="zoneDefList" style="margin-top:10px;"></div>
+      <p class="fineprint" id="filterStats"></p>
+    </div>
+  </div>
+
+  <!-- STEP 3 — ALERTS, high up and impossible to miss -->
+  <div class="step" id="stepAlerts">
+    <div class="step-head">
+      <div class="step-num">3</div>
+      <div class="step-title">Where do alerts go?</div>
+      <div class="step-hint">Do not skip</div>
+    </div>
+    <div class="step-body">
+      <label>Email — you can list several, separated by commas</label>
+      <input type="text" id="alertEmail" placeholder="you@gym.com, 4797212719@vtext.com">
+      <label>Phone for SMS (only if you set up Twilio)</label>
+      <input type="tel" id="alertPhone" placeholder="+15551234567">
+      <button type="button" class="btn-ghost-sm" onclick="sendTestAlert()">Send me a test alert now</button>
+      <p class="fineprint" id="testAlertResult" style="margin-top:9px;"></p>
+      <div class="tip"><strong>No Twilio? You can still get texts.</strong> Add your carrier's text-by-email address to the email box above, comma-separated: Verizon <span class="mono">number@vtext.com</span> · AT&amp;T <span class="mono">number@txt.att.net</span> · T-Mobile <span class="mono">number@tmomail.net</span> · Google Fi <span class="mono">number@msg.fi.google.com</span>. Use the plain 10-digit number.</div>
+      <p class="fineprint">If monitoring ever stops overnight — tab closed, PC restarted — you get an alert here within about 3 minutes. That's why this step matters more than any other.</p>
+    </div>
+  </div>
+
+  <!-- STEP 4 -->
+  <div class="step" id="stepSchedule">
+    <div class="step-head">
+      <div class="step-num">4</div>
+      <div class="step-title">When should it watch?</div>
+      <div class="step-hint" id="scheduleHint">11pm – 5am</div>
+    </div>
+    <div class="step-body">
+      <div class="row2">
+        <div><label>From</label><input type="time" id="scheduleStart" value="23:00"></div>
+        <div><label>Until</label><input type="time" id="scheduleEnd" value="05:00"></div>
+      </div>
+      <p class="fineprint">Overnight windows crossing midnight work fine. Outside these hours nothing is captured or charged. Uses your local time.</p>
+
+      <details class="more">
+        <summary>Advanced settings — most people can leave these alone</summary>
+        <div style="padding-top:12px;">
+          <div class="row2">
+            <div>
+              <label>Model</label>
+              <select id="modelSelect">
+                <option value="claude-sonnet-4-6">Sonnet — more accurate</option>
+                <option value="claude-haiku-4-5-20251001">Haiku — 3x cheaper</option>
+              </select>
+            </div>
+            <div>
+              <label>Motion sensitivity</label>
+              <select id="sensitivitySelect">
+                <option value="all">All motion — most alerts</option>
+                <option value="moderate" selected>Moderate — recommended</option>
+                <option value="fast">Fast only — fewest alerts</option>
+              </select>
+            </div>
+          </div>
+          <div class="tip"><strong>"Fast only" will miss someone walking in calmly</strong> behind another person, which is how most people actually get in at an unstaffed door. It catches running and gate-hopping. Moderate is the safer default.<br><br><strong>Missing smaller or further-away people?</strong> Switch to "All motion" — in testing it caught children and distant figures that Moderate did not. Costs a few more analyses per night.</div>
+          <label>Daily analysis limit (rolling 24h)</label>
+          <input type="text" id="dailyBurstCap" value="400" inputmode="numeric">
+          <p class="fineprint">A spending ceiling. If something in a zone moves constantly, this stops it running up a bill. It slows down before it ever stops.</p>
+          <label>Gym access code</label>
+          <input type="text" id="gymCode" placeholder="leave blank if you weren't given one" autocomplete="off">
+          <div style="display:flex;align-items:center;gap:10px;margin-top:-4px;flex-wrap:wrap;">
+            <label style="margin:0;display:flex;align-items:center;gap:6px;cursor:pointer;">
+              <input type="checkbox" id="rememberCode" checked style="width:15px;height:15px;accent-color:var(--green);cursor:pointer;">Remember on this computer
+            </label>
+            <button type="button" class="btn-ghost-sm" style="padding:5px 10px;font-size:12px;" onclick="forgotCode()">Forgot your code?</button>
+          </div>
+        </div>
+      </details>
+    </div>
+  </div>
+
+  <details class="more" style="margin-bottom:14px;">
+    <summary>Server setup check — open this if something isn't working</summary>
+    <div id="preflightList" style="padding-top:10px;"><div class="log-empty">Checking…</div></div>
+    <button type="button" class="btn-ghost-sm" style="margin-top:10px;" onclick="runPreflight()">Re-check</button>
+  </details>
+
+  <div class="step">
+    <div class="step-head"><div class="step-num">5</div><div class="step-title">Recent activity</div></div>
+    <div class="step-body">
+      <div class="log-list" id="logList"><div class="log-empty">Nothing in the last 24 hours.</div></div>
+      <p class="fineprint">Last 24 hours, kept even if this page closes. Tap a thumbnail for full size.</p>
+    </div>
+  </div>
+
+</div></main>
+
+<div class="startbar"><div class="wrap">
+  <div style="width:100%;">
+    <div class="consent">
+      <input type="checkbox" id="monitorConsent">
+      <p>I agree to let this page capture frames from the boxes I drew, during the hours set above, and send them for analysis and alerting. I can stop any time.</p>
+    </div>
+    <div style="display:flex;gap:11px;align-items:center;flex-wrap:wrap;">
+      <button class="btn-primary" id="startBtn" onclick="startMonitoring()" disabled>Start monitoring</button>
+      <button class="btn-danger" id="stopBtn" onclick="stopMonitoring()" style="display:none;">Stop monitoring</button>
+      <span class="fineprint" id="startError" style="color:var(--red);display:none;"></span>
+    </div>
+  </div>
+</div></div>
+
+<script>
+
+const consentBox = document.getElementById('monitorConsent');
+const startBtn = document.getElementById('startBtn');
+const stopBtn = document.getElementById('stopBtn');
+const startError = document.getElementById('startError');
+consentBox.addEventListener('change', () => { startBtn.disabled = !consentBox.checked; });
+
+let screenStream = null;
+let camStream = null;
+
+// Which video element is currently feeding detection. Screen share and a
+// capture device are mutually exclusive — whichever was started last wins.
+function activeVideoEl(){
+  if(camStream) return document.getElementById('camVideo');
+  if(screenStream) return document.getElementById('screenVideo');
+  return null;
+}
+function anySourceLive(){ return !!(camStream || screenStream); }
+let motionLoopInterval = null;
+// Multiplier on the per-zone cooldown, pushed down by the server when
+// usage is running ahead of the nightly budget. 1 = normal pace.
+let pacingFactor = 1;
+let wakeLock = null;
+let heartbeatTimer = null;
+
+// --- Keeping the tab alive ------------------------------------------
+// The browser tab is the most fragile part of this setup. None of the
+// below can stop a Windows update reboot — the server's dead-man switch
+// covers that by alerting you. These just reduce how often it happens.
+
+// Screen Wake Lock stops the display (and on most machines, the whole
+// PC) from sleeping while monitoring runs. It is released automatically
+// whenever the tab is hidden, so we re-request it every time the tab
+// becomes visible again.
+async function acquireWakeLock(){
+  try{
+    if('wakeLock' in navigator && !wakeLock){
+      wakeLock = await navigator.wakeLock.request('screen');
+      wakeLock.addEventListener('release', () => { wakeLock = null; });
+    }
+  } catch(err){ /* unsupported or blocked — the dead-man switch still covers us */ }
+}
+function releaseWakeLock(){
+  try{ if(wakeLock){ wakeLock.release(); wakeLock = null; } } catch(err){}
+}
+document.addEventListener('visibilitychange', () => {
+  if(document.visibilityState === 'visible' && motionLoopInterval) acquireWakeLock();
+});
+
+// Tells the server we're still alive. If these stop arriving during
+// monitored hours, the server emails and texts you that monitoring went
+// down — which is the difference between finding out at 1am and finding
+// out at 9am.
+function startHeartbeat(){
+  if(heartbeatTimer) return;
+  const beat = () => fetch('/monitor/heartbeat', { method:'POST' }).catch(()=>{});
+  beat();
+  heartbeatTimer = setInterval(beat, 30000);
+}
+function stopHeartbeat(){
+  if(heartbeatTimer){ clearInterval(heartbeatTimer); heartbeatTimer = null; }
+}
+
+// Warns before an accidental close. Browsers show their own generic
+// wording; the string is only a hint.
+window.addEventListener('beforeunload', (e) => {
+  if(motionLoopInterval){ e.preventDefault(); e.returnValue = 'Monitoring is running. Closing this tab stops it.'; }
+});
+
+// Detection maths lives in detect.js, shared with the server-side RTSP
+// pipeline so both paths agree on what counts as someone crossing a door.
+const MOTION_CHECK_MS = D.MOTION_CHECK_MS;
+const MOTION_COOLDOWN_MS = D.MOTION_COOLDOWN_MS;
+// Long edge of frames SENT for analysis. Image tokens scale with area, so
+// this is the single biggest cost lever: without it a gym on a 4K monitor
+// pays ~3.6x what a 1080p gym pays for the same doorway. 384px is ample
+// to count one to three people crossing — we never read faces or text.
+const API_FRAME_MAX_PX = 384;
+// Evidence frames are for a human to look at and never reach the API, so
+// they stay larger. Costs disk, not money.
+const EVIDENCE_FRAME_MAX_PX = 640;
+function currentSensitivity(){ return D.SENSITIVITY[document.getElementById('sensitivitySelect').value] || D.SENSITIVITY.moderate; }
+const rejectStats = { still:0, lighting:0, chronic:0, 'too-small':0, scattered:0, 'in-place':0, candidate:0, person:0, 'no-crossing':0 };
+
+const zoneDefs = [];
+let zoneIdCounter = 0;
+
+async function listWebcams(){
+  const sel = document.getElementById('webcamSelect');
+  try{
+    const devs = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === 'videoinput');
+    sel.innerHTML = devs.length
+      ? devs.map((d,i) => `<option value="${d.deviceId}">${(d.label || ('Camera ' + (i+1))).replace(/</g,'')}</option>`).join('')
+      : '<option value="">No cameras found</option>';
+  } catch(err){ sel.innerHTML = '<option value="">Could not list devices</option>'; }
+}
+
+async function toggleWebcam(){
+  const dot = document.getElementById('screenStatusDot');
+  const text = document.getElementById('screenStatusText');
+  const btn = document.getElementById('webcamBtn');
+  const vid = document.getElementById('camVideo');
+
+  if(camStream){
+    camStream.getTracks().forEach(t => t.stop());
+    camStream = null; vid.srcObject = null;
+    document.getElementById('webcamPicker').style.display = 'none';
+    dot.className = 'status-dot'; text.textContent = 'Not connected yet';
+    btn.textContent = 'Use a camera or capture device';
+    return;
+  }
+  if(!window.isSecureContext){ text.textContent = 'Camera access needs https:// or http://localhost.'; return; }
+  if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){ text.textContent = 'This browser can\'t open cameras.'; return; }
+
+  // Stop a screen share first — one source at a time keeps zone
+  // coordinates meaningful.
+  if(screenStream){ screenStream.getTracks().forEach(t => t.stop()); screenStream = null;
+    document.getElementById('screenShareBtn').textContent = 'Share a screen or window'; }
+
+  try{
+    camStream = await navigator.mediaDevices.getUserMedia({ video: { width:{ideal:1920}, height:{ideal:1080} } });
+    vid.srcObject = camStream;
+    document.getElementById('webcamPicker').style.display = 'block';
+    await listWebcams();   // labels only populate after permission is granted
+    dot.className = 'status-dot running'; text.textContent = 'Capture device live';
+    btn.textContent = 'Disconnect device';
+    camStream.getVideoTracks()[0].addEventListener('ended', () => {
+      camStream = null; dot.className = 'status-dot'; text.textContent = 'Device disconnected';
+      btn.textContent = 'Use a camera or capture device';
+      if(motionLoopInterval) stopMonitoring();
+    });
+  } catch(err){ text.textContent = 'Could not open that device: ' + err.message; }
+}
+
+async function switchWebcam(){
+  const id = document.getElementById('webcamSelect').value;
+  if(!id) return;
+  if(camStream) camStream.getTracks().forEach(t => t.stop());
+  try{
+    camStream = await navigator.mediaDevices.getUserMedia({ video: { deviceId: { exact: id }, width:{ideal:1920}, height:{ideal:1080} } });
+    document.getElementById('camVideo').srcObject = camStream;
+    document.getElementById('screenStatusText').textContent = 'Capture device live';
+  } catch(err){ document.getElementById('screenStatusText').textContent = 'Could not switch device: ' + err.message; }
+}
+
+async function toggleScreenCapture(){
+  const video = document.getElementById('screenVideo');
+  const dot = document.getElementById('screenStatusDot');
+  const text = document.getElementById('screenStatusText');
+  const btn = document.getElementById('screenShareBtn');
+
+  if(screenStream){
+    screenStream.getTracks().forEach(t => t.stop());
+    screenStream = null;
+    video.style.display = 'none'; video.srcObject = null;
+    dot.className = 'status-dot'; text.textContent = 'Screen not shared yet';
+    btn.textContent = 'Share a screen or window';
+    return;
+  }
+  if(!window.isSecureContext){
+    text.textContent = 'Screen share needs this page loaded over https:// or http://localhost.';
+    return;
+  }
+  if(!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia){
+    const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+    text.textContent = isMobile
+      ? 'Screen sharing isn\'t supported on phone browsers — run this page on the computer showing your cameras.'
+      : 'This browser doesn\'t support screen sharing.';
+    return;
+  }
+  if(camStream){ camStream.getTracks().forEach(t => t.stop()); camStream = null;
+    document.getElementById('webcamBtn').textContent = 'Use a camera or capture device';
+    document.getElementById('webcamPicker').style.display = 'none'; }
+  try{
+    screenStream = await navigator.mediaDevices.getDisplayMedia({ video: { cursor: 'never' }, audio: false });
+    video.srcObject = screenStream;
+    dot.className = 'status-dot running'; text.textContent = 'Screen share live';
+    btn.textContent = 'Stop sharing';
+    screenStream.getVideoTracks()[0].addEventListener('ended', () => {
+      screenStream = null;
+      dot.className = 'status-dot'; text.textContent = 'Screen share stopped';
+      btn.textContent = 'Share a screen or window';
+      if(motionLoopInterval) stopMonitoring();
+    });
+  } catch(err){
+    text.textContent = 'Screen share canceled or unavailable: ' + err.message;
+  }
+}
+
+function captureReferenceFrame(){
+  const video = activeVideoEl();
+  const canvas = document.getElementById('zoneDrawCanvas');
+  if(!video || !video.videoWidth){ alert('Connect a source first — share a screen or open a capture device.'); return; }
+  canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+  canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+  redrawZoneOverlay();
+}
+
+function redrawZoneOverlay(){
+  const canvas = document.getElementById('zoneDrawCanvas');
+  const video = activeVideoEl() || document.getElementById('screenVideo');
+  if(!canvas.width) return;
+  const ctx = canvas.getContext('2d');
+  if(video.videoWidth) ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+  ctx.strokeStyle = '#3FCF8E'; ctx.lineWidth = 2; ctx.font = '14px sans-serif'; ctx.fillStyle = '#3FCF8E';
+  zoneDefs.forEach(z => {
+    const px = z.x*canvas.width, py = z.y*canvas.height;
+    ctx.strokeRect(px, py, z.w*canvas.width, z.h*canvas.height);
+    ctx.fillText(z.label, px + 4, py + 16);
+  });
+}
+
+(function setupZoneDrawing(){
+  const canvas = document.getElementById('zoneDrawCanvas');
+  let dragStart = null;
+  function pointFromEvent(e){
+    const rect = canvas.getBoundingClientRect();
+    const cx = e.touches ? e.touches[0].clientX : e.clientX;
+    const cy = e.touches ? e.touches[0].clientY : e.clientY;
+    return { x:(cx-rect.left)*(canvas.width/rect.width), y:(cy-rect.top)*(canvas.height/rect.height) };
+  }
+  canvas.addEventListener('mousedown', e => { if(canvas.width) dragStart = pointFromEvent(e); });
+  canvas.addEventListener('touchstart', e => { if(canvas.width) dragStart = pointFromEvent(e); }, { passive:true });
+  function move(e){
+    if(!dragStart) return;
+    const p = pointFromEvent(e);
+    redrawZoneOverlay();
+    const ctx = canvas.getContext('2d');
+    ctx.strokeStyle = '#FFB020'; ctx.lineWidth = 2;
+    ctx.strokeRect(dragStart.x, dragStart.y, p.x-dragStart.x, p.y-dragStart.y);
+  }
+  canvas.addEventListener('mousemove', move);
+  canvas.addEventListener('touchmove', move, { passive:true });
+  function end(e){
+    if(!dragStart) return;
+    const src = e.changedTouches ? { clientX:e.changedTouches[0].clientX, clientY:e.changedTouches[0].clientY } : e;
+    const p = pointFromEvent(src);
+    const x = Math.min(dragStart.x,p.x), y = Math.min(dragStart.y,p.y);
+    const w = Math.abs(p.x-dragStart.x), h = Math.abs(p.y-dragStart.y);
+    dragStart = null;
+    if(w < 20 || h < 20){ redrawZoneOverlay(); return; }
+    const label = window.prompt('Label for this entrance (e.g. "Front door"):', 'Entrance ' + (zoneDefs.length+1));
+    if(!label){ redrawZoneOverlay(); return; }
+    const expected = window.prompt('Expected check-ins per entry event here:', '1');
+    const accessibleGate = window.confirm('Does this entrance have a separate accessible/disabled-access gate? OK = yes, Cancel = no.');
+    zoneDefs.push({
+      id:'zone'+(zoneIdCounter++), label,
+      expectedCount: parseInt(expected,10) || 1,
+      accessibleGate,
+      x:x/canvas.width, y:y/canvas.height, w:w/canvas.width, h:h/canvas.height,
+      consecutiveHits:0, cooldownUntil:0, prevCells:null,
+    });
+    renderZoneDefList(); redrawZoneOverlay();
+  }
+  canvas.addEventListener('mouseup', end);
+  canvas.addEventListener('touchend', end);
+})();
+
+function removeZoneDef(id){
+  const i = zoneDefs.findIndex(z => z.id === id);
+  if(i !== -1) zoneDefs.splice(i,1);
+  renderZoneDefList(); redrawZoneOverlay();
+}
+
+function renderZoneDefList(){
+  const el = document.getElementById('zoneDefList');
+  el.innerHTML = zoneDefs.length
+    ? zoneDefs.map(z => `<div class="log-item"><span class="t">${z.label} — expects ${z.expectedCount}${z.accessibleGate ? ', accessible gate' : ''}</span><button type="button" class="zone-remove" onclick="removeZoneDef('${z.id}')">Remove</button></div>`).join('')
+    : '<div class="log-empty">No entrance zones drawn yet.</div>';
+}
+renderZoneDefList();
+
+// Mirrors the server's schedule check so the browser doesn't even sample
+// pixels outside the window. The server enforces it too — this is just to
+// avoid pointless work locally.
+function isWithinSchedule(){
+  const s = document.getElementById('scheduleStart').value;
+  const e = document.getElementById('scheduleEnd').value;
+  if(!s || !e) return true;
+  const now = new Date(); const mins = now.getHours()*60 + now.getMinutes();
+  const [sh,sm] = s.split(':').map(Number), [eh,em] = e.split(':').map(Number);
+  const start = sh*60+sm, end = eh*60+em;
+  if(start === end) return true;
+  return start < end ? (mins >= start && mins < end) : (mins >= start || mins < end);
+}
+
+function sampleZoneCells(video, z){
+  const c = document.createElement('canvas');
+  c.width = DIFF_GRID; c.height = DIFF_GRID;
+  const ctx = c.getContext('2d');
+  ctx.drawImage(video, z.x*video.videoWidth, z.y*video.videoHeight, z.w*video.videoWidth, z.h*video.videoHeight, 0, 0, DIFF_GRID, DIFF_GRID);
+  const d = ctx.getImageData(0,0,DIFF_GRID,DIFF_GRID).data;
+  const cells = [];
+  for(let i=0;i<d.length;i+=4) cells.push(0.299*d[i] + 0.587*d[i+1] + 0.114*d[i+2]);
+  return cells;
+}
+
+function cropZoneToBase64(video, z, maxPx, quality){
+  const sw = Math.round(z.w*video.videoWidth), sh = Math.round(z.h*video.videoHeight);
+  const scale = maxPx ? Math.min(1, maxPx / Math.max(sw, sh)) : 1;
+  const dw = Math.max(1, Math.round(sw*scale)), dh = Math.max(1, Math.round(sh*scale));
+  const c = document.createElement('canvas');
+  c.width = dw; c.height = dh;
+  const ctx = c.getContext('2d');
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(video, z.x*video.videoWidth, z.y*video.videoHeight, sw, sh, 0, 0, dw, dh);
+  return c.toDataURL('image/jpeg', quality || 0.75).split(',')[1];
+}
+
+// Did the motion actually pass THROUGH the doorway, or just move around
+// inside the box? Returns the verdict plus the numbers behind it so the
+// on-screen tally can explain itself.
+// Picks which buffered frames to actually send. Spread across the event
+// but weighted late, because the crossing almost always happens after
+// any pause to scan — the last frames are the ones that matter most.
+async function triggerZoneBurst(z, ev){
+  z.cooldownUntil = Date.now() + MOTION_COOLDOWN_MS * pacingFactor;
+  const frames = D.selectEventFrames(z.eventFrames || [], D.EVENT_FRAMES_SENT);
+  const evidence = (z.eventEvidence && z.eventEvidence.length)
+    ? z.eventEvidence[z.eventEvidence.length - 1] : null;
+  const durationSec = ev.durationSec;
+  z.eventFrames = []; z.eventEvidence = [];
+  if(frames.length < 2) return;
+  try{
+    await fetch('/monitor/push-burst', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ frames, evidence, zone:{ label:z.label, expectedCount:z.expectedCount, accessibleGate:z.accessibleGate, durationSec } }),
+    });
+  } catch(err){ /* pollers surface connectivity problems */ }
+}
+
+function motionLoopTick(){
+  const video = document.getElementById('screenVideo');
+  const src = activeVideoEl();
+  if(!src || !src.videoWidth) return;
+  if(!isWithinSchedule()) return;
+  const sens = currentSensitivity();
+  const now = Date.now();
+  zoneDefs.forEach(z => {
+    if(now < z.cooldownUntil) return;
+    const cells = sampleZoneCells(src, z);
+    const step = D.stepZone(z, cells, sens, {
+      // Called on every tick that belongs to an open event, so the frames
+      // we keep span the whole crossing rather than just its start.
+      onCapture: () => {
+        (z.eventFrames = z.eventFrames || []).push(cropZoneToBase64(src, z, API_FRAME_MAX_PX));
+        (z.eventEvidence = z.eventEvidence || []).push(cropZoneToBase64(src, z, EVIDENCE_FRAME_MAX_PX, 0.85));
+        if(z.eventFrames.length > 60){ z.eventFrames.shift(); z.eventEvidence.shift(); }
+      },
+    });
+    if(step.verdict && rejectStats[step.verdict] !== undefined) rejectStats[step.verdict]++;
+    if(step.rejected === 'no-crossing') rejectStats['no-crossing']++;
+    if(step.send) triggerZoneBurst(z, step.send);
+    else if(step.rejected){ z.eventFrames = []; z.eventEvidence = []; }
+  });
+  renderRejectStats();
+}
+
+function renderRejectStats(){
+  const el = document.getElementById('filterStats');
+  if(!el) return;
+  const total = Object.values(rejectStats).reduce((a,b)=>a+b,0);
+  if(!total){ el.textContent = ''; return; }
+  el.textContent = `Local filter (no API cost): ${rejectStats.person} looked like people · `
+    + `${rejectStats.lighting} lighting changes, ${rejectStats.chronic} constant-motion spots, `
+    + `${rejectStats['in-place']} moving-but-not-travelling, ${rejectStats.scattered + rejectStats['too-small']} too small/scattered, `
+    + `${rejectStats.still} no change, ${rejectStats['no-crossing']||0} moved but never crossed the doorway — all rejected before any analysis.`;
+  const noisy = zoneDefs.filter(z => (z.noiseFloor || 0) > 14);
+  if(noisy.length){
+    el.textContent += `  Grain is high on ${noisy.map(z=>z.label).join(', ')} — if entries are being missed there, more light on the doorway helps more than any setting.`;
+  }
+}
+
+function startMotionLoop(){ if(!motionLoopInterval) motionLoopInterval = setInterval(motionLoopTick, MOTION_CHECK_MS); }
+function stopMotionLoop(){
+  if(motionLoopInterval){ clearInterval(motionLoopInterval); motionLoopInterval = null; }
+  zoneDefs.forEach(z => { D.resetZone(z); z.cooldownUntil = 0; z.eventFrames = []; z.eventEvidence = []; });
+}
+
+function setFieldsDisabled(d){
+  ['gymCode','scheduleStart','scheduleEnd','modelSelect','sensitivitySelect','dailyBurstCap','alertEmail','alertPhone','monitorConsent']
+    .forEach(id => document.getElementById(id).disabled = d);
+}
+
+async function startMonitoring(){
+  startError.style.display = 'none';
+  if(!anySourceLive()){ return showStartError('Connect a source first — share a screen or open a capture device.'); }
+  if(!zoneDefs.length){ return showStartError('Draw at least one entrance zone first.'); }
+
+  const body = {
+    sourceType: 'browser-push',
+    mode: 'entry',
+    gymCode: document.getElementById('gymCode').value.trim(),
+    model: document.getElementById('modelSelect').value,
+    scheduleStart: document.getElementById('scheduleStart').value,
+    scheduleEnd: document.getElementById('scheduleEnd').value,
+    // So the server judges the schedule against this gym's clock, not its own (Render runs UTC).
+    tzOffsetMinutes: new Date().getTimezoneOffset(),
+    dailyBurstCap: document.getElementById('dailyBurstCap').value,
+    alertEmail: document.getElementById('alertEmail').value.trim(),
+    alertPhone: document.getElementById('alertPhone').value.trim(),
+  };
+  try{
+    const res = await fetch('/monitor/start', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+    const data = await res.json();
+    if(!res.ok) throw new Error(data.error || 'Failed to start');
+    setFieldsDisabled(true);
+    startBtn.style.display = 'none'; stopBtn.style.display = 'inline-block';
+    startMotionLoop();
+    startHeartbeat();
+    acquireWakeLock();
+    try{ localStorage.setItem('securityai:lastConfig', JSON.stringify({ ...body, zones: zoneDefs.map(z => ({label:z.label, expectedCount:z.expectedCount, accessibleGate:z.accessibleGate, x:z.x, y:z.y, w:z.w, h:z.h})) })); }catch(err){}
+    refreshStatus();
+  } catch(err){ showStartError(err.message); }
+}
+
+function showStartError(msg){
+  startError.textContent = msg;
+  startError.style.display = 'block';
+}
+
+async function stopMonitoring(){
+  await fetch('/monitor/stop', { method:'POST' });
+  stopMotionLoop();
+  stopHeartbeat();
+  releaseWakeLock();
+  try{ localStorage.removeItem('securityai:lastConfig'); }catch(err){}
+  setFieldsDisabled(false);
+  startBtn.disabled = !consentBox.checked;
+  startBtn.style.display = 'inline-block'; stopBtn.style.display = 'none';
+  refreshStatus();
+}
+
+function fmtTime(iso){ return new Date(iso).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit'}); }
+
+async function refreshStatus(){
+  try{
+    const s = await (await fetch('/monitor/status')).json();
+    const dot = document.getElementById('statusDot');
+    const main = document.getElementById('statusMain');
+    const sub = document.getElementById('statusSub');
+    if(s.running){
+      const inWindow = s.withinSchedule !== false;
+      dot.className = inWindow ? 'status-dot running' : 'status-dot idle';
+      main.textContent = inWindow
+        ? `Watching ${zoneDefs.length} zone${zoneDefs.length===1?'':'s'} for motion`
+        : 'Idle — outside scheduled hours';
+      pacingFactor = s.pacingFactor || 1;
+      const bits = [`${s.burstsLast24h ?? s.captureCount}/${s.dailyBurstCap} analyses used (24h)`];
+      if(pacingFactor > 1.05) bits.push(`pacing ${pacingFactor.toFixed(1)}x slower to stay in budget`);
+      if(s.projectedTotal && s.projectedTotal > s.dailyBurstCap) bits.push(`on pace for ~${s.projectedTotal} tonight`);
+      if(s.heartbeatLost) bits.push('DASHBOARD DISCONNECTED — not recording');
+      if(s.skippedOverCap) bits.push(`${s.skippedOverCap} blocked by cap`);
+      if(s.skippedOutOfWindow) bits.push(`${s.skippedOutOfWindow} skipped off-hours`);
+      if(s.config && s.config.scheduleStart) bits.push(`window ${s.config.scheduleStart}–${s.config.scheduleEnd}`);
+      if(s.lastError) bits.push(`last error: ${s.lastError}`);
+      sub.textContent = bits.join(' · ');
+      setFieldsDisabled(true);
+      startBtn.style.display = 'none'; stopBtn.style.display = 'inline-block';
+    } else {
+      dot.className = 'status-dot';
+      main.textContent = 'Stopped'; sub.textContent = '';
+      setFieldsDisabled(false);
+      startBtn.disabled = !consentBox.checked;
+      startBtn.style.display = 'inline-block'; stopBtn.style.display = 'none';
+    }
+  } catch(err){ document.getElementById('statusMain').textContent = 'Could not reach the server — is it running?'; }
+}
+
+async function refreshLog(){
+  try{
+    const log = await (await fetch('/monitor/log')).json();
+    const el = document.getElementById('logList');
+    if(!log.length){ el.innerHTML = '<div class="log-empty">Nothing in the last 24 hours.</div>'; return; }
+    el.innerHTML = log.map(e => {
+      const zone = e.zoneLabel ? `${e.zoneLabel} · ` : '';
+      const gc = document.getElementById('gymCode').value.trim() || 'default';
+      const thumb = e.frame
+        ? `<a href="/monitor/frame/${encodeURIComponent(gc)}/${encodeURIComponent(e.frame)}" target="_blank" rel="noopener" title="Open full size"><img src="/monitor/frame/${encodeURIComponent(gc)}/${encodeURIComponent(e.frame)}" class="evidence" alt="Frame captured at ${fmtTime(e.timestamp)}"></a>`
+        : '';
+      if(e.error) return `<div class="log-item">${thumb}<span class="t">${fmtTime(e.timestamp)} — ${zone}capture failed</span><span class="badge bad">${e.error}</span></div>`;
+      const kind = e.tailgate_flag ? 'bad' : (e.accessible_gate_used ? 'warn' : 'ok');
+      const label = e.tailgate_flag ? 'Tailgate flagged' : (e.accessible_gate_used ? 'Accessible gate' : 'Matched');
+      let alertNote = '';
+      if(e.alertResult){
+        const parts = [];
+        if(e.alertResult.email) parts.push('email: ' + e.alertResult.email);
+        if(e.alertResult.sms) parts.push('sms: ' + e.alertResult.sms);
+        if(parts.length) alertNote = ` · ${parts.join(', ')}`;
+      }
+      const burst = e.burstFrames ? ` (${e.burstFrames}-frame burst)` : '';
+      return `<div class="log-item">${thumb}<span class="t">${fmtTime(e.timestamp)} · ${zone}${e.people_count} seen, ${e.queued_count || 0} waiting${burst} — ${e.note}${alertNote}</span><span class="badge ${kind}">${label}</span></div>`;
+    }).join('');
+  } catch(err){ /* status poller reports connectivity */ }
+}
+
+// If the tab died while monitoring was on, offer to pick up where it
+// left off. The screen share itself can't be restored automatically —
+// browsers require a fresh user gesture — so this restores the settings
+// and zones and tells you what to click.
+(function offerResume(){
+  let saved = null;
+  try{ saved = JSON.parse(localStorage.getItem('securityai:lastConfig') || 'null'); }catch(err){}
+  if(!saved) return;
+  const bar = document.createElement('div');
+  bar.className = 'disclosure';
+  bar.style.cssText = 'background:rgba(255,176,32,0.08);border-color:var(--amber);';
+  bar.innerHTML = '<div class="mark">INTERRUPTED</div><p>Monitoring was running when this page last closed. Your zones and settings have been restored — share your screen again and press Start to resume. <button type="button" class="btn-ghost-sm" style="margin-left:10px;" id="dismissResume">Dismiss</button></p>';
+  document.querySelector('main .wrap').prepend(bar);
+  document.getElementById('dismissResume').onclick = () => { try{ localStorage.removeItem('securityai:lastConfig'); }catch(e){} bar.remove(); };
+  try{
+    if(saved.gymCode && !document.getElementById('gymCode').value) document.getElementById('gymCode').value = saved.gymCode;
+    if(saved.scheduleStart) document.getElementById('scheduleStart').value = saved.scheduleStart;
+    if(saved.scheduleEnd) document.getElementById('scheduleEnd').value = saved.scheduleEnd;
+    if(saved.model) document.getElementById('modelSelect').value = saved.model;
+    if(saved.dailyBurstCap) document.getElementById('dailyBurstCap').value = saved.dailyBurstCap;
+    if(saved.alertEmail) document.getElementById('alertEmail').value = saved.alertEmail;
+    if(saved.alertPhone) document.getElementById('alertPhone').value = saved.alertPhone;
+    (saved.zones || []).forEach(z => { zoneDefs.push({ id:'zone'+(zoneIdCounter++), ...z, consecutiveHits:0, cooldownUntil:0, prevCells:null }); });
+    renderZoneDefList();
+  }catch(err){}
+})();
+
+// The code lives on this machine so the front desk doesn't have to
+// retype it every night. It only scopes which gym's dashboard you see.
+(function restoreCode(){
+  try{
+    const saved = localStorage.getItem('securityai:gymCode');
+    if(saved){ document.getElementById('gymCode').value = saved; }
+    else { document.getElementById('rememberCode').checked = true; }
+  }catch(err){}
+})();
+document.getElementById('gymCode').addEventListener('change', () => {
+  try{
+    if(document.getElementById('rememberCode').checked){
+      localStorage.setItem('securityai:gymCode', document.getElementById('gymCode').value.trim());
+    }
+  }catch(err){}
+});
+document.getElementById('rememberCode').addEventListener('change', e => {
+  try{
+    if(e.target.checked) localStorage.setItem('securityai:gymCode', document.getElementById('gymCode').value.trim());
+    else localStorage.removeItem('securityai:gymCode');
+  }catch(err){}
+});
+
+async function forgotCode(){
+  const email = window.prompt('Enter the email your SecurityAI account was set up with. If it matches, your access code will be sent there.');
+  if(email === null) return;
+  const addr = email.trim();
+  if(!addr){ return; }
+  try{
+    const res = await fetch('/gym/recover-code', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ email: addr }),
+    });
+    const data = await res.json();
+    // Deliberately the same message either way — the server won't reveal
+    // whether an email is on file, and neither should this.
+    alert(data.message || 'If that email is on file, the access code is on its way to it.');
+  } catch(err){
+    alert('Could not reach the server. Check your connection and try again.');
+  }
+}
+
+// Shows what's actually configured on the server, so a missing API key or
+// unconfigured SMTP is caught now rather than discovered at 2am.
+async function runPreflight(){
+  const el = document.getElementById('preflightList');
+  try{
+    const p = await (await fetch('/monitor/preflight')).json();
+    el.innerHTML = p.checks.map(c => {
+      const state = c.ok ? 'ok' : (c.critical ? 'bad' : 'warn');
+      const word  = c.ok ? 'Ready' : (c.critical ? 'Required' : 'Optional');
+      return `<div class="log-item">
+        <span class="t">${c.label}${c.ok ? '' : ' — ' + c.fix}</span>
+        <span class="badge ${state}">${word}</span>
+      </div>`;
+    }).join('') + (p.ready
+      ? '<p class="fineprint" style="color:var(--green);margin-top:12px;">Everything required is configured. Safe to run tonight.</p>'
+      : '<p class="fineprint" style="color:var(--red);margin-top:12px;">Not ready — the items marked Required must be set in Render → Environment first. Without email alerts in particular, you will not be told if monitoring stops overnight.</p>');
+  } catch(err){
+    el.innerHTML = '<div class="log-empty">Could not reach the server to check configuration.</div>';
+  }
+}
+
+async function sendTestAlert(){
+  const out = document.getElementById('testAlertResult');
+  const email = document.getElementById('alertEmail').value.trim();
+  const phone = document.getElementById('alertPhone').value.trim();
+  if(!email && !phone){
+    out.style.color = 'var(--amber)';
+    out.textContent = 'Fill in an alert email or phone below first, then press this again.';
+    return;
+  }
+  out.style.color = 'var(--muted)';
+  out.textContent = 'Sending…';
+  try{
+    const res = await fetch('/monitor/test-alert', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ email, phone }),
+    });
+    const d = await res.json();
+    if(!res.ok) throw new Error(d.error || 'Failed');
+    const bits = [];
+    if(d.result && d.result.email) bits.push('email: ' + d.result.email);
+    if(d.result && d.result.sms) bits.push('sms: ' + d.result.sms);
+    const good = bits.every(b => b.includes('sent'));
+    out.style.color = good ? 'var(--green)' : 'var(--red)';
+    out.textContent = (good ? 'Sent — check your inbox/phone now. ' : 'Problem: ') + bits.join(', ');
+  } catch(err){
+    out.style.color = 'var(--red)';
+    out.textContent = 'Could not send: ' + err.message;
+  }
+}
+
+runPreflight();
+refreshStatus(); refreshLog();
+setInterval(refreshStatus, 4000);
+setInterval(refreshLog, 4000);
+
+// --- Step progress: marks each step done so it's obvious what's left ---
+function updateStepStates(){
+  const set = (id, done) => { const el = document.getElementById(id); if(el) el.classList.toggle('done', !!done); };
+  set('stepScreen', anySourceLive());
+  set('stepZones', zoneDefs.length > 0);
+  const em = document.getElementById('alertEmail').value.trim();
+  const ph = document.getElementById('alertPhone').value.trim();
+  set('stepAlerts', !!(em || ph));
+  set('stepSchedule', true);
+  const zc = document.getElementById('zoneCount');
+  if(zc) zc.textContent = zoneDefs.length ? zoneDefs.length + (zoneDefs.length === 1 ? ' entrance' : ' entrances') : 'none yet';
+  const sh = document.getElementById('scheduleHint');
+  if(sh){
+    const s = document.getElementById('scheduleStart').value, e = document.getElementById('scheduleEnd').value;
+    if(s && e) sh.textContent = s + ' – ' + e;
+  }
+}
+['alertEmail','alertPhone','scheduleStart','scheduleEnd'].forEach(id => {
+  document.getElementById(id).addEventListener('input', updateStepStates);
+});
+setInterval(updateStepStates, 1000);
+updateStepStates();
+</script>
+</body>
+</html>
