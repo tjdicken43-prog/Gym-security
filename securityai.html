@@ -3,18 +3,24 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SecurityAI — AI entrance monitoring for gyms</title>
+<title>Gym Tailgating Detection &amp; Entrance Monitoring | SecurityAI</title>
+<meta name="description" content="Catch tailgating at your gym doors overnight using the cameras you already have. Alerts arrive with the photo that triggered them. From $99/month.">
+<meta name="keywords" content="gym tailgating detection, gym access control, 24 hour gym security, unauthorized gym entry, gym door monitoring, piggybacking detection, fitness club security camera">
+<meta name="author" content="SecurityAI">
+<meta name="theme-color" content="#14171A">
 <meta name="description" content="SecurityAI watches your gym's entrance camera and flags unscanned entries in real time, using Claude to tell a scanned member apart from a tailgater. $250/month for a single gym, discounted multi-gym contracts available.">
 <meta name="robots" content="index, follow">
 <link rel="canonical" href="https://your-domain-goes-here.com/securityai.html">
 <link rel="icon" type="image/svg+xml" href="logo.svg">
-<meta property="og:title" content="SecurityAI — AI entrance monitoring for gyms">
-<meta property="og:description" content="Real-time tailgating detection for gym entrances, built on Claude. No new access-control hardware required.">
+<meta property="og:site_name" content="SecurityAI">
+<meta property="og:locale" content="en_US">
+<meta property="og:title" content="Gym Tailgating Detection &amp; Entrance Monitoring | SecurityAI">
+<meta property="og:description" content="Catch tailgating and unauthorized entries at your gym doors overnight, using the cameras you already have. Alerts include the photo that triggered them. From $99/month.">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://your-domain-goes-here.com/securityai.html">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="SecurityAI — AI entrance monitoring for gyms">
-<meta name="twitter:description" content="Real-time tailgating detection for gym entrances, built on Claude.">
+<meta name="twitter:description" content="Catch tailgating at your gym doors overnight using cameras you already have. From $99/month.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
@@ -165,6 +171,8 @@
   .mono{font-family:'IBM Plex Mono', monospace;}
   a{color:inherit;}
   .wrap{max-width:1120px;margin:0 auto;padding:0 28px;}
+  .skip{position:absolute;left:-9999px;top:0;background:var(--green);color:#0C1512;padding:10px 16px;z-index:100;border-radius:0 0 6px 0;}
+  .skip:focus{left:0;}
   .thin{color:var(--muted);}
 
   /* NAV */
@@ -323,10 +331,10 @@
   /* DEMO */
   .demo{
     background:var(--panel);border:1px solid var(--line);border-radius:6px;
-    display:grid;grid-template-columns:1.1fr 1fr;
+    display:grid;grid-template-columns:1.1fr 1fr;overflow:hidden;
   }
   @media(max-width:860px){.demo{grid-template-columns:1fr;}}
-  .demo-feed{padding:26px;border-right:1px solid var(--line);}
+  .demo-feed{padding:26px;border-right:1px solid var(--line);min-width:0;}
   @media(max-width:860px){.demo-feed{border-right:none;border-bottom:1px solid var(--line);}}
   .start-here{
     display:flex;flex-wrap:wrap;gap:16px;font-size:13px;color:var(--muted);
@@ -364,7 +372,7 @@
   .status-dot.bad{background:var(--red);}
   .status-dot.warn{background:var(--amber);}
   .demo-actions{display:flex;gap:10px;margin-top:16px;}
-  .demo-log{padding:26px;}
+  .demo-log{padding:26px;min-width:0;}
   .demo-log h3{font-size:15px;color:var(--muted);font-weight:500;margin-bottom:14px;font-family:'IBM Plex Sans';}
   .log-list{display:flex;flex-direction:column;gap:0;max-height:280px;overflow-y:auto;}
   .log-item{
@@ -448,11 +456,134 @@
     .hero-ctas{order:5;margin:0 0 20px;}
     .hero-facts{order:6;margin:0;gap:10px 20px;}
   }
+
+  /* ================= RESPONSIVE — appended last so it wins ================= */
+  html, body { max-width: 100%; overflow-x: hidden; }
+  img, svg, video, canvas, table { max-width: 100%; }
+  .pricing-3 { grid-template-columns: repeat(3, 1fr); }
+
+  /* --- Tablet and below --- */
+  @media (max-width: 1000px){
+    .pricing, .pricing-3 { grid-template-columns: repeat(2, 1fr); }
+    .setup-flow { grid-template-columns: repeat(2, 1fr); }
+  }
+
+  /* --- Phones and small tablets: everything goes single column --- */
+  @media (max-width: 780px){
+    .wrap { padding: 0 18px; }
+    /* Contact rows: stack the label above the value instead of forcing an
+       email address to share a line it doesn't fit on. */
+    .log-item { flex-direction: column; align-items: flex-start; gap: 3px; }
+    .log-item .t { font-size: 11px; }
+    .log-item span { min-width: 0; overflow-wrap: anywhere; }
+    section { padding: 52px 0; }
+    .sec-head { margin-bottom: 30px; }
+    .sec-head h2 { font-size: 26px; }
+    .hero-ctas { flex-direction: column; align-items: stretch; }
+    .hero-ctas button, .hero-ctas .btn-primary, .hero-ctas .btn-ghost { width: 100%; }
+
+    .demo { grid-template-columns: 1fr; }
+    .demo-feed { border-right: none; border-bottom: 1px solid var(--line); }
+    .demo-feed, .demo-log { padding: 20px; min-width: 0; }
+    .demo-actions { flex-direction: column; align-items: stretch; }
+    .demo-actions button { width: 100%; }
+
+    .pricing, .pricing-3 { grid-template-columns: 1fr; }
+    .steps, .steps-4, .setup-flow { grid-template-columns: 1fr; }
+    .step { border-right: none; border-bottom: 1px solid var(--line); }
+    .step:last-child { border-bottom: none; }
+    .frow { grid-template-columns: 1fr; gap: 6px; }
+    .setup-cta { flex-direction: column; align-items: stretch; }
+    .setup-cta .btn-primary { width: 100%; text-align: center; }
+    .trustbar .wrap { gap: 10px 18px; padding: 14px 18px; }
+    .trustbar span { font-size: 12px; }
+    .plan.highlight::after { right: 10px; font-size: 9px; }
+  }
+
+  /* --- Phone held sideways: short but wide. Vertical space is the scarce
+         thing, so trim heights rather than stacking columns. --- */
+  /* Narrow-but-wide screens: the nav has enough links to wrap onto two
+     lines, which looks broken. Tighten it rather than hiding it. */
+  @media (max-width: 1080px) and (min-width: 781px){
+    .navlinks { gap: 16px; font-size: 13px; }
+    .navcta { padding: 8px 13px; font-size: 13px; }
+    .brand { font-size: 17px; }
+  }
+  @media (max-height: 480px) and (orientation: landscape){
+    nav .wrap { height: 50px; }
+    .navlinks { gap: 14px; font-size: 12.5px; white-space: nowrap; }
+    .hero { padding: 26px 0 30px; }
+    .hero h1 { font-size: clamp(24px, 4.4vw, 34px); }
+    .hero p { font-size: 14.5px; }
+    .hero-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; align-items: center; }
+    .hero-grid > div:first-child { display: block; }
+    .hero-ctas { flex-direction: row; margin-top: 16px; }
+    .hero-ctas button { width: auto; }
+    .hero-facts { display: none; }
+    section { padding: 34px 0; }
+    .demo { grid-template-columns: 1.1fr 1fr; }
+    .log-list { max-height: 200px; }
+  }
+
+  /* --- Big screens: stop lines getting uncomfortably long --- */
+  @media (min-width: 1440px){
+    .wrap { max-width: 1180px; }
+    .hero h1 { font-size: 60px; }
+  }
 </style>
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "SoftwareApplication",
+      "name": "SecurityAI",
+      "applicationCategory": "SecurityApplication",
+      "operatingSystem": "Web",
+      "description": "Entrance monitoring for gyms. Detects tailgating and unexpected entries on cameras you already have, and sends alerts with the photo that triggered them.",
+      "offers": [
+        {"@type": "Offer", "name": "One entrance", "price": "99", "priceCurrency": "USD"},
+        {"@type": "Offer", "name": "Whole gym", "price": "199", "priceCurrency": "USD"},
+        {"@type": "Offer", "name": "Multi-gym, per location", "price": "169", "priceCurrency": "USD"}
+      ],
+      "featureList": [
+        "Tailgating detection at gym entrances",
+        "Works with existing cameras, no new hardware",
+        "Alerts by email and SMS with an evidence photo",
+        "Scheduled overnight monitoring",
+        "No facial recognition"
+      ]
+    },
+    {
+      "@type": "FAQPage",
+      "mainEntity": [
+        {"@type": "Question", "name": "Is this facial recognition?",
+         "acceptedAnswer": {"@type": "Answer", "text": "No. SecurityAI counts people and reads behavior at your door. It does not identify anyone and cannot tell you whether a specific person is a member, an employee or a stranger."}},
+        {"@type": "Question", "name": "Do I need to buy new cameras?",
+         "acceptedAnswer": {"@type": "Answer", "text": "No. SecurityAI works from the cameras you already have, whether they are shown on a computer, a locked-down NVR box, or available as an RTSP stream."}},
+        {"@type": "Question", "name": "How much does gym tailgating detection cost?",
+         "acceptedAnswer": {"@type": "Answer", "text": "SecurityAI starts at 99 US dollars per month for a single entrance, 199 per month for a whole gym with unlimited entrances, and 169 per gym per month for three or more locations."}},
+        {"@type": "Question", "name": "Does it replace my check-in system?",
+         "acceptedAnswer": {"@type": "Answer", "text": "No. It sits alongside whatever check-in system you already use and flags entries that do not match what you expect."}},
+        {"@type": "Question", "name": "What happens to the footage?",
+         "acceptedAnswer": {"@type": "Answer", "text": "Individual frames are analyzed and discarded. What is retained is an alert log with the photo that triggered each alert, kept on a rolling 24-hour basis."}}
+      ]
+    },
+    {
+      "@type": "Organization",
+      "name": "SecurityAI",
+      "description": "Entrance monitoring for 24-hour gyms and fitness clubs.",
+      "contactPoint": {"@type": "ContactPoint", "contactType": "customer support", "email": "tjdicken43@gmail.com", "telephone": "+1-479-721-2719", "areaServed": "US"}
+    }
+  ]
+}
+</script>
 </head>
 <body>
+<a href="#how" class="skip">Skip to content</a>
 
-<nav>
+<nav aria-label="Main">
   <div class="wrap">
     <div class="brand">
       <svg class="logo-mark" width="26" height="26" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
@@ -788,7 +919,7 @@
       <h2>Priced against what you'd actually pay elsewhere</h2>
       <p>Camera-based tailgating tools are typically sold per door, around $125/door/month. If you only have one entrance to watch, that's the number to beat — so there's a tier for exactly that. If you have several, flat-rate wins.</p>
     </div>
-    <div class="pricing" style="grid-template-columns:repeat(3,1fr);">
+    <div class="pricing pricing-3">
       <div class="plan">
         <div class="plan-name">ONE ENTRANCE</div>
         <div class="plan-price">$99<span>/month</span></div>
