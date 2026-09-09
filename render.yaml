@@ -1,0 +1,31 @@
+# Render deployment config for SecurityAI.
+#
+# The `disk` block below is what makes the 24-hour alert log survive a
+# REDEPLOY, not just a restart. Without a mounted disk, Render gives each
+# deploy a fresh filesystem and the log starts empty every time you push.
+#
+# Note honestly: persistent disks require a paid instance type. On the
+# free tier this block is ignored and the log will reset on each deploy
+# (it still survives ordinary restarts within a deploy).
+services:
+  - type: web
+    name: securityai
+    env: node
+    plan: starter          # free tier cannot mount a disk
+    buildCommand: npm install
+    startCommand: node server.js
+    disk:
+      name: securityai-data
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      - key: DATA_DIR
+        value: /var/data   # monitor.js writes alert-log.json here
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: DOMAIN
+        sync: false
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: SUPPORT_EMAIL
+        sync: false

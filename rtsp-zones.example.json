@@ -1,0 +1,27 @@
+{
+  "gymCode": "yourgym",
+  "label": "Main building",
+  "scheduleStart": "23:00",
+  "scheduleEnd": "05:00",
+  "model": "claude-sonnet-4-6",
+  "sensitivity": "moderate",
+  "dailyBurstCap": 400,
+  "alertEmail": "you@yourgym.com, 5551234567@vtext.com",
+  "alertPhone": "",
+  "zones": [
+    {
+      "label": "Front door",
+      "cameraUrl": "rtsp://user:pass@192.168.1.50:554/Streaming/Channels/101",
+      "cropX": 420, "cropY": 260, "cropW": 520, "cropH": 400,
+      "expectedCount": 1,
+      "accessibleGate": false
+    },
+    {
+      "label": "Side gate",
+      "cameraUrl": "rtsp://user:pass@192.168.1.50:554/Streaming/Channels/201",
+      "cropX": 300, "cropY": 200, "cropW": 480, "cropH": 380,
+      "expectedCount": 1,
+      "accessibleGate": true
+    }
+  ]
+}
