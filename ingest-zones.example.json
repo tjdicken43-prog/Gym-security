@@ -1,0 +1,23 @@
+{
+  "gymCode": "yourgym",
+  "label": "Main building",
+  "scheduleStart": "23:00",
+  "scheduleEnd": "05:00",
+  "model": "claude-sonnet-4-6",
+  "dailyBurstCap": 400,
+  "alertEmail": "you@yourgym.com, 5551234567@vtext.com",
+  "alertPhone": "",
+
+  "ftpPort": 2121,
+  "ftpUser": "camera",
+  "ftpPass": "pick-something",
+  "publicHost": "192.168.1.20",
+  "watchFolder": "",
+  "verbose": true,
+
+  "defaultCamera": { "label": "Unknown camera", "expectedCount": 1, "accessibleGate": false },
+  "cameras": [
+    { "match": "IPC-D3083", "label": "Front door", "expectedCount": 1, "accessibleGate": false },
+    { "match": "SideGate",  "label": "Side gate",  "expectedCount": 1, "accessibleGate": true  }
+  ]
+}

@@ -839,7 +839,13 @@ function start(cfg) {
     model: cfg.model || null,
     scheduleStart: cfg.scheduleStart || null,
     scheduleEnd: cfg.scheduleEnd || null,
-    dailyBurstCap: parseInt(cfg.dailyBurstCap, 10) || DEFAULT_DAILY_BURST_CAP,
+    // A negative or zero cap used to be accepted, which made every burst
+    // fail the cap check and silently disabled monitoring for the night.
+    // A typo in config should not quietly turn the product off.
+    dailyBurstCap: (() => {
+      const n = parseInt(cfg.dailyBurstCap, 10);
+      return (Number.isFinite(n) && n > 0) ? n : DEFAULT_DAILY_BURST_CAP;
+    })(),
     gymCode: code,
     tzOffsetMinutes: typeof cfg.tzOffsetMinutes === 'number' ? cfg.tzOffsetMinutes : null,
   };

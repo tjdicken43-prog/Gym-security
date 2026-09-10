@@ -229,3 +229,123 @@ helps more than any setting.
 **Too many false alerts**
 Redraw the box to exclude anything that moves by itself — a TV, a clock
 overlay, a fan, a treadmill.
+
+---
+
+# Anpviz cameras (and most IP cameras)
+
+If your gym uses Anpviz, Hikvision, Dahua, Reolink or similar network
+cameras, you can skip the browser entirely and use **PART 3C** — the
+server pulls frames straight from the camera. Nothing to leave open,
+survives reboots, and it's the most reliable of the three options.
+
+You need one thing from each camera: its RTSP address. These vary by
+model and the printed manual is often wrong, so there's a tool that finds
+it for you.
+
+### 1. Find a camera's IP address
+Any of these:
+- Your router's admin page → list of connected devices → look for `IPC`,
+  `ANPVIZ`, or an unfamiliar device
+- The NVR's own menu → Network, or Camera / Channel Management
+- Anpviz ships at `192.168.0.123` if it was never configured
+- On Windows, run `arp -a` in Command Prompt
+
+### 2. Find the working address
+On a computer on the same network, with Node.js and ffmpeg installed:
+
+    node find-camera.js 192.168.1.64 admin yourpassword
+
+It tries ten known formats and prints the one that works, with the
+resolution so you know you got the main stream. Takes about a minute.
+
+Default Anpviz login is `admin` / `123456`, but if the system was set up
+properly that was changed — check the NVR or ask whoever installed it.
+
+### 3. Other cameras
+Usually the same address with a different channel number:
+
+    .../Streaming/Channels/101   camera 1
+    .../Streaming/Channels/201   camera 2
+    .../Streaming/Channels/301   camera 3
+
+Or re-run the tool with a channel number on the end:
+
+    node find-camera.js 192.168.1.64 admin yourpassword 2
+
+### 4. Put them in the config
+Copy `rtsp-zones.example.json` to `rtsp-zones.json`, paste each address
+in as `cameraUrl`, then set the crop box for each doorway — `cropX`,
+`cropY`, `cropW`, `cropH` in pixels, measured from the top-left of that
+camera's picture. Take a screenshot of the camera view and use any image
+editor to read off the coordinates of the doorway.
+
+Then: `node rtsp-run.js`
+
+`rtsp-zones.json` holds your camera passwords and is already excluded
+from git, so it will never be uploaded to GitHub.
+
+---
+
+# Route D — let the cameras push to you (nothing at the gym)
+
+The other three routes all need something running at the gym. This one
+doesn't. Your cameras already have their own person detection — Anpviz
+calls it Human Detection and IVS tripwire — and they can push a snapshot
+out when it fires. We receive those and answer what the camera can't:
+**how many people crossed, versus how many were expected.**
+
+That division is worth understanding. The camera is better than us at
+"is that a person." We're the only one that can say "that was two people
+on one check-in."
+
+### 1. Work out what your cameras actually are
+
+    node scan-cameras.js 192.168.1.0/24                 sweep the network
+    node scan-cameras.js 192.168.1.64 admin yourpass    one camera in detail
+
+It reports brand, model, firmware, open ports, whether ONVIF is present,
+which RTSP address works — and then tells you which route to use. It only
+reads; it changes nothing on the camera.
+
+### 2. Start the ingest server
+
+    cp ingest-zones.example.json ingest-zones.json
+
+Edit it: your gym code, hours, alert email, an FTP password of your
+choosing, and a `cameras` list mapping each camera to a doorway. The
+`match` value is matched loosely against the folder the camera uploads
+into, so `"match": "IPC-D3083"` catches `/IPC-D3083/2026-09-09/`.
+
+    node ingest-run.js
+
+This can run on Render — the cameras reach out to it, so nothing needs to
+be opened up on the gym's network.
+
+### 3. Point the camera at it
+
+In the camera's web interface, under **Event**, **Alarm** or **Storage**:
+
+1. Turn on **Human Detection** (not plain motion — the whole point is
+   letting the camera filter out shadows and reflections for free)
+2. Draw a **tripwire or intrusion area** across the doorway
+3. Under **Linkage / Action**, enable **Upload to FTP**
+4. FTP settings: your server's address, port `2121`, and the username and
+   password from your config
+5. If it offers a **snapshot count**, set it to 3. Several frames of one
+   event is far more useful than one still — it's how someone pausing to
+   scan gets told apart from two people walking through.
+
+### 4. Check it
+
+Walk through the door. Within a few seconds the ingest console should
+print the upload and then the analysis, and the alert log on
+monitor.html should show it with a photo.
+
+Snapshots arriving within four seconds of each other are grouped into one
+event, so a camera pushing three frames produces one alert, not three.
+
+### Also supported
+- **Folder watching** — if the camera writes to a NAS or shared folder,
+  set `watchFolder` in the config and skip FTP entirely.
+- **HTTP push** — for cameras with webhook support.

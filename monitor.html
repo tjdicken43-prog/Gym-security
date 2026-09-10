@@ -478,7 +478,7 @@ function redrawZoneOverlay(){
   zoneDefs.forEach(z => {
     const px = z.x*canvas.width, py = z.y*canvas.height;
     ctx.strokeRect(px, py, z.w*canvas.width, z.h*canvas.height);
-    ctx.fillText(z.label, px + 4, py + 16);
+    ctx.fillText(String(z.label).slice(0, 40), px + 4, py + 16);
   });
 }
 
@@ -511,7 +511,8 @@ function redrawZoneOverlay(){
     const w = Math.abs(p.x-dragStart.x), h = Math.abs(p.y-dragStart.y);
     dragStart = null;
     if(w < 20 || h < 20){ redrawZoneOverlay(); return; }
-    const label = window.prompt('Label for this entrance (e.g. "Front door"):', 'Entrance ' + (zoneDefs.length+1));
+    let label = window.prompt('Label for this entrance (e.g. "Front door"):', 'Entrance ' + (zoneDefs.length+1));
+if(label) label = label.slice(0, 40);
     if(!label){ redrawZoneOverlay(); return; }
     const expected = window.prompt('Expected check-ins per entry event here:', '1');
     const accessibleGate = window.confirm('Does this entrance have a separate accessible/disabled-access gate? OK = yes, Cancel = no.');
@@ -537,7 +538,7 @@ function removeZoneDef(id){
 function renderZoneDefList(){
   const el = document.getElementById('zoneDefList');
   el.innerHTML = zoneDefs.length
-    ? zoneDefs.map(z => `<div class="log-item"><span class="t">${z.label} — expects ${z.expectedCount}${z.accessibleGate ? ', accessible gate' : ''}</span><button type="button" class="zone-remove" onclick="removeZoneDef('${z.id}')">Remove</button></div>`).join('')
+    ? zoneDefs.map(z => `<div class="log-item"><span class="t">${esc(z.label)} — expects ${esc(z.expectedCount)}${z.accessibleGate ? ', accessible gate' : ''}</span><button type="button" class="zone-remove" onclick="removeZoneDef('${z.id}')">Remove</button></div>`).join('')
     : '<div class="log-empty">No entrance zones drawn yet.</div>';
 }
 renderZoneDefList();
@@ -703,6 +704,16 @@ async function stopMonitoring(){
   refreshStatus();
 }
 
+// Anything that reaches the log from outside this page gets escaped
+// before it becomes HTML. Zone labels arrive from the camera's own upload
+// folder on the ingest path, and notes are model output — neither should
+// ever be trusted to be markup-free.
+function esc(v){
+  return String(v == null ? '' : v)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
 function fmtTime(iso){ return new Date(iso).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit'}); }
 
 async function refreshStatus(){
@@ -745,23 +756,23 @@ async function refreshLog(){
     const el = document.getElementById('logList');
     if(!log.length){ el.innerHTML = '<div class="log-empty">Nothing in the last 24 hours.</div>'; return; }
     el.innerHTML = log.map(e => {
-      const zone = e.zoneLabel ? `${e.zoneLabel} · ` : '';
+      const zone = e.zoneLabel ? `${esc(e.zoneLabel)} · ` : '';
       const gc = document.getElementById('gymCode').value.trim() || 'default';
       const thumb = e.frame
         ? `<a href="/monitor/frame/${encodeURIComponent(gc)}/${encodeURIComponent(e.frame)}" target="_blank" rel="noopener" title="Open full size"><img src="/monitor/frame/${encodeURIComponent(gc)}/${encodeURIComponent(e.frame)}" class="evidence" alt="Frame captured at ${fmtTime(e.timestamp)}"></a>`
         : '';
-      if(e.error) return `<div class="log-item">${thumb}<span class="t">${fmtTime(e.timestamp)} — ${zone}capture failed</span><span class="badge bad">${e.error}</span></div>`;
+      if(e.error) return `<div class="log-item">${thumb}<span class="t">${fmtTime(e.timestamp)} — ${zone}capture failed</span><span class="badge bad">${esc(e.error)}</span></div>`;
       const kind = e.tailgate_flag ? 'bad' : (e.accessible_gate_used ? 'warn' : 'ok');
       const label = e.tailgate_flag ? 'Tailgate flagged' : (e.accessible_gate_used ? 'Accessible gate' : 'Matched');
       let alertNote = '';
       if(e.alertResult){
         const parts = [];
-        if(e.alertResult.email) parts.push('email: ' + e.alertResult.email);
-        if(e.alertResult.sms) parts.push('sms: ' + e.alertResult.sms);
+        if(e.alertResult.email) parts.push('email: ' + esc(e.alertResult.email));
+        if(e.alertResult.sms) parts.push('sms: ' + esc(e.alertResult.sms));
         if(parts.length) alertNote = ` · ${parts.join(', ')}`;
       }
-      const burst = e.burstFrames ? ` (${e.burstFrames}-frame burst)` : '';
-      return `<div class="log-item">${thumb}<span class="t">${fmtTime(e.timestamp)} · ${zone}${e.people_count} seen, ${e.queued_count || 0} waiting${burst} — ${e.note}${alertNote}</span><span class="badge ${kind}">${label}</span></div>`;
+      const burst = e.burstFrames ? ` (${esc(e.burstFrames)}-frame burst)` : '';
+      return `<div class="log-item">${thumb}<span class="t">${fmtTime(e.timestamp)} · ${zone}${esc(e.people_count)} seen, ${esc(e.queued_count || 0)} waiting${burst} — ${esc(e.note)}${alertNote}</span><span class="badge ${kind}">${label}</span></div>`;
     }).join('');
   } catch(err){ /* status poller reports connectivity */ }
 }
@@ -845,7 +856,7 @@ async function runPreflight(){
       const state = c.ok ? 'ok' : (c.critical ? 'bad' : 'warn');
       const word  = c.ok ? 'Ready' : (c.critical ? 'Required' : 'Optional');
       return `<div class="log-item">
-        <span class="t">${c.label}${c.ok ? '' : ' — ' + c.fix}</span>
+        <span class="t">${esc(c.label)}${c.ok ? '' : ' — ' + esc(c.fix)}</span>
         <span class="badge ${state}">${word}</span>
       </div>`;
     }).join('') + (p.ready
