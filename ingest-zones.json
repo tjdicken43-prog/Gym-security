@@ -5,14 +5,14 @@
   "scheduleEnd": "08:00",
   "model": "claude-sonnet-4-6",
   "dailyBurstCap": 400,
-  "alertEmail": "tjdicken43@gmail.com, 4797212719@vtext.com",
+  "alertEmail": "Jstreet.alerts@gmail.com, 4797212719@vtext.com",
   "verbose": true,
   "ftp": false,
   "email": {
     "host": "imap.gmail.com",
     "port": 993,
-    "user": "PUT YOUR NEW GMAIL HERE",
-    "pass": "PUT THE 16 CHARACTER APP PASSWORD HERE",
+    "user": "Jstreet.alerts@gmail.com",
+    "pass": "jzsf tfuu kyra bjlj",
     "mailbox": "INBOX",
     "pollSeconds": 30
   },
