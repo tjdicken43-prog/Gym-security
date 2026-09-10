@@ -7,17 +7,38 @@
   "dailyBurstCap": 400,
   "alertEmail": "you@yourgym.com, 5551234567@vtext.com",
   "alertPhone": "",
-
   "ftpPort": 2121,
   "ftpUser": "camera",
   "ftpPass": "pick-something",
   "publicHost": "192.168.1.20",
   "watchFolder": "",
   "verbose": true,
-
-  "defaultCamera": { "label": "Unknown camera", "expectedCount": 1, "accessibleGate": false },
+  "defaultCamera": {
+    "label": "Unknown camera",
+    "expectedCount": 1,
+    "accessibleGate": false
+  },
   "cameras": [
-    { "match": "IPC-D3083", "label": "Front door", "expectedCount": 1, "accessibleGate": false },
-    { "match": "SideGate",  "label": "Side gate",  "expectedCount": 1, "accessibleGate": true  }
-  ]
+    {
+      "match": "channel3",
+      "label": "Front door",
+      "expectedCount": 1,
+      "accessibleGate": false
+    },
+    {
+      "match": "channel5",
+      "label": "Side gate",
+      "expectedCount": 1,
+      "accessibleGate": true
+    }
+  ],
+  "email": {
+    "host": "imap.gmail.com",
+    "port": 993,
+    "user": "yourgym.alerts@gmail.com",
+    "pass": "your-16-char-app-password",
+    "mailbox": "INBOX",
+    "pollSeconds": 30,
+    "maxPerPoll": 20
+  }
 }

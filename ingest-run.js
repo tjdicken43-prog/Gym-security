@@ -15,6 +15,7 @@ try { require('dotenv').config(); } catch (e) { /* env vars can be set directly 
 const fs = require('fs');
 const path = require('path');
 const ingest = require('./ingest');
+const emailIngest = require('./email-ingest');
 const monitor = require('./monitor');
 
 const CONFIG = process.env.INGEST_CONFIG || path.join(__dirname, 'ingest-zones.json');
@@ -86,6 +87,17 @@ if (cfg.ftp !== false) {
   }, handlers));
 }
 if (cfg.watchFolder) running.push(ingest.startFolderWatch(cfg.watchFolder, handlers));
+
+// Email route — the NVR sends a snapshot to a mailbox and we poll it.
+// This is the only route that needs nothing whatsoever at the gym, so
+// it's the right one when there's no machine to leave behind.
+if (cfg.email && cfg.email.host) {
+  running.push(emailIngest.startEmailIngest(cfg.email, Object.assign({}, handlers, {
+    onPoll: n => { if (cfg.verbose) console.log(`  mailbox: ${n} new message(s)`); },
+    onSkipped: id => { if (cfg.verbose) console.log(`  message ${id}: no usable image, skipped`); },
+    onError: msg => console.warn('  mailbox error: ' + msg),
+  })));
+}
 
 setInterval(() => monitor.recordHeartbeat(), 30000);
 monitor.recordHeartbeat();
