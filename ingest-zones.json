@@ -1,0 +1,22 @@
+{
+  "gymCode": "jstreet",
+  "label": "J Street Gym",
+  "scheduleStart": "20:00",
+  "scheduleEnd": "08:00",
+  "model": "claude-sonnet-4-6",
+  "dailyBurstCap": 400,
+  "alertEmail": "tjdicken43@gmail.com, 4797212719@vtext.com",
+  "verbose": true,
+  "ftp": false,
+  "email": {
+    "host": "imap.gmail.com",
+    "port": 993,
+    "user": "PUT YOUR NEW GMAIL HERE",
+    "pass": "PUT THE 16 CHARACTER APP PASSWORD HERE",
+    "mailbox": "INBOX",
+    "pollSeconds": 30
+  },
+  "cameras": [
+    { "match": "channel3", "label": "Front door", "expectedCount": 1 }
+  ]
+}
