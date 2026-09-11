@@ -114,7 +114,10 @@ function extractJpegs(raw) {
 // The NVR usually puts the channel or camera name in the subject line.
 function cameraFromMessage(raw) {
   const subj = (raw.match(/^Subject:\s*(.+)$/im) || [, ''])[1].trim();
-  const chan = subj.match(/\b(?:CH|Channel|Camera|D)\s*0*(\d{1,2})\b/i);
+  // Subjects vary a lot by brand and firmware: "Channel: 1",
+  // "Channel No.: 1", "D1", "Camera01", "CH03". Allow punctuation and
+  // filler between the word and the number.
+  const chan = subj.match(/\b(?:CH|Channel|Camera|Cam|D)(?:\s*No\.?)?[\s.:#-]*0*(\d{1,2})\b/i);
   if (chan) return 'channel' + chan[1];
   const clean = subj.replace(/[^A-Za-z0-9 _-]/g, '').trim();
   return clean ? clean.slice(0, 40) : 'nvr';
@@ -136,7 +139,11 @@ function startEmailIngest(opts, handlers) {
       await imap.login();
       await imap.selectInbox(opts.mailbox);
       const ids = await imap.unseenIds();
-      if (ids.length && handlers.onPoll) handlers.onPoll(ids.length);
+      // Report every poll, including empty ones. Silence in a log is
+      // impossible to diagnose — "0 new messages" tells you the mailbox
+      // is being read and simply has nothing unread, which is a
+      // completely different problem from not connecting at all.
+      if (handlers.onPoll) handlers.onPoll(ids.length);
 
       for (const id of ids.slice(0, opts.maxPerPoll || 20)) {
         const raw = await imap.fetchRaw(id);
@@ -166,4 +173,40 @@ function startEmailIngest(opts, handlers) {
   return { stop() { clearInterval(timer); }, pollNow: poll };
 }
 
-module.exports = { startEmailIngest, extractJpegs, cameraFromMessage, Imap };
+// Connects once and reports what's actually in the mailbox, without
+// consuming or marking anything. For working out why nothing is arriving.
+async function diagnose(opts) {
+  const out = { connected: false, loggedIn: false, mailbox: opts.mailbox || 'INBOX',
+                unread: 0, recentSubjects: [], jpegsInNewest: 0, error: null };
+  const imap = new Imap(opts);
+  try {
+    await imap.connect();      out.connected = true;
+    await imap.login();        out.loggedIn = true;
+    await imap.selectInbox(opts.mailbox);
+
+    const unseen = await imap.unseenIds();
+    out.unread = unseen.length;
+
+    // Look at the newest few messages whether read or not, so we can tell
+    // "nothing is arriving" apart from "everything has been opened".
+    const all = await imap.cmd('SEARCH ALL');
+    const allIds = ((all.match(/^\* SEARCH([^\r\n]*)/m) || [, ''])[1]).trim().split(/\s+/).filter(Boolean);
+    out.totalMessages = allIds.length;
+
+    for (const id of allIds.slice(-3).reverse()) {
+      const raw = await imap.fetchRaw(id);
+      const subj = (raw.match(/^Subject:\s*(.+)$/im) || [, '(no subject)'])[1].trim().slice(0, 70);
+      const seen = /\\Seen/.test(raw.slice(0, 400));
+      const jpegs = extractJpegs(raw).length;
+      out.recentSubjects.push({ id, subject: subj, read: seen, attachments: jpegs });
+      if (!out.jpegsInNewest) out.jpegsInNewest = jpegs;
+    }
+    await imap.logout();
+  } catch (err) {
+    out.error = err.message;
+    try { imap.sock && imap.sock.destroy(); } catch (e) {}
+  }
+  return out;
+}
+
+module.exports = { startEmailIngest, extractJpegs, cameraFromMessage, diagnose, Imap };

@@ -718,9 +718,16 @@ async function pushBurst(frames, zoneCfg, evidence) {
   if (!state.running || state.config.sourceType !== 'browser-push') {
     throw new Error('Monitoring is not running with a browser-push source.');
   }
-  if (!Array.isArray(frames) || frames.length < 2) {
-    throw new Error('A burst needs at least 2 frames to give Claude any real sequence to reason across.');
+  if (!Array.isArray(frames) || frames.length < 1) {
+    throw new Error('At least one frame is required.');
   }
+  // Multi-frame bursts are better — a sequence shows whether someone
+  // paused to scan before crossing. But plenty of NVRs only send a single
+  // snapshot per event, and one frame still answers the main question:
+  // how many people are in the doorway. Single frames get the
+  // single-image prompt rather than the sequence one, which would
+  // otherwise tell Claude to reason about movement it cannot see.
+  const singleFrame = frames.length === 1;
   recordHeartbeat();
   if (!isWithinSchedule(state.config)) {
     // Outside the configured window: drop it silently rather than paying
@@ -771,7 +778,9 @@ async function pushBurst(frames, zoneCfg, evidence) {
   const frame = saveEvidenceFrame(state.gymCode, keep, frameId);
 
   try {
-    const result = await vision.analyzeEntryBurst(frames, cfg);
+    const result = singleFrame
+      ? await vision.analyzeEntry(frames[0], cfg)
+      : await vision.analyzeEntryBurst(frames, cfg);
     state.captureCount += 1;
     state.lastError = null;
     await handleEntryResult(result, cfg, { burstFrames: frames.length, zoneLabel: zoneCfg.label || null, frame });

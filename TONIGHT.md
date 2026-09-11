@@ -157,16 +157,25 @@ Two things to change for your setup:
   T-Mobile `@tmomail.net`
 
 ### 4.3 Run it
-On Render, change the **Start Command** from `node server.js` to:
 
-    node ingest-run.js
+**Leave the Start Command as `node server.js`.** Don't change it.
 
-Save. It redeploys.
+Render runs a *web service*, which has to answer on a web port. A command
+that only reads a mailbox never opens one, so Render reports **"no open
+ports detected"** and shuts it down. The ingest now runs inside the web
+server instead — one service doing both, and your site stays up.
 
-**Check:** Render → **Logs**. You should see:
+It switches itself on as soon as `ingest-zones.json` exists in the repo.
+So committing that file in step 4.2 is all that's needed.
 
-    Ready. Schedule 20:00–08:00.
-    Watching mailbox imap.gmail.com
+**Check:** Render → **Logs**. You should see all three lines:
+
+    SecurityAI payment server running on port 10000
+    Ingest: watching mailbox yourgym.alerts@gmail.com every 30s
+    Monthly report scheduler active
+
+If the middle line is missing, `ingest-zones.json` isn't in the repo root
+or has a typo in it — Render's log will say which.
 
 ---
 
@@ -210,5 +219,9 @@ Delete it and re-add, pasting fresh.
 **Alerts flooding you** — the detection area covers too much. Tighten it,
 or set the NVR's arming schedule to a shorter window tonight.
 
-**To stop everything** — on Render, set the Start Command back to
-`node server.js`. On the NVR, untick Send Email under Linkage Action.
+**"No open ports detected"** — the Start Command was changed. Put it back
+to `node server.js`; the ingest runs inside it.
+
+**To stop everything** — delete `ingest-zones.json` from the repo (the
+website keeps running), and on the NVR untick Send Email under Linkage
+Action.

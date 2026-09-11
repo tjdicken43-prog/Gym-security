@@ -225,8 +225,34 @@ app.post('/monitor/test-alert', async (req, res) => {
   }
 });
 
+// Reports what's actually in the configured mailbox — read/unread counts
+// and the newest few subjects — so a silent ingest can be diagnosed from
+// the dashboard instead of guessing.
+app.get('/monitor/mailbox-test', async (req, res) => {
+  const fsx = require('fs'); const pathx = require('path');
+  const cfgPath = process.env.INGEST_CONFIG || pathx.join(__dirname, 'ingest-zones.json');
+  if (!fsx.existsSync(cfgPath)) return res.json({ configured: false, reason: 'No ingest-zones.json found.' });
+  let cfg;
+  try { cfg = JSON.parse(fsx.readFileSync(cfgPath, 'utf8')); }
+  catch (e) { return res.json({ configured: false, reason: 'ingest-zones.json is not valid JSON: ' + e.message }); }
+  if (!cfg.email || !cfg.email.host) return res.json({ configured: false, reason: 'No email section in ingest-zones.json.' });
+  try {
+    const emailIngest = require('./email-ingest');
+    const out = await emailIngest.diagnose(cfg.email);
+    res.json(Object.assign({ configured: true, user: cfg.email.user }, out));
+  } catch (err) {
+    res.json({ configured: true, error: err.message });
+  }
+});
+
 app.get('/monitor/status', (req, res) => {
-  res.json(monitor.getStatus());
+  // ingestMode tells the dashboard that the server is receiving frames on
+  // its own — so it can stop asking the user to connect a camera, which
+  // is only relevant to the browser-capture routes.
+  res.json(Object.assign({}, monitor.getStatus(), {
+    ingestMode: !!global.__securityaiIngest,
+    ingestDetail: global.__securityaiIngest || null,
+  }));
 });
 
 // Serves an evidence frame for one logged event. Scoped to the gym code
@@ -535,7 +561,7 @@ scheduler.start();
     onReady: i => console.log(i.transport === 'email'
       ? `Ingest: watching mailbox ${i.user} every ${i.everySec}s`
       : i.transport === 'ftp' ? `Ingest: FTP on port ${i.port}` : `Ingest: watching ${i.dir}`),
-    onPoll: n => { if (cfg.verbose) console.log(`  mailbox: ${n} new message(s)`); },
+    onPoll: n => console.log(`  mailbox checked: ${n} unread message(s)`),
     onSkipped: id => { if (cfg.verbose) console.log(`  message ${id}: no usable image`); },
     onError: msg => console.warn('  ingest error: ' + msg),
     onEvent: async (key, frames, meta) => {
@@ -552,6 +578,16 @@ scheduler.start();
           (r && r.skipped ? `skipped (${r.skipped})` : `${meta.frameCount} frame(s) analyzed`));
       } catch (err) { console.warn(`${z.label}: ${err.message}`); }
     },
+  };
+
+  global.__securityaiIngest = {
+    transports: [
+      cfg.email && cfg.email.host ? 'email (' + cfg.email.user + ')' : null,
+      cfg.ftp === true ? 'ftp' : null,
+      cfg.watchFolder ? 'folder' : null,
+    ].filter(Boolean),
+    gymCode: cfg.gymCode || null,
+    schedule: (cfg.scheduleStart && cfg.scheduleEnd) ? `${cfg.scheduleStart}–${cfg.scheduleEnd}` : 'always',
   };
 
   if (cfg.email && cfg.email.host) emailIngest.startEmailIngest(cfg.email, handlers);

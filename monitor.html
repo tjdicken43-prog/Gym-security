@@ -118,6 +118,11 @@
 
 <main><div class="wrap">
 
+  <div class="disclosure" id="ingestBanner" style="display:none;">
+    <div class="mark">SERVER MODE</div>
+    <p id="ingestText"></p>
+  </div>
+
   <div class="statusbar">
     <span class="status-dot" id="statusDot"></span>
     <span class="main" id="statusMain">Checking…</span>
@@ -250,6 +255,11 @@
     <div class="step-body">
       <div class="log-list" id="logList"><div class="log-empty">Nothing in the last 24 hours.</div></div>
       <p class="fineprint">Last 24 hours, kept even if this page closes. Tap a thumbnail for full size.</p>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px;">
+        <button type="button" class="btn-ghost-sm" onclick="refreshLog()">Refresh</button>
+        <button type="button" class="btn-ghost-sm" onclick="testMailbox()">Check the mailbox</button>
+      </div>
+      <div id="mailboxResult" style="margin-top:12px;"></div>
     </div>
   </div>
 
@@ -722,6 +732,23 @@ async function refreshStatus(){
     const dot = document.getElementById('statusDot');
     const main = document.getElementById('statusMain');
     const sub = document.getElementById('statusSub');
+    // Server-side ingest: the steps below are for browser capture and
+    // don't apply, so hide them rather than leave the page asking for a
+    // camera that will never be connected here.
+    const banner = document.getElementById('ingestBanner');
+    if(s.ingestMode){
+      const d = s.ingestDetail || {};
+      banner.style.display = 'flex';
+      document.getElementById('ingestText').innerHTML =
+        `This server is receiving snapshots directly from your cameras via <strong>${esc((d.transports||[]).join(', ') || 'ingest')}</strong>` +
+        (d.schedule ? `, during <strong>${esc(d.schedule)}</strong>` : '') +
+        `. The camera setup steps below are only for screen sharing or a capture device — you can ignore them. Alerts appear in Recent activity.`;
+      ['stepScreen','stepZones','stepAlerts','stepSchedule'].forEach(id => {
+        const el = document.getElementById(id); if(el) el.style.display = 'none';
+      });
+      const sb = document.querySelector('.startbar'); if(sb) sb.style.display = 'none';
+    }
+
     if(s.running){
       const inWindow = s.withinSchedule !== false;
       dot.className = inWindow ? 'status-dot running' : 'status-dot idle';
@@ -729,6 +756,7 @@ async function refreshStatus(){
         ? `Watching ${zoneDefs.length} zone${zoneDefs.length===1?'':'s'} for motion`
         : 'Idle — outside scheduled hours';
       pacingFactor = s.pacingFactor || 1;
+      if(s.gymCode) window.__serverGymCode = s.gymCode;
       const bits = [`${s.burstsLast24h ?? s.captureCount}/${s.dailyBurstCap} analyses used (24h)`];
       if(pacingFactor > 1.05) bits.push(`pacing ${pacingFactor.toFixed(1)}x slower to stay in budget`);
       if(s.projectedTotal && s.projectedTotal > s.dailyBurstCap) bits.push(`on pace for ~${s.projectedTotal} tonight`);
@@ -750,6 +778,34 @@ async function refreshStatus(){
   } catch(err){ document.getElementById('statusMain').textContent = 'Could not reach the server — is it running?'; }
 }
 
+// Reads the configured mailbox and reports what's in it. When the
+// activity log is empty this says whether mail is arriving at all, which
+// is the difference between an NVR problem and a server problem.
+async function testMailbox(){
+  const el = document.getElementById('mailboxResult');
+  el.innerHTML = '<div class="log-empty">Checking…</div>';
+  try{
+    const r = await (await fetch('/monitor/mailbox-test')).json();
+    if(!r.configured){
+      el.innerHTML = `<div class="tip"><strong>Not set up for email.</strong> ${esc(r.reason)}</div>`;
+      return;
+    }
+    if(r.error || !r.loggedIn){
+      el.innerHTML = `<div class="tip" style="border-left-color:var(--red);"><strong>Could not read the mailbox.</strong> ${esc(r.error || 'Login failed')}<br><br>Almost always the app password in ingest-zones.json. It must be the 16-character app password, not the Gmail account password.</div>`;
+      return;
+    }
+    const rows = (r.recentSubjects || []).map(m =>
+      `<div class="log-item"><span class="t">${esc(m.subject)}</span><span class="badge ${m.attachments ? 'ok' : 'warn'}">${m.read ? 'read' : 'UNREAD'} · ${esc(m.attachments)} photo${m.attachments===1?'':'s'}</span></div>`).join('');
+    let verdict = '';
+    if(!r.totalMessages) verdict = '<strong>The mailbox is empty.</strong> No alarm emails are arriving — that is the NVR side, not this server. Check Send Email is still ticked and the schedule covers now.';
+    else if(!r.unread) verdict = '<strong>Mail is arriving, but nothing is unread.</strong> Opening an alarm email in Gmail marks it read and this server skips it. Mark one unread and it will be picked up within 30 seconds.';
+    else verdict = `<strong>${r.unread} unread message(s) waiting.</strong> They should be processed within 30 seconds.`;
+    el.innerHTML = `<div class="tip">Signed in as ${esc(r.user)} — ${esc(r.totalMessages||0)} message(s), ${esc(r.unread)} unread.<br><br>${verdict}</div>${rows}`;
+  } catch(err){
+    el.innerHTML = `<div class="tip" style="border-left-color:var(--red);">Could not reach the server: ${esc(err.message)}</div>`;
+  }
+}
+
 async function refreshLog(){
   try{
     const log = await (await fetch('/monitor/log')).json();
@@ -757,7 +813,7 @@ async function refreshLog(){
     if(!log.length){ el.innerHTML = '<div class="log-empty">Nothing in the last 24 hours.</div>'; return; }
     el.innerHTML = log.map(e => {
       const zone = e.zoneLabel ? `${esc(e.zoneLabel)} · ` : '';
-      const gc = document.getElementById('gymCode').value.trim() || 'default';
+      const gc = (window.__serverGymCode) || document.getElementById('gymCode').value.trim() || 'default';
       const thumb = e.frame
         ? `<a href="/monitor/frame/${encodeURIComponent(gc)}/${encodeURIComponent(e.frame)}" target="_blank" rel="noopener" title="Open full size"><img src="/monitor/frame/${encodeURIComponent(gc)}/${encodeURIComponent(e.frame)}" class="evidence" alt="Frame captured at ${fmtTime(e.timestamp)}"></a>`
         : '';
