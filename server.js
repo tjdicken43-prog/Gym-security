@@ -485,4 +485,81 @@ app.post('/webhook', express.raw({ type: 'application/json' }), (req, res) => {
 // 4242 for local development, where PORT usually isn't set.
 const PORT = process.env.PORT || 4242;
 scheduler.start();
+
+// --- Camera ingest, in this same process ------------------------------
+// Render (and most managed hosts) run a Web Service that must listen on
+// an HTTP port; a process that only polls a mailbox is treated as having
+// "no open ports detected" and gets shut down. Rather than run a second
+// service, the ingest runs alongside the web server here — one process,
+// one port, and monitor.html stays reachable while snapshots come in.
+//
+// Turns itself on if an ingest config exists, or INGEST=1 is set.
+(function maybeStartIngest() {
+  const fsx = require('fs');
+  const pathx = require('path');
+  const cfgPath = process.env.INGEST_CONFIG || pathx.join(__dirname, 'ingest-zones.json');
+  if (process.env.INGEST !== '1' && !fsx.existsSync(cfgPath)) return;
+
+  let cfg;
+  try {
+    cfg = JSON.parse(fsx.readFileSync(cfgPath, 'utf8'));
+  } catch (err) {
+    console.warn(`Ingest config at ${cfgPath} could not be read: ${err.message}`);
+    return;
+  }
+
+  const ingest = require('./ingest');
+  const emailIngest = require('./email-ingest');
+
+  monitor.start({
+    sourceType: 'browser-push',
+    gymCode: cfg.gymCode || null,
+    scheduleStart: cfg.scheduleStart || null,
+    scheduleEnd: cfg.scheduleEnd || null,
+    tzOffsetMinutes: typeof cfg.tzOffsetMinutes === 'number' ? cfg.tzOffsetMinutes : new Date().getTimezoneOffset(),
+    model: cfg.model || null,
+    dailyBurstCap: cfg.dailyBurstCap,
+    alertEmail: cfg.alertEmail || null,
+    alertPhone: cfg.alertPhone || null,
+    label: cfg.label || 'Camera ingest',
+  });
+
+  function zoneFor(key) {
+    const k = String(key).toLowerCase();
+    return (cfg.cameras || []).find(c =>
+      k === String(c.match).toLowerCase() || k.includes(String(c.match).toLowerCase()))
+      || cfg.defaultCamera || { label: key, expectedCount: 1, accessibleGate: false };
+  }
+
+  const handlers = {
+    onReady: i => console.log(i.transport === 'email'
+      ? `Ingest: watching mailbox ${i.user} every ${i.everySec}s`
+      : i.transport === 'ftp' ? `Ingest: FTP on port ${i.port}` : `Ingest: watching ${i.dir}`),
+    onPoll: n => { if (cfg.verbose) console.log(`  mailbox: ${n} new message(s)`); },
+    onSkipped: id => { if (cfg.verbose) console.log(`  message ${id}: no usable image`); },
+    onError: msg => console.warn('  ingest error: ' + msg),
+    onEvent: async (key, frames, meta) => {
+      const z = zoneFor(key);
+      const b64 = frames.map(f => Buffer.isBuffer(f) ? f.toString('base64') : f);
+      try {
+        const r = await monitor.pushBurst(b64, {
+          label: z.label || key,
+          expectedCount: z.expectedCount || 1,
+          accessibleGate: !!z.accessibleGate,
+          durationSec: meta.durationSec,
+        }, b64[b64.length - 1]);
+        console.log(`[${new Date().toLocaleTimeString()}] ${z.label}: ` +
+          (r && r.skipped ? `skipped (${r.skipped})` : `${meta.frameCount} frame(s) analyzed`));
+      } catch (err) { console.warn(`${z.label}: ${err.message}`); }
+    },
+  };
+
+  if (cfg.email && cfg.email.host) emailIngest.startEmailIngest(cfg.email, handlers);
+  if (cfg.ftp === true) ingest.startFtpServer({ port: cfg.ftpPort || 2121, user: cfg.ftpUser || 'camera', pass: cfg.ftpPass || null, publicHost: cfg.publicHost }, handlers);
+  if (cfg.watchFolder) ingest.startFolderWatch(cfg.watchFolder, handlers);
+
+  setInterval(() => monitor.recordHeartbeat(), 30000);
+  monitor.recordHeartbeat();
+})();
+
 app.listen(PORT, () => console.log(`SecurityAI payment server running on port ${PORT}`));

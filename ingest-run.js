@@ -105,4 +105,14 @@ monitor.recordHeartbeat();
 function shutdown() { console.log('\nStopping…'); running.forEach(r => r.stop()); monitor.stop(); process.exit(0); }
 process.on('SIGINT', shutdown);
 process.on('SIGTERM', shutdown);
+// Some hosts kill a process that never opens a port. If PORT is set,
+// answer on it with a tiny status page so the service stays alive.
+if (process.env.PORT) {
+  require('http').createServer((req, res) => {
+    const s = monitor.getStatus();
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ ok: true, mode: 'ingest', running: s.running, analysedLast24h: s.burstsLast24h }));
+  }).listen(process.env.PORT, () => console.log(`Health endpoint on port ${process.env.PORT}`));
+}
+
 console.log(`Ready. Schedule ${cfg.scheduleStart || 'always'}–${cfg.scheduleEnd || 'always'}. Ctrl-C to stop.`);
