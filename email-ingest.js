@@ -77,6 +77,20 @@ class Imap {
     return line.trim().split(/\s+/).filter(Boolean);
   }
 
+  // UIDs are stable for the life of a mailbox; sequence numbers shift as
+  // mail arrives and is deleted. Tracking progress by UID is the only way
+  // to be certain a message is processed exactly once.
+  async uidsAbove(lastUid) {
+    const r = await this.cmd(`UID SEARCH UID ${(lastUid || 0) + 1}:*`);
+    const line = (r.match(/^\* SEARCH([^\r\n]*)/m) || [, ''])[1];
+    return line.trim().split(/\s+/).filter(Boolean)
+      .map(Number).filter(n => Number.isFinite(n) && n > (lastUid || 0))
+      .sort((a, b) => a - b);
+  }
+
+  async fetchRawByUid(uid) { return this.cmd(`UID FETCH ${uid} BODY.PEEK[]`); }
+  async markSeenByUid(uid) { try { await this.cmd(`UID STORE ${uid} +FLAGS (\\Seen)`); } catch (e) {} }
+
   async fetchRaw(id) { return this.cmd(`FETCH ${id} BODY.PEEK[]`); }
 
   // Flags live in the FETCH response, not the message body. Asking for
@@ -139,6 +153,27 @@ function startEmailIngest(opts, handlers) {
   const intervalMs = Math.max(15000, (opts.pollSeconds || 30) * 1000);
   let busy = false;
 
+  // Progress is remembered on disk as the highest UID already handled.
+  // This is deliberately independent of the read/unread flag: opening an
+  // alarm email in Gmail marks it read, and a poller that trusted that
+  // flag would silently skip the event. It also guarantees a message is
+  // never analysed twice, which would mean paying twice for one entry.
+  const fs = require('fs');
+  const path = require('path');
+  const stateFile = path.join(
+    process.env.DATA_DIR || __dirname,
+    `mail-progress-${String(opts.user || 'default').replace(/[^a-z0-9]/gi, '').slice(0, 40)}.json`
+  );
+
+  function loadProgress() {
+    try { return JSON.parse(fs.readFileSync(stateFile, 'utf8')) || {}; }
+    catch (e) { return {}; }
+  }
+  function saveProgress(p) {
+    try { fs.writeFileSync(stateFile, JSON.stringify(p)); }
+    catch (e) { console.warn('Could not save mail progress: ' + e.message); }
+  }
+
   async function poll() {
     if (busy) return;
     busy = true;
@@ -147,23 +182,38 @@ function startEmailIngest(opts, handlers) {
       await imap.connect();
       await imap.login();
       await imap.selectInbox(opts.mailbox);
-      const ids = await imap.unseenIds();
-      // Report every poll, including empty ones. Silence in a log is
-      // impossible to diagnose — "0 new messages" tells you the mailbox
-      // is being read and simply has nothing unread, which is a
-      // completely different problem from not connecting at all.
-      if (handlers.onPoll) handlers.onPoll(ids.length);
 
-      for (const id of ids.slice(0, opts.maxPerPoll || 20)) {
-        const raw = await imap.fetchRaw(id);
+      const progress = loadProgress();
+      let lastUid = Number(progress.lastUid) || 0;
+
+      // First run on an existing mailbox: start from the newest message
+      // rather than analysing months of old alarm mail at once.
+      if (!lastUid) {
+        const all = await imap.uidsAbove(0);
+        lastUid = all.length ? all[all.length - 1] - 1 : 0;
+        if (all.length > 1) {
+          console.log(`  mailbox has ${all.length} existing message(s); starting from the newest.`);
+        }
+      }
+
+      const fresh = await imap.uidsAbove(lastUid);
+      if (handlers.onPoll) handlers.onPoll(fresh.length);
+
+      for (const uid of fresh.slice(0, opts.maxPerPoll || 20)) {
+        const raw = await imap.fetchRawByUid(uid);
         const jpegs = extractJpegs(raw);
-        await imap.markSeen(id);          // mark read either way, or we loop on it forever
+        // Advance the watermark whether or not this one had a usable
+        // image, so a junk message can't wedge the queue forever.
+        lastUid = Math.max(lastUid, uid);
+        saveProgress({ lastUid, updated: new Date().toISOString() });
+        await imap.markSeenByUid(uid);
+
         if (!jpegs.length) {
-          if (handlers.onSkipped) handlers.onSkipped(id);
+          if (handlers.onSkipped) handlers.onSkipped(uid);
           continue;
         }
-        handlers.onEvent(cameraFromMessage(raw), jpegs.slice(0, 4), {
-          durationSec: null, frameCount: jpegs.length, source: 'email',
+        await handlers.onEvent(cameraFromMessage(raw), jpegs.slice(0, 4), {
+          durationSec: null, frameCount: jpegs.length, source: 'email', uid,
         });
       }
       await imap.logout();
@@ -179,75 +229,7 @@ function startEmailIngest(opts, handlers) {
   const timer = setInterval(poll, intervalMs);
   if (timer.unref) timer.unref();
   if (handlers.onReady) handlers.onReady({ transport: 'email', host: opts.host, user: opts.user, everySec: intervalMs / 1000 });
-  return { stop() { clearInterval(timer); }, pollNow: poll };
-}
-
-// Connects once and reports what's actually in the mailbox, without
-// consuming or marking anything. For working out why nothing is arriving.
-async function diagnose(opts) {
-  const out = { connected: false, loggedIn: false, mailbox: opts.mailbox || 'INBOX',
-                unread: 0, recentSubjects: [], jpegsInNewest: 0, error: null };
-  const imap = new Imap(opts);
-  try {
-    await imap.connect();      out.connected = true;
-    await imap.login();        out.loggedIn = true;
-    await imap.selectInbox(opts.mailbox);
-
-    const unseen = await imap.unseenIds();
-    out.unread = unseen.length;
-
-    // Look at the newest few messages whether read or not, so we can tell
-    // "nothing is arriving" apart from "everything has been opened".
-    const all = await imap.cmd('SEARCH ALL');
-    const allIds = ((all.match(/^\* SEARCH([^\r\n]*)/m) || [, ''])[1]).trim().split(/\s+/).filter(Boolean);
-    out.totalMessages = allIds.length;
-
-    for (const id of allIds.slice(-3).reverse()) {
-      const raw = await imap.fetchRaw(id);
-      const subj = (raw.match(/^Subject:\s*(.+)$/im) || [, '(no subject)'])[1].trim().slice(0, 70);
-      const fl = await imap.flags(id);
-      const seen = fl.some(f => /\\Seen/i.test(f));
-      const jpegs = extractJpegs(raw).length;
-      out.recentSubjects.push({ id, subject: subj, read: seen, attachments: jpegs });
-      if (!out.jpegsInNewest) out.jpegsInNewest = jpegs;
-    }
-    await imap.logout();
-  } catch (err) {
-    out.error = err.message;
-    try { imap.sock && imap.sock.destroy(); } catch (e) {}
-  }
-  return out;
-}
-
-// Reprocesses the newest messages whether or not they've been read. The
-// poller deliberately ignores read mail so it never loops on the same
-// event — but that makes it impossible to catch up after someone has
-// opened the alarm emails in Gmail. This is the manual way back.
-async function processLatest(opts, handlers, count) {
-  const imap = new Imap(opts);
-  const done = [];
-  try {
-    await imap.connect();
-    await imap.login();
-    await imap.selectInbox(opts.mailbox);
-    const all = await imap.cmd('SEARCH ALL');
-    const ids = ((all.match(/^\* SEARCH([^\r\n]*)/m) || [, ''])[1]).trim().split(/\s+/).filter(Boolean);
-    const pick = ids.slice(-(count || 1));
-    for (const id of pick) {
-      const raw = await imap.fetchRaw(id);
-      const jpegs = extractJpegs(raw);
-      if (!jpegs.length) { done.push({ id, frames: 0, skipped: 'no image' }); continue; }
-      await handlers.onEvent(cameraFromMessage(raw), jpegs.slice(0, 4), {
-        durationSec: null, frameCount: jpegs.length, source: 'email-manual',
-      });
-      done.push({ id, frames: jpegs.length });
-    }
-    await imap.logout();
-  } catch (err) {
-    try { imap.sock && imap.sock.destroy(); } catch (e) {}
-    throw err;
-  }
-  return done;
+  return { stop() { clearInterval(timer); }, pollNow: poll, progressFile: stateFile };
 }
 
 module.exports = { startEmailIngest, extractJpegs, cameraFromMessage, diagnose, processLatest, Imap };

@@ -581,7 +581,7 @@ scheduler.start();
     onReady: i => console.log(i.transport === 'email'
       ? `Ingest: watching mailbox ${i.user} every ${i.everySec}s`
       : i.transport === 'ftp' ? `Ingest: FTP on port ${i.port}` : `Ingest: watching ${i.dir}`),
-    onPoll: n => console.log(`  mailbox checked: ${n} unread message(s)`),
+    onPoll: n => { if (n) console.log(`  mailbox: ${n} new message(s) to analyse`); else if (cfg.verbose) console.log('  mailbox checked: nothing new'); },
     onSkipped: id => { if (cfg.verbose) console.log(`  message ${id}: no usable image`); },
     onError: msg => console.warn('  ingest error: ' + msg),
     onEvent: async (key, frames, meta) => {

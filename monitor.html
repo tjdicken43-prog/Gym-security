@@ -816,12 +816,12 @@ async function testMailbox(){
       return;
     }
     const rows = (r.recentSubjects || []).map(m =>
-      `<div class="log-item"><span class="t">${esc(m.subject)}</span><span class="badge ${m.attachments ? 'ok' : 'warn'}">${m.read ? 'read' : 'UNREAD'} · ${esc(m.attachments)} photo${m.attachments===1?'':'s'}</span></div>`).join('');
+      `<div class="log-item"><span class="t">${esc(m.subject)}</span><span class="badge ${m.attachments ? 'ok' : 'warn'}">${esc(m.attachments)} photo${m.attachments===1?'':'s'}</span></div>`).join('');
     let verdict = '';
-    if(!r.totalMessages) verdict = '<strong>The mailbox is empty.</strong> No alarm emails are arriving — that is the NVR side, not this server. Check Send Email is still ticked and the schedule covers now.';
-    else if(!r.unread) verdict = '<strong>Mail is arriving, but nothing is unread.</strong> Opening an alarm email in Gmail marks it read and this server skips it. Mark one unread and it will be picked up within 30 seconds.';
-    else verdict = `<strong>${r.unread} unread message(s) waiting.</strong> They should be processed within 30 seconds.`;
-    el.innerHTML = `<div class="tip">Signed in as ${esc(r.user)} — ${esc(r.totalMessages||0)} message(s), ${esc(r.unread)} unread.<br><br>${verdict}</div>${rows}`;
+    if(!r.totalMessages) verdict = '<strong>The mailbox is empty.</strong> No alarm emails are arriving, so this is the NVR side rather than the server. Check Send Email is still ticked and that the arming schedule covers right now.';
+    else if(r.awaitingAnalysis > 0) verdict = `<strong>${esc(r.awaitingAnalysis)} message(s) waiting to be analysed.</strong> They will be picked up within 30 seconds.`;
+    else verdict = '<strong>Everything received has been analysed.</strong> New alarm emails are handled automatically — nothing to press. Opening them in Gmail is fine now; it no longer affects anything.';
+    el.innerHTML = `<div class="tip">Signed in as ${esc(r.user)} — ${esc(r.totalMessages||0)} message(s) in the mailbox.<br>Analysed up to message #${esc(r.lastProcessedUid ?? 0)}.<br><br>${verdict}</div>${rows}`;
   } catch(err){
     el.innerHTML = `<div class="tip" style="border-left-color:var(--red);">Could not reach the server: ${esc(err.message)}</div>`;
   }
