@@ -232,4 +232,76 @@ function startEmailIngest(opts, handlers) {
   return { stop() { clearInterval(timer); }, pollNow: poll, progressFile: stateFile };
 }
 
+// Connects once and reports what's actually in the mailbox, without
+// consuming or marking anything. For working out why nothing is arriving.
+async function diagnose(opts) {
+  const out = { connected: false, loggedIn: false, mailbox: opts.mailbox || 'INBOX',
+                unread: 0, totalMessages: 0, recentSubjects: [], jpegsInNewest: 0, error: null };
+  const imap = new Imap(opts);
+  try {
+    await imap.connect();      out.connected = true;
+    await imap.login();        out.loggedIn = true;
+    await imap.selectInbox(opts.mailbox);
+
+    const unseen = await imap.unseenIds();
+    out.unread = unseen.length;
+
+    // What actually governs processing is the UID watermark, not the read
+    // flag — report that so the dashboard tells the truth.
+    try {
+      const fs = require('fs'), path = require('path');
+      const f = path.join(process.env.DATA_DIR || __dirname,
+        `mail-progress-${String(opts.user || 'default').replace(/[^a-z0-9]/gi, '').slice(0, 40)}.json`);
+      out.lastProcessedUid = fs.existsSync(f) ? (JSON.parse(fs.readFileSync(f, 'utf8')).lastUid || 0) : 0;
+      out.awaitingAnalysis = (await imap.uidsAbove(out.lastProcessedUid)).length;
+    } catch (e) { out.lastProcessedUid = null; }
+
+    const all = await imap.cmd('SEARCH ALL');
+    const allIds = ((all.match(/^\* SEARCH([^\r\n]*)/m) || [, ''])[1]).trim().split(/\s+/).filter(Boolean);
+    out.totalMessages = allIds.length;
+
+    for (const id of allIds.slice(-3).reverse()) {
+      const raw = await imap.fetchRaw(id);
+      const subj = (raw.match(/^Subject:\s*(.+)$/im) || [, '(no subject)'])[1].trim().slice(0, 70);
+      const jpegs = extractJpegs(raw).length;
+      out.recentSubjects.push({ id, subject: subj, attachments: jpegs });
+      if (!out.jpegsInNewest) out.jpegsInNewest = jpegs;
+    }
+    await imap.logout();
+  } catch (err) {
+    out.error = err.message;
+    try { imap.sock && imap.sock.destroy(); } catch (e) {}
+  }
+  return out;
+}
+
+// Reprocesses the newest messages regardless of the watermark. The poller
+// only ever moves forward, so this is the way to re-run something that has
+// already been handled — for testing, or to catch up after a config fix.
+async function processLatest(opts, handlers, count) {
+  const imap = new Imap(opts);
+  const done = [];
+  try {
+    await imap.connect();
+    await imap.login();
+    await imap.selectInbox(opts.mailbox);
+    const all = await imap.cmd('SEARCH ALL');
+    const ids = ((all.match(/^\* SEARCH([^\r\n]*)/m) || [, ''])[1]).trim().split(/\s+/).filter(Boolean);
+    for (const id of ids.slice(-(count || 1))) {
+      const raw = await imap.fetchRaw(id);
+      const jpegs = extractJpegs(raw);
+      if (!jpegs.length) { done.push({ id, frames: 0, skipped: 'no image' }); continue; }
+      await handlers.onEvent(cameraFromMessage(raw), jpegs.slice(0, 4), {
+        durationSec: null, frameCount: jpegs.length, source: 'email-manual',
+      });
+      done.push({ id, frames: jpegs.length });
+    }
+    await imap.logout();
+  } catch (err) {
+    try { imap.sock && imap.sock.destroy(); } catch (e) {}
+    throw err;
+  }
+  return done;
+}
+
 module.exports = { startEmailIngest, extractJpegs, cameraFromMessage, diagnose, processLatest, Imap };

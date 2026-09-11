@@ -44,4 +44,37 @@ function check(path){
   console.log(missingFns.length ? `[FAIL] onclick/onchange calls undefined function(s): ${missingFns.join(', ')}` : '[OK] All onclick/onchange handlers resolve to defined functions');
 }
 
-process.argv.slice(2).forEach(check);
+// Load-check every Node module, not just syntax-check it. `node --check`
+// only parses; it cannot see that a name in module.exports was never
+// defined. That exact gap shipped a crash-on-startup once — a file that
+// parsed perfectly and threw ReferenceError the moment it was required.
+function loadCheck(files) {
+  const Module = require('module');
+  const orig = Module._load;
+  const stubs = {
+    express: (() => { const f = () => { const app = () => {}; ['get','post','use','listen'].forEach(m => app[m] = () => ({ close(){} })); return app; };
+      f.json = () => () => {}; f.raw = () => () => {}; f.static = () => () => {}; return f; })(),
+    cors: () => () => {},
+    stripe: () => ({}),
+    dotenv: { config() {} },
+    nodemailer: { createTransport: () => ({ sendMail: async () => {} }) },
+    twilio: () => ({}),
+  };
+  Module._load = function (req, parent, isMain) {
+    if (Object.prototype.hasOwnProperty.call(stubs, req)) return stubs[req];
+    return orig.apply(this, arguments);
+  };
+  let failed = 0;
+  for (const f of files) {
+    try { delete require.cache[require.resolve(f)]; require(f); console.log(`[OK] ${f} loads`); }
+    catch (err) { failed++; console.log(`[FAIL] ${f} threw on load: ${err.message}`); }
+  }
+  Module._load = orig;
+  return failed;
+}
+
+const args = process.argv.slice(2);
+const html = args.filter(a => a.endsWith('.html'));
+const js = args.filter(a => a.endsWith('.js'));
+html.forEach(check);
+if (js.length) { console.log(''); loadCheck(js.map(f => f.startsWith('/') ? f : './' + f)); }
