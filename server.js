@@ -265,6 +265,56 @@ app.post('/monitor/process-latest', async (req, res) => {
   }
 });
 
+// One page that answers "why is the log empty" without needing to cross
+// reference the Render console. Everything that can stop an event
+// reaching the log, in one place.
+app.get('/monitor/debug', (req, res) => {
+  const fsx = require('fs'); const pathx = require('path');
+  const st = monitor.getStatus();
+  const dataDir = process.env.DATA_DIR || __dirname;
+  const cfgPath = process.env.INGEST_CONFIG || pathx.join(__dirname, 'ingest-zones.json');
+
+  let files = [];
+  try { files = fsx.readdirSync(dataDir).filter(f => /^(alert-log|summary|mail-progress|frames)/.test(f)); } catch (e) {}
+
+  const log = monitor.getLog();
+  const errs = log.filter(e => e && e.error);
+
+  res.json({
+    summary: {
+      monitoringRunning: st.running,
+      ingestRunning: !!global.__securityaiIngest,
+      entriesInLog: log.length,
+      entriesWithErrors: errs.length,
+      withinSchedule: st.withinSchedule,
+      analysedLast24h: st.burstsLast24h,
+      skippedOutsideHours: st.skippedOutOfWindow,
+      skippedOverCap: st.skippedOverCap,
+    },
+    likelyProblem: (() => {
+      if (!global.__securityaiIngest) return 'The ingest is not running — ingest-zones.json missing or unreadable.';
+      if (!st.running) return 'Monitoring is not started, so nothing can be logged.';
+      if (st.withinSchedule === false) return `Outside the monitored hours (${(st.config||{}).scheduleStart}–${(st.config||{}).scheduleEnd}), so events are deliberately discarded without spending anything.`;
+      if (st.skippedOverCap) return 'The daily analysis cap has been reached.';
+      if (errs.length && errs.length === log.length) return `Every analysis failed. First error: ${errs[0].error}`;
+      if (!log.length) return 'Nothing has reached the log yet. If the Render console shows analyses, the service has restarted since — an unmounted disk loses the log on every deploy.';
+      return 'Nothing obviously wrong — entries exist.';
+    })(),
+    apiKeySet: !!process.env.ANTHROPIC_API_KEY,
+    emailSendingConfigured: !!process.env.SMTP_HOST,
+    gymCode: st.gymCode,
+    schedule: st.config ? `${st.config.scheduleStart || 'always'}–${st.config.scheduleEnd || 'always'}` : null,
+    tzOffsetMinutes: st.config ? st.config.tzOffsetMinutes : null,
+    serverTime: new Date().toISOString(),
+    dataDir,
+    dataDirIsPersistent: !!process.env.DATA_DIR && process.env.DATA_DIR !== __dirname,
+    dataFiles: files,
+    ingestConfigFound: fsx.existsSync(cfgPath),
+    ingestDetail: global.__securityaiIngest || null,
+    lastThreeEntries: log.slice(0, 3),
+  });
+});
+
 app.get('/monitor/status', (req, res) => {
   // ingestMode tells the dashboard that the server is receiving frames on
   // its own — so it can stop asking the user to connect a camera, which
