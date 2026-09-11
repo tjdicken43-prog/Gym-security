@@ -245,6 +245,26 @@ app.get('/monitor/mailbox-test', async (req, res) => {
   }
 });
 
+// Reprocesses the newest alarm email(s) regardless of read state.
+app.post('/monitor/process-latest', async (req, res) => {
+  const fsx = require('fs'); const pathx = require('path');
+  const cfgPath = process.env.INGEST_CONFIG || pathx.join(__dirname, 'ingest-zones.json');
+  if (!fsx.existsSync(cfgPath)) return res.status(400).json({ error: 'No ingest-zones.json found.' });
+  let cfg;
+  try { cfg = JSON.parse(fsx.readFileSync(cfgPath, 'utf8')); }
+  catch (e) { return res.status(400).json({ error: 'Config is not valid JSON: ' + e.message }); }
+  if (!cfg.email || !cfg.email.host) return res.status(400).json({ error: 'No email section configured.' });
+  try {
+    const emailIngest = require('./email-ingest');
+    const handlers = global.__securityaiIngestHandlers;
+    if (!handlers) return res.status(400).json({ error: 'Ingest is not running.' });
+    const done = await emailIngest.processLatest(cfg.email, handlers, parseInt(req.query.count, 10) || 1);
+    res.json({ ok: true, processed: done });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.get('/monitor/status', (req, res) => {
   // ingestMode tells the dashboard that the server is receiving frames on
   // its own — so it can stop asking the user to connect a camera, which
@@ -590,6 +610,7 @@ scheduler.start();
     schedule: (cfg.scheduleStart && cfg.scheduleEnd) ? `${cfg.scheduleStart}–${cfg.scheduleEnd}` : 'always',
   };
 
+  global.__securityaiIngestHandlers = handlers;
   if (cfg.email && cfg.email.host) emailIngest.startEmailIngest(cfg.email, handlers);
   if (cfg.ftp === true) ingest.startFtpServer({ port: cfg.ftpPort || 2121, user: cfg.ftpUser || 'camera', pass: cfg.ftpPass || null, publicHost: cfg.publicHost }, handlers);
   if (cfg.watchFolder) ingest.startFolderWatch(cfg.watchFolder, handlers);

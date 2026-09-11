@@ -258,6 +258,7 @@
       <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px;">
         <button type="button" class="btn-ghost-sm" onclick="refreshLog()">Refresh</button>
         <button type="button" class="btn-ghost-sm" onclick="testMailbox()">Check the mailbox</button>
+        <button type="button" class="btn-ghost-sm" onclick="processLatest()">Analyse the newest email now</button>
       </div>
       <div id="mailboxResult" style="margin-top:12px;"></div>
     </div>
@@ -781,6 +782,26 @@ async function refreshStatus(){
 // Reads the configured mailbox and reports what's in it. When the
 // activity log is empty this says whether mail is arriving at all, which
 // is the difference between an NVR problem and a server problem.
+// Pulls the newest alarm email through the analysis even if it has
+// already been read. The poller skips read mail so it never loops on the
+// same event, which leaves no way to catch up after you've opened them
+// in Gmail — this is that way.
+async function processLatest(){
+  const el = document.getElementById('mailboxResult');
+  el.innerHTML = '<div class="log-empty">Analysing the newest email…</div>';
+  try{
+    const r = await (await fetch('/monitor/process-latest?count=1', { method:'POST' })).json();
+    if(r.error){ el.innerHTML = `<div class="tip" style="border-left-color:var(--red);">${esc(r.error)}</div>`; return; }
+    const p = (r.processed || [])[0];
+    el.innerHTML = p
+      ? `<div class="tip">${p.frames ? `Sent ${esc(p.frames)} frame(s) for analysis. The result appears below within a few seconds.` : `That message had no usable photo (${esc(p.skipped)}).`}</div>`
+      : '<div class="tip">No messages found in the mailbox.</div>';
+    setTimeout(refreshLog, 2500);
+  } catch(err){
+    el.innerHTML = `<div class="tip" style="border-left-color:var(--red);">${esc(err.message)}</div>`;
+  }
+}
+
 async function testMailbox(){
   const el = document.getElementById('mailboxResult');
   el.innerHTML = '<div class="log-empty">Checking…</div>';
@@ -814,8 +835,14 @@ async function refreshLog(){
     el.innerHTML = log.map(e => {
       const zone = e.zoneLabel ? `${esc(e.zoneLabel)} · ` : '';
       const gc = (window.__serverGymCode) || document.getElementById('gymCode').value.trim() || 'default';
-      const thumb = e.frame
-        ? `<a href="/monitor/frame/${encodeURIComponent(gc)}/${encodeURIComponent(e.frame)}" target="_blank" rel="noopener" title="Open full size"><img src="/monitor/frame/${encodeURIComponent(gc)}/${encodeURIComponent(e.frame)}" class="evidence" alt="Frame captured at ${fmtTime(e.timestamp)}"></a>`
+      // Show every frame that went to analysis, not just one — you should
+      // be able to see exactly what Claude was looking at when it reached
+      // its conclusion.
+      const shots = (e.frames && e.frames.length) ? e.frames : (e.frame ? [e.frame] : []);
+      const thumb = shots.length
+        ? '<span style="display:flex;gap:4px;flex-shrink:0;">' + shots.map((f,i) =>
+            `<a href="/monitor/frame/${encodeURIComponent(gc)}/${encodeURIComponent(f)}" target="_blank" rel="noopener" title="Frame ${i+1} of ${shots.length} — tap for full size"><img src="/monitor/frame/${encodeURIComponent(gc)}/${encodeURIComponent(f)}" class="evidence" alt="Frame ${i+1}"></a>`
+          ).join('') + '</span>'
         : '';
       if(e.error) return `<div class="log-item">${thumb}<span class="t">${fmtTime(e.timestamp)} — ${zone}capture failed</span><span class="badge bad">${esc(e.error)}</span></div>`;
       const kind = e.tailgate_flag ? 'bad' : (e.accessible_gate_used ? 'warn' : 'ok');
@@ -827,8 +854,13 @@ async function refreshLog(){
         if(e.alertResult.sms) parts.push('sms: ' + esc(e.alertResult.sms));
         if(parts.length) alertNote = ` · ${parts.join(', ')}`;
       }
-      const burst = e.burstFrames ? ` (${esc(e.burstFrames)}-frame burst)` : '';
-      return `<div class="log-item">${thumb}<span class="t">${fmtTime(e.timestamp)} · ${zone}${esc(e.people_count)} seen, ${esc(e.queued_count || 0)} waiting${burst} — ${esc(e.note)}${alertNote}</span><span class="badge ${kind}">${label}</span></div>`;
+      const burst = e.burstFrames ? ` · analysed ${esc(e.burstFrames)} frame${e.burstFrames==1?'':'s'}` : '';
+      return `<div class="log-item">${thumb}
+        <span style="flex:1;min-width:0;">
+          <span style="display:block;color:var(--text);font-size:13.5px;">${esc(e.note)}</span>
+          <span class="t" style="display:block;margin-top:3px;">${fmtTime(e.timestamp)} · ${zone}${esc(e.people_count)} crossed, ${esc(e.expectedCount || 1)} expected${e.queued_count ? ', ' + esc(e.queued_count) + ' waiting' : ''}${burst}${alertNote}</span>
+        </span>
+        <span class="badge ${kind}">${label}</span></div>`;
     }).join('');
   } catch(err){ /* status poller reports connectivity */ }
 }

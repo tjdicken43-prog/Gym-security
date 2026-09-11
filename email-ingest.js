@@ -78,6 +78,15 @@ class Imap {
   }
 
   async fetchRaw(id) { return this.cmd(`FETCH ${id} BODY.PEEK[]`); }
+
+  // Flags live in the FETCH response, not the message body. Asking for
+  // BODY.PEEK[] alone and then searching the text for \Seen finds
+  // nothing, which made every message look unread.
+  async flags(id) {
+    const r = await this.cmd(`FETCH ${id} (FLAGS)`);
+    const m = r.match(/FLAGS \(([^)]*)\)/i);
+    return m ? m[1].split(/\s+/).filter(Boolean) : [];
+  }
   async markSeen(id) { await this.cmd(`STORE ${id} +FLAGS (\\Seen)`); }
   async logout() { try { await this.cmd('LOGOUT'); } catch (e) {} this.sock.end(); }
 }
@@ -196,7 +205,8 @@ async function diagnose(opts) {
     for (const id of allIds.slice(-3).reverse()) {
       const raw = await imap.fetchRaw(id);
       const subj = (raw.match(/^Subject:\s*(.+)$/im) || [, '(no subject)'])[1].trim().slice(0, 70);
-      const seen = /\\Seen/.test(raw.slice(0, 400));
+      const fl = await imap.flags(id);
+      const seen = fl.some(f => /\\Seen/i.test(f));
       const jpegs = extractJpegs(raw).length;
       out.recentSubjects.push({ id, subject: subj, read: seen, attachments: jpegs });
       if (!out.jpegsInNewest) out.jpegsInNewest = jpegs;
@@ -209,4 +219,35 @@ async function diagnose(opts) {
   return out;
 }
 
-module.exports = { startEmailIngest, extractJpegs, cameraFromMessage, diagnose, Imap };
+// Reprocesses the newest messages whether or not they've been read. The
+// poller deliberately ignores read mail so it never loops on the same
+// event — but that makes it impossible to catch up after someone has
+// opened the alarm emails in Gmail. This is the manual way back.
+async function processLatest(opts, handlers, count) {
+  const imap = new Imap(opts);
+  const done = [];
+  try {
+    await imap.connect();
+    await imap.login();
+    await imap.selectInbox(opts.mailbox);
+    const all = await imap.cmd('SEARCH ALL');
+    const ids = ((all.match(/^\* SEARCH([^\r\n]*)/m) || [, ''])[1]).trim().split(/\s+/).filter(Boolean);
+    const pick = ids.slice(-(count || 1));
+    for (const id of pick) {
+      const raw = await imap.fetchRaw(id);
+      const jpegs = extractJpegs(raw);
+      if (!jpegs.length) { done.push({ id, frames: 0, skipped: 'no image' }); continue; }
+      await handlers.onEvent(cameraFromMessage(raw), jpegs.slice(0, 4), {
+        durationSec: null, frameCount: jpegs.length, source: 'email-manual',
+      });
+      done.push({ id, frames: jpegs.length });
+    }
+    await imap.logout();
+  } catch (err) {
+    try { imap.sock && imap.sock.destroy(); } catch (e) {}
+    throw err;
+  }
+  return done;
+}
+
+module.exports = { startEmailIngest, extractJpegs, cameraFromMessage, diagnose, processLatest, Imap };

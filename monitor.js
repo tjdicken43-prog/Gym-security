@@ -206,8 +206,8 @@ function saveLogToDisk() {
       // flagged summary — otherwise the monthly report's photos would be
       // deleted a day after the event.
       pruneEvidenceFrames(state.gymCode, [
-        ...state.log.map(e => e && e.frame),
-        ...loadSummary(state.gymCode).map(e => e && e.frame),
+        ...state.log.flatMap(e => [e && e.frame, ...((e && e.frames) || [])]),
+        ...loadSummary(state.gymCode).flatMap(e => [e && e.frame, ...((e && e.frames) || [])]),
       ]);
     } catch (err) {
       console.warn('Could not persist alert log:', err.message);
@@ -773,9 +773,16 @@ async function pushBurst(frames, zoneCfg, evidence) {
   // mid-doorway rather than just entering or leaving the crop.
   // Prefer the larger evidence copy the browser sent for human viewing;
   // fall back to the middle analysis frame if it wasn't provided.
+  // Save every frame that was sent for analysis, not just one. The log
+  // shows Claude's conclusion, and you should be able to see exactly the
+  // images it drew that conclusion from — one representative thumbnail
+  // isn't enough to check its work.
+  const stamp = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const allFrames = frames
+    .map((f, i) => saveEvidenceFrame(state.gymCode, f, `${stamp}-${i}`))
+    .filter(Boolean);
   const keep = evidence || frames[Math.floor(frames.length / 2)];
-  const frameId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-  const frame = saveEvidenceFrame(state.gymCode, keep, frameId);
+  const frame = saveEvidenceFrame(state.gymCode, keep, `${stamp}-main`) || allFrames[0];
 
   try {
     const result = singleFrame
@@ -783,7 +790,7 @@ async function pushBurst(frames, zoneCfg, evidence) {
       : await vision.analyzeEntryBurst(frames, cfg);
     state.captureCount += 1;
     state.lastError = null;
-    await handleEntryResult(result, cfg, { burstFrames: frames.length, zoneLabel: zoneCfg.label || null, frame });
+    await handleEntryResult(result, cfg, { burstFrames: frames.length, zoneLabel: zoneCfg.label || null, frame, frames: allFrames });
   } catch (err) {
     state.lastError = err.message;
     pushLog({
@@ -792,6 +799,7 @@ async function pushBurst(frames, zoneCfg, evidence) {
       error: err.message,
       zoneLabel: zoneCfg.label || null,
       frame,
+      frames: allFrames,
     });
   }
 }
