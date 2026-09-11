@@ -17,6 +17,6 @@
     "pollSeconds": 30
   },
   "cameras": [
-    { "match": "CAM4", "label": "Front door", "expectedCount": 1 }
+    { "match": "Channel1", "label": "Front door", "expectedCount": 1 }
   ]
 }
