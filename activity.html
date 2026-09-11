@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<link rel="icon" type="image/svg+xml" href="logo.svg">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Activity — SecurityAI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+  :root{--bg:#14171A;--panel:#1C2124;--panel-2:#22282C;--line:#31383D;
+        --text:#EDEFF1;--muted:#8B939B;--green:#3FCF8E;--red:#FF5A5A;--amber:#FFB020;}
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:'IBM Plex Sans',sans-serif;line-height:1.55;}
+  h1,h2{font-family:'Oswald',sans-serif;font-weight:600;margin:0;}
+  .mono{font-family:'IBM Plex Mono',monospace;}
+  a{color:inherit;}
+  .wrap{max-width:860px;margin:0 auto;padding:0 18px;}
+
+  nav{border-bottom:1px solid var(--line);position:sticky;top:0;background:rgba(20,23,26,.96);backdrop-filter:blur(8px);z-index:20;}
+  nav .wrap{display:flex;align-items:center;justify-content:space-between;height:56px;}
+  .brand{display:flex;align-items:center;gap:9px;font-family:'Oswald';font-size:18px;font-weight:600;text-decoration:none;color:var(--text);}
+  .navlink{color:var(--muted);font-size:13.5px;text-decoration:none;}
+  .navlink:hover{color:var(--text);}
+
+  main{padding:24px 0 80px;}
+  .bar{display:flex;align-items:center;gap:11px;background:var(--panel);border:1px solid var(--line);
+       border-radius:8px;padding:14px 16px;margin-bottom:16px;flex-wrap:wrap;}
+  .dot{width:9px;height:9px;border-radius:50%;background:var(--muted);flex-shrink:0;}
+  .dot.live{background:var(--green);animation:pulse 1.6s infinite;}
+  .dot.idle{background:var(--amber);}
+  @keyframes pulse{50%{opacity:.4;}}
+  .bar .main{font-size:14px;font-weight:500;}
+  .bar .sub{color:var(--muted);font-size:12px;margin-left:auto;text-align:right;}
+
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px;}
+  @media(max-width:640px){.stats{grid-template-columns:repeat(2,1fr);}}
+  .stat{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:13px 14px;}
+  .stat .n{font-family:'Oswald';font-size:23px;}
+  .stat .l{color:var(--muted);font-size:11.5px;letter-spacing:.3px;}
+  .stat.flag .n{color:var(--red);}
+
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:18px;margin-bottom:14px;}
+  .card h2{font-size:16px;margin-bottom:12px;}
+
+  .ev{display:flex;gap:12px;padding:14px 0;border-bottom:1px solid var(--line);}
+  .ev:last-child{border-bottom:none;}
+  .shots{display:flex;gap:4px;flex-shrink:0;flex-wrap:wrap;max-width:186px;}
+  .shots img{width:88px;height:62px;object-fit:cover;border-radius:4px;border:1px solid var(--line);background:#0F1214;display:block;}
+  .shots a:hover img{border-color:var(--green);}
+  .ev .body{flex:1;min-width:0;}
+  .ev .concl{font-size:14px;color:var(--text);}
+  .ev .meta{font-family:'IBM Plex Mono';font-size:11.5px;color:var(--muted);margin-top:4px;}
+  .badge{font-size:11px;padding:2px 9px;border-radius:20px;font-weight:600;height:fit-content;flex-shrink:0;}
+  .badge.ok{background:rgba(63,207,142,.14);color:var(--green);}
+  .badge.bad{background:rgba(255,90,90,.14);color:var(--red);}
+  .badge.warn{background:rgba(255,176,32,.14);color:var(--amber);}
+  .empty{color:var(--muted);font-size:13.5px;padding:10px 0;}
+  .btn{background:transparent;color:var(--text);font-weight:500;font-size:13px;padding:9px 14px;
+       border-radius:5px;border:1px solid var(--line);cursor:pointer;}
+  .btn:hover{border-color:#4a545b;}
+  .note{background:var(--panel-2);border-left:2px solid var(--amber);border-radius:0 5px 5px 0;
+        padding:11px 13px;font-size:12.5px;color:var(--muted);margin-top:12px;}
+  .note strong{color:var(--text);}
+</style>
+</head>
+<body>
+
+<nav><div class="wrap">
+  <a class="brand" href="securityai.html">
+    <svg width="21" height="21" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" style="flex-shrink:0;">
+      <path d="M4 18V6a2 2 0 0 1 2-2h12" stroke="currentColor" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M44 18V6a2 2 0 0 0-2-2H30" stroke="currentColor" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M4 30v12a2 2 0 0 0 2 2h12" stroke="currentColor" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M44 30v12a2 2 0 0 1-2 2H30" stroke="currentColor" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/>
+      <line x1="10" y1="24" x2="38" y2="24" stroke="#3FCF8E" stroke-width="2.4" stroke-opacity=".4" stroke-linecap="round"/>
+      <circle cx="24" cy="24" r="5.5" fill="#3FCF8E"/>
+    </svg>SecurityAI
+  </a>
+  <a class="navlink" href="monitor.html">Settings →</a>
+</div></nav>
+
+<main><div class="wrap">
+
+  <div class="bar">
+    <span class="dot" id="dot"></span>
+    <span class="main" id="statusMain">Loading…</span>
+    <span class="sub" id="statusSub"></span>
+  </div>
+
+  <div class="stats">
+    <div class="stat"><div class="n" id="sTotal">—</div><div class="l">EVENTS (24H)</div></div>
+    <div class="stat flag"><div class="n" id="sFlag">—</div><div class="l">FLAGGED</div></div>
+    <div class="stat"><div class="n" id="sPeople">—</div><div class="l">PEOPLE SEEN</div></div>
+    <div class="stat"><div class="n" id="sLast">—</div><div class="l">LAST EVENT</div></div>
+  </div>
+
+  <div class="card">
+    <h2>Last 24 hours</h2>
+    <div id="list"><div class="empty">Loading…</div></div>
+    <div style="display:flex;gap:9px;flex-wrap:wrap;margin-top:14px;">
+      <button class="btn" onclick="load()">Refresh</button>
+      <button class="btn" onclick="location.href='/monitor/debug'">Diagnostics</button>
+    </div>
+    <div class="note" id="hint" style="display:none;"></div>
+  </div>
+
+</div></main>
+
+<script>
+// This page does one job: show what happened, with the pictures the
+// conclusion was drawn from. No setup, no camera steps — those live on
+// monitor.html and don't apply when the server receives snapshots itself.
+function esc(v){
+  return String(v == null ? '' : v)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+function fmtTime(iso){
+  const d = new Date(iso);
+  return d.toLocaleString([], { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit', second:'2-digit' });
+}
+function ago(iso){
+  const s = Math.floor((Date.now() - new Date(iso)) / 1000);
+  if(s < 60) return s + 's';
+  if(s < 3600) return Math.floor(s/60) + 'm';
+  if(s < 86400) return Math.floor(s/3600) + 'h';
+  return Math.floor(s/86400) + 'd';
+}
+
+let gymCode = 'default';
+
+async function load(){
+  try{
+    const [st, log] = await Promise.all([
+      fetch('/monitor/status').then(r => r.json()).catch(() => ({})),
+      fetch('/monitor/log').then(r => r.json()).catch(() => []),
+    ]);
+    if(st.gymCode) gymCode = st.gymCode;
+    renderStatus(st);
+    renderLog(Array.isArray(log) ? log : [], st);
+  } catch(err){
+    document.getElementById('statusMain').textContent = 'Could not reach the server';
+  }
+}
+
+function renderStatus(s){
+  const dot = document.getElementById('dot');
+  const main = document.getElementById('statusMain');
+  const sub = document.getElementById('statusSub');
+  if(!s.running){
+    dot.className = 'dot'; main.textContent = 'Not running';
+    sub.textContent = ''; return;
+  }
+  const inWindow = s.withinSchedule !== false;
+  dot.className = inWindow ? 'dot live' : 'dot idle';
+  const where = s.ingestDetail && s.ingestDetail.transports
+    ? s.ingestDetail.transports.join(', ') : 'monitoring';
+  main.textContent = inWindow ? `Watching — ${where}` : 'Idle — outside monitored hours';
+  const bits = [];
+  if(s.config && s.config.scheduleStart) bits.push(`${s.config.scheduleStart}–${s.config.scheduleEnd}`);
+  if(typeof s.burstsLast24h === 'number') bits.push(`${s.burstsLast24h}/${s.dailyBurstCap} analyses used`);
+  if(s.heartbeatLost) bits.push('DISCONNECTED');
+  sub.textContent = bits.join(' · ');
+}
+
+function renderLog(log, st){
+  const el = document.getElementById('list');
+  const hint = document.getElementById('hint');
+
+  const real = log.filter(e => !e.error);
+  const flagged = real.filter(e => e.tailgate_flag);
+  const people = real.reduce((n, e) => n + (Number(e.people_count) || 0), 0);
+  document.getElementById('sTotal').textContent = real.length;
+  document.getElementById('sFlag').textContent = flagged.length;
+  document.getElementById('sPeople').textContent = people;
+  document.getElementById('sLast').textContent = log.length ? ago(log[0].timestamp) : '—';
+
+  if(!log.length){
+    el.innerHTML = '<div class="empty">Nothing in the last 24 hours.</div>';
+    hint.style.display = 'block';
+    hint.innerHTML = (st && st.withinSchedule === false)
+      ? '<strong>Currently outside monitored hours.</strong> Events during this time are deliberately discarded without being analysed, so nothing will appear until the window opens.'
+      : '<strong>No events yet.</strong> If the server console shows analyses but nothing appears here, open Diagnostics below — it reports exactly what is stopping them.';
+    return;
+  }
+  hint.style.display = 'none';
+
+  el.innerHTML = log.map(e => {
+    const shots = (e.frames && e.frames.length) ? e.frames : (e.frame ? [e.frame] : []);
+    const imgs = shots.map((f, i) =>
+      `<a href="/monitor/frame/${encodeURIComponent(gymCode)}/${encodeURIComponent(f)}" target="_blank" rel="noopener" title="Frame ${i+1} of ${shots.length}"><img src="/monitor/frame/${encodeURIComponent(gymCode)}/${encodeURIComponent(f)}" alt="Frame ${i+1}"></a>`).join('');
+    const thumbs = imgs ? `<span class="shots">${imgs}</span>` : '';
+
+    if(e.error){
+      return `<div class="ev">${thumbs}<div class="body">
+        <div class="concl">Could not analyse this event</div>
+        <div class="meta">${fmtTime(e.timestamp)}${e.zoneLabel ? ' · ' + esc(e.zoneLabel) : ''} — ${esc(e.error)}</div>
+      </div><span class="badge bad">Error</span></div>`;
+    }
+
+    const kind = e.tailgate_flag ? 'bad' : (e.accessible_gate_used ? 'warn' : 'ok');
+    const label = e.tailgate_flag ? 'Flagged' : (e.accessible_gate_used ? 'Accessible gate' : 'Matched');
+    let alertNote = '';
+    if(e.alertResult){
+      const p = [];
+      if(e.alertResult.email) p.push('email ' + esc(e.alertResult.email));
+      if(e.alertResult.sms) p.push('sms ' + esc(e.alertResult.sms));
+      if(p.length) alertNote = ' · alert ' + p.join(', ');
+    }
+    return `<div class="ev">${thumbs}<div class="body">
+      <div class="concl">${esc(e.note || 'No description returned')}</div>
+      <div class="meta">${fmtTime(e.timestamp)}${e.zoneLabel ? ' · ' + esc(e.zoneLabel) : ''} — ${esc(e.people_count)} crossed, ${esc(e.expectedCount || 1)} expected${e.queued_count ? ', ' + esc(e.queued_count) + ' waiting' : ''}${e.burstFrames ? ' · ' + esc(e.burstFrames) + ' frame' + (e.burstFrames == 1 ? '' : 's') : ''}${alertNote}</div>
+    </div><span class="badge ${kind}">${label}</span></div>`;
+  }).join('');
+}
+
+load();
+setInterval(load, 5000);
+</script>
+</body>
+</html>

@@ -617,6 +617,9 @@ async function handleEntryResult(result, cfg, extra) {
     timestamp: new Date().toISOString(),
     mode: 'entry',
     people_count: result.people_count,
+    // The log shows "N crossed, M expected" — without this it always
+    // displayed 1, regardless of what the zone was actually set to.
+    expectedCount: cfg.expectedCount,
     queued_count: result.queued_count,
     accessible_gate_used: result.accessible_gate_used,
     tailgate_flag: result.tailgate_flag,
