@@ -309,6 +309,15 @@ app.get('/monitor/debug', (req, res) => {
     dataDir,
     dataDirIsPersistent: !!process.env.DATA_DIR && process.env.DATA_DIR !== __dirname,
     dataFiles: files,
+    frameFolders: (() => {
+      try {
+        return fsx.readdirSync(dataDir).filter(f => f.startsWith('frames-')).map(f => {
+          let n = 0;
+          try { n = fsx.readdirSync(pathx.join(dataDir, f)).length; } catch (e) {}
+          return { folder: f, photos: n };
+        });
+      } catch (e) { return []; }
+    })(),
     ingestConfigFound: fsx.existsSync(cfgPath),
     ingestDetail: global.__securityaiIngest || null,
     lastThreeEntries: log.slice(0, 3),
@@ -330,12 +339,34 @@ app.get('/monitor/status', (req, res) => {
 // files off the server.
 app.get('/monitor/frame/:code/:file', (req, res) => {
   const path_ = require('path');
+  const fsx = require('fs');
   const dir = monitor.framesDirFor(req.params.code);
   const file = String(req.params.file).replace(/[^a-zA-Z0-9._-]/g, '');
-  if (!file.endsWith('.jpg')) return res.status(400).end();
+  if (!file.endsWith('.jpg')) return res.status(400).json({ error: 'Not a jpg filename.' });
   const full = path_.join(dir, file);
-  if (!full.startsWith(dir)) return res.status(400).end();
-  res.sendFile(full, err => { if (err) res.status(404).end(); });
+  if (!full.startsWith(dir)) return res.status(400).json({ error: 'Bad path.' });
+
+  if (!fsx.existsSync(full)) {
+    // A blank thumbnail with an opaque error is impossible to diagnose, so
+    // say which gym code was looked under and what is actually on disk.
+    // The usual cause is a log entry that outlived its photos — a deploy
+    // before DATA_DIR pointed at a mounted disk wipes the images but the
+    // entry can come back from the summary store.
+    let present = [];
+    try { present = fsx.existsSync(dir) ? fsx.readdirSync(dir).slice(-5) : []; } catch (e) {}
+    return res.status(404).json({
+      error: 'That frame is not on disk.',
+      lookedIn: dir,
+      gymCode: req.params.code,
+      requested: file,
+      directoryExists: fsx.existsSync(dir),
+      newestFilesHere: present,
+      hint: fsx.existsSync(dir)
+        ? 'The folder exists but not this file — the photo was probably lost in a deploy before the disk was mounted. Newer events will have theirs.'
+        : 'No folder for this gym code. The code in the page URL may not match the one the server is saving under — check /monitor/debug.',
+    });
+  }
+  res.sendFile(full);
 });
 
 // Report data as JSON — used by the dashboard's preview.

@@ -254,7 +254,7 @@
     <div class="step-head"><div class="step-num">5</div><div class="step-title">Recent activity</div></div>
     <div class="step-body">
       <div class="log-list" id="logList"><div class="log-empty">Nothing in the last 24 hours.</div></div>
-      <p class="fineprint">Last 24 hours, kept even if this page closes. Tap a thumbnail for full size.</p>
+      <p class="fineprint">Kept for the retention window set on the server (48 hours by default), and survives this page closing. Tap a thumbnail for full size.</p>
       <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px;">
         <button type="button" class="btn-ghost-sm" onclick="refreshLog()">Refresh</button>
         <button type="button" class="btn-ghost-sm" onclick="testMailbox()">Check the mailbox</button>
@@ -831,7 +831,7 @@ async function refreshLog(){
   try{
     const log = await (await fetch('/monitor/log')).json();
     const el = document.getElementById('logList');
-    if(!log.length){ el.innerHTML = '<div class="log-empty">Nothing in the last 24 hours.</div>'; return; }
+    if(!log.length){ el.innerHTML = '<div class="log-empty">Nothing in the retention window yet.</div>'; return; }
     el.innerHTML = log.map(e => {
       const zone = e.zoneLabel ? `${esc(e.zoneLabel)} · ` : '';
       const gc = (window.__serverGymCode) || document.getElementById('gymCode').value.trim() || 'default';

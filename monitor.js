@@ -43,7 +43,19 @@ const state = {
 };
 
 const MAX_LOG = 5000;              // generous — 24h of real events is far below this
-const LOG_RETENTION_MS = 24*60*60*1000;
+// How long the activity log keeps events. Set LOG_RETENTION_HOURS in the
+// environment to change it without editing code. Evidence photos are
+// pruned on the same clock, so this also governs how much disk the
+// images use.
+//
+// Note this is separate from the flagged-event summary, which is kept for
+// 35 days because the monthly report is built from it. Routine events
+// expire here; flagged ones survive long enough to be reported on.
+const LOG_RETENTION_HOURS = (() => {
+  const n = parseFloat(process.env.LOG_RETENTION_HOURS);
+  return (Number.isFinite(n) && n > 0 && n <= 24 * 30) ? n : 48;
+})();
+const LOG_RETENTION_MS = LOG_RETENTION_HOURS * 60 * 60 * 1000;
 const DATA_DIR = process.env.DATA_DIR || __dirname;
 // One log file per gym code, so two gyms sharing a server never see each
 // other's entries. Codes are slugified before touching the filesystem so
@@ -268,7 +280,10 @@ function pacingFactor(cfg) {
 }
 
 function burstsLast24h() {
-  const cutoff = Date.now() - LOG_RETENTION_MS;
+  // Deliberately a fixed 24 hours, not the log retention window. This is
+  // what the daily spending cap is measured against, so stretching the
+  // log to 48 hours must not double the budget.
+  const cutoff = Date.now() - 24 * 60 * 60 * 1000;
   return state.log.filter(e => {
     const t = Date.parse(e && e.timestamp);
     return !isNaN(t) && t >= cutoff;
@@ -339,6 +354,7 @@ function getStatus() {
     skippedOutOfWindow: state.skippedOutOfWindow || 0,
     skippedOverCap: state.skippedOverCap || 0,
     burstsLast24h: burstsLast24h(),
+    logRetentionHours: LOG_RETENTION_HOURS,
     lastHeartbeat: state.lastHeartbeat || null,
     heartbeatLost: !!state.heartbeatLost,
     pacingFactor: state.running ? Number(pacingFactor(state.config).toFixed(2)) : 1,

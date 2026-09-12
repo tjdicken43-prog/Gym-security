@@ -90,14 +90,14 @@
   </div>
 
   <div class="stats">
-    <div class="stat"><div class="n" id="sTotal">—</div><div class="l">EVENTS (24H)</div></div>
+    <div class="stat"><div class="n" id="sTotal">—</div><div class="l" id="lblTotal">EVENTS</div></div>
     <div class="stat flag"><div class="n" id="sFlag">—</div><div class="l">FLAGGED</div></div>
     <div class="stat"><div class="n" id="sPeople">—</div><div class="l">PEOPLE SEEN</div></div>
     <div class="stat"><div class="n" id="sLast">—</div><div class="l">LAST EVENT</div></div>
   </div>
 
   <div class="card">
-    <h2>Last 24 hours</h2>
+    <h2 id="listTitle">Recent activity</h2>
     <div id="list"><div class="empty">Loading…</div></div>
     <div style="display:flex;gap:9px;flex-wrap:wrap;margin-top:14px;">
       <button class="btn" onclick="load()">Refresh</button>
@@ -138,7 +138,12 @@ async function load(){
       fetch('/monitor/status').then(r => r.json()).catch(() => ({})),
       fetch('/monitor/log').then(r => r.json()).catch(() => []),
     ]);
-    if(st.gymCode) gymCode = st.gymCode;
+        if(st.gymCode) gymCode = st.gymCode;
+      const hrs = st.logRetentionHours;
+      if(hrs){
+        document.getElementById('listTitle').textContent = `Last ${hrs} hours`;
+        document.getElementById('lblTotal').textContent = `EVENTS (${hrs}H)`;
+      }
     renderStatus(st);
     renderLog(Array.isArray(log) ? log : [], st);
   } catch(err){
@@ -179,7 +184,7 @@ function renderLog(log, st){
   document.getElementById('sLast').textContent = log.length ? ago(log[0].timestamp) : '—';
 
   if(!log.length){
-    el.innerHTML = '<div class="empty">Nothing in the last 24 hours.</div>';
+    el.innerHTML = '<div class="empty">Nothing in the retention window yet.</div>';
     hint.style.display = 'block';
     hint.innerHTML = (st && st.withinSchedule === false)
       ? '<strong>Currently outside monitored hours.</strong> Events during this time are deliberately discarded without being analysed, so nothing will appear until the window opens.'
