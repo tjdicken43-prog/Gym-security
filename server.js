@@ -643,10 +643,14 @@ scheduler.start();
           expectedCount: z.expectedCount || 1,
           accessibleGate: !!z.accessibleGate,
           durationSec: meta.durationSec,
-        }, b64[b64.length - 1]);
-        console.log(`[${new Date().toLocaleTimeString()}] ${z.label}: ` +
-          (r && r.skipped ? `skipped (${r.skipped})` : `${meta.frameCount} frame(s) analyzed`));
-      } catch (err) { console.warn(`${z.label}: ${err.message}`); }
+        }, b64[b64.length - 1], meta.manual === true);
+        const outcome = (r && r.skipped) ? `skipped (${r.skipped})` : `${meta.frameCount} frame(s) analyzed`;
+        console.log(`[${new Date().toLocaleTimeString()}] ${z.label}: ${outcome}`);
+        return outcome;
+      } catch (err) {
+        console.warn(`${z.label}: ${err.message}`);
+        return 'failed: ' + err.message;
+      }
     },
   };
 

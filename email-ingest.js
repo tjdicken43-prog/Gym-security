@@ -291,10 +291,12 @@ async function processLatest(opts, handlers, count) {
       const raw = await imap.fetchRaw(id);
       const jpegs = extractJpegs(raw);
       if (!jpegs.length) { done.push({ id, frames: 0, skipped: 'no image' }); continue; }
-      await handlers.onEvent(cameraFromMessage(raw), jpegs.slice(0, 4), {
-        durationSec: null, frameCount: jpegs.length, source: 'email-manual',
+      // manual: true tells the handler to bypass the schedule and cap,
+      // and to report back whether the event actually landed.
+      const outcome = await handlers.onEvent(cameraFromMessage(raw), jpegs.slice(0, 4), {
+        durationSec: null, frameCount: jpegs.length, source: 'email-manual', manual: true,
       });
-      done.push({ id, frames: jpegs.length });
+      done.push({ id, frames: jpegs.length, result: outcome || 'analysed' });
     }
     await imap.logout();
   } catch (err) {

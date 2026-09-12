@@ -717,7 +717,12 @@ async function pushFrame(base64) {
 // accessibleGate/label, independent of whatever the top-level monitoring
 // config says, since one screen can have several different entrances
 // each with their own rules.
-async function pushBurst(frames, zoneCfg, evidence) {
+// force: a manual, explicitly-requested reprocess. The schedule and the
+// daily cap exist to stop AUTOMATIC events spending money outside the
+// hours you chose — they shouldn't silently discard something you pressed
+// a button to ask for. Pressing "re-analyse" during the day used to do
+// nothing at all, with no explanation.
+async function pushBurst(frames, zoneCfg, evidence, force) {
   if (!state.running || state.config.sourceType !== 'browser-push') {
     throw new Error('Monitoring is not running with a browser-push source.');
   }
@@ -732,7 +737,7 @@ async function pushBurst(frames, zoneCfg, evidence) {
   // otherwise tell Claude to reason about movement it cannot see.
   const singleFrame = frames.length === 1;
   recordHeartbeat();
-  if (!isWithinSchedule(state.config)) {
+  if (!force && !isWithinSchedule(state.config)) {
     // Outside the configured window: drop it silently rather than paying
     // for an analysis nobody asked for. Not an error — this is the
     // schedule working as intended.
@@ -746,7 +751,7 @@ async function pushBurst(frames, zoneCfg, evidence) {
   // every 5 seconds all night and run up a bill far beyond what the
   // subscription covers. Measured over a rolling 24h, not a calendar day.
   const cap = state.config.dailyBurstCap || DEFAULT_DAILY_BURST_CAP;
-  if (burstsLast24h() >= cap) {
+  if (!force && burstsLast24h() >= cap) {
     if (!state.capNotified) {
       state.capNotified = true;
       pushLog({
