@@ -837,6 +837,15 @@ function start(cfg) {
   if (code !== state.gymCode) {
     state.gymCode = code;
     state.log = loadLogFromDisk();
+    // Say out loud what was restored. "The log wiped on redeploy" is
+    // impossible to distinguish from "the log was already empty" without
+    // this line, and the answer changes what you'd go and fix.
+    const file = logFileFor(code);
+    const persistent = !!process.env.DATA_DIR && process.env.DATA_DIR !== __dirname;
+    console.log(
+      `Log restored: ${state.log.length} event(s) for "${code || 'default'}" from ${file}` +
+      (persistent ? '' : '  [WARNING: DATA_DIR is not set to a mounted disk — this will be wiped on the next deploy]')
+    );
   }
 
   const validTypes = ['url', 'webcam', 'browser-push'];
