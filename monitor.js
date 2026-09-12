@@ -279,6 +279,27 @@ function pacingFactor(cfg) {
   return Math.min(8, used / expected);                       // over budget -> stretch cooldown, capped at 8x
 }
 
+// Rough running cost, so spend is visible without logging into the
+// Anthropic console. Based on a 384px crop and the burst sizes actually
+// sent — an estimate, not a bill, but close enough to spot a problem the
+// same night rather than at the end of the month.
+const PRICE_PER_MTOK = {
+  'claude-sonnet-4-6': { in: 3, out: 15 },
+  'claude-haiku-4-5-20251001': { in: 1, out: 5 },
+};
+
+function estimateCost(entries, model) {
+  const p = PRICE_PER_MTOK[model] || PRICE_PER_MTOK['claude-sonnet-4-6'];
+  let cost = 0;
+  for (const e of entries) {
+    if (!e || e.error) continue;                 // failed calls aren't billed for output
+    const frames = e.burstFrames || 1;
+    const inTok = (384 * 288 / 750) * frames + 320;
+    cost += (inTok / 1e6) * p.in + (100 / 1e6) * p.out;
+  }
+  return cost;
+}
+
 function burstsLast24h() {
   // Deliberately a fixed 24 hours, not the log retention window. This is
   // what the daily spending cap is measured against, so stretching the
@@ -355,6 +376,20 @@ function getStatus() {
     skippedOverCap: state.skippedOverCap || 0,
     burstsLast24h: burstsLast24h(),
     logRetentionHours: LOG_RETENTION_HOURS,
+    costEstimate: (() => {
+      const model = (state.config && state.config.model) || DEFAULT_MODEL;
+      const day = Date.now() - 24 * 60 * 60 * 1000;
+      const recent = state.log.filter(e => Date.parse(e && e.timestamp) >= day);
+      const perDay = estimateCost(recent, model);
+      return {
+        model,
+        last24h: Number(perDay.toFixed(3)),
+        projectedMonthly: Number((perDay * 30).toFixed(2)),
+        capMonthlyWorstCase: Number((estimateCost(
+          Array.from({ length: (state.config && state.config.dailyBurstCap) || DEFAULT_DAILY_BURST_CAP },
+            () => ({ burstFrames: 3 })), model) * 30).toFixed(2)),
+      };
+    })(),
     lastHeartbeat: state.lastHeartbeat || null,
     heartbeatLost: !!state.heartbeatLost,
     pacingFactor: state.running ? Number(pacingFactor(state.config).toFixed(2)) : 1,

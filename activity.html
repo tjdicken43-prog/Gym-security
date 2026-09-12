@@ -34,7 +34,7 @@
   .bar .main{font-size:14px;font-weight:500;}
   .bar .sub{color:var(--muted);font-size:12px;margin-left:auto;text-align:right;}
 
-  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px;}
+  .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px;}
   @media(max-width:640px){.stats{grid-template-columns:repeat(2,1fr);}}
   .stat{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:13px 14px;}
   .stat .n{font-family:'Oswald';font-size:23px;}
@@ -94,6 +94,8 @@
     <div class="stat flag"><div class="n" id="sFlag">—</div><div class="l">FLAGGED</div></div>
     <div class="stat"><div class="n" id="sPeople">—</div><div class="l">PEOPLE SEEN</div></div>
     <div class="stat"><div class="n" id="sLast">—</div><div class="l">LAST EVENT</div></div>
+    <div class="stat"><div class="n" id="sCost">—</div><div class="l">EST. COST (24H)</div></div>
+    <div class="stat"><div class="n" id="sMonth">—</div><div class="l">AT THIS RATE / MONTH</div></div>
   </div>
 
   <div class="card">
@@ -169,6 +171,10 @@ function renderStatus(s){
   if(typeof s.burstsLast24h === 'number') bits.push(`${s.burstsLast24h}/${s.dailyBurstCap} analyses used`);
   if(s.heartbeatLost) bits.push('DISCONNECTED');
   sub.textContent = bits.join(' · ');
+  if(s.costEstimate){
+    document.getElementById('sCost').textContent = '$' + s.costEstimate.last24h.toFixed(2);
+    document.getElementById('sMonth').textContent = '$' + s.costEstimate.projectedMonthly.toFixed(0);
+  }
 }
 
 function renderLog(log, st){
