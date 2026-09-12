@@ -102,6 +102,7 @@
     <div style="display:flex;gap:9px;flex-wrap:wrap;margin-top:14px;">
       <button class="btn" onclick="load()">Refresh</button>
       <button class="btn" onclick="location.href='/monitor/debug'">Diagnostics</button>
+      <button class="btn" onclick="backfill()">Re-analyse recent emails</button>
     </div>
     <div class="note" id="hint" style="display:none;"></div>
   </div>
@@ -214,6 +215,28 @@ function renderLog(log, st){
       <div class="meta">${fmtTime(e.timestamp)}${e.zoneLabel ? ' · ' + esc(e.zoneLabel) : ''} — ${esc(e.people_count)} crossed, ${esc(e.expectedCount || 1)} expected${e.queued_count ? ', ' + esc(e.queued_count) + ' waiting' : ''}${e.burstFrames ? ' · ' + esc(e.burstFrames) + ' frame' + (e.burstFrames == 1 ? '' : 's') : ''}${alertNote}</div>
     </div><span class="badge ${kind}">${label}</span></div>`;
   }).join('');
+}
+
+// The alarm emails stay in Gmail even if the log is lost — a redeploy on
+// an unmounted disk wipes it. This pulls them back through so a night's
+// events can be recovered rather than gone for good.
+async function backfill(){
+  const n = window.prompt('How many of the most recent alarm emails should be re-analysed?\n\nEach one costs an analysis, so keep it to what you need.', '20');
+  if(n === null) return;
+  const count = Math.max(1, Math.min(100, parseInt(n, 10) || 20));
+  const hint = document.getElementById('hint');
+  hint.style.display = 'block';
+  hint.innerHTML = `<strong>Re-analysing the newest ${count} email(s)…</strong> This takes a few seconds each. The list updates as they finish.`;
+  try{
+    const r = await (await fetch('/monitor/process-latest?count=' + count, { method:'POST' })).json();
+    if(r.error){ hint.innerHTML = '<strong>Could not re-analyse.</strong> ' + esc(r.error); return; }
+    const done = (r.processed || []);
+    const withImages = done.filter(x => x.frames).length;
+    hint.innerHTML = `<strong>Done.</strong> ${done.length} message(s) read, ${withImages} had photos and were analysed. Anything without a photo was skipped.`;
+    load();
+  } catch(err){
+    hint.innerHTML = '<strong>Could not re-analyse.</strong> ' + esc(err.message);
+  }
 }
 
 load();
