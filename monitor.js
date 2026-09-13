@@ -836,9 +836,20 @@ async function pushBurst(frames, zoneCfg, evidence, force) {
   // shows Claude's conclusion, and you should be able to see exactly the
   // images it drew that conclusion from — one representative thumbnail
   // isn't enough to check its work.
-  const stamp = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  // Readable filenames. "front-door-2026-09-11-0214-07-1.jpg" tells you
+  // which door and when at a glance; "1789093162140-21ez3o-0.jpg" tells
+  // you nothing, and these get downloaded and emailed to people.
+  // An unparseable capture time used to produce filenames full of NaN.
+  // Fall back to now rather than writing "front-door-NaN-NaN-NaN.jpg".
+  const parsed = zoneCfg.capturedAt ? new Date(zoneCfg.capturedAt) : null;
+  const when = (parsed && !isNaN(parsed)) ? parsed : new Date();
+  const pad = n => String(n).padStart(2, '0');
+  const slug = String(zoneCfg.label || 'camera').toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 24) || 'camera';
+  const stamp = `${slug}-${when.getFullYear()}-${pad(when.getMonth() + 1)}-${pad(when.getDate())}`
+    + `-${pad(when.getHours())}${pad(when.getMinutes())}-${pad(when.getSeconds())}`;
   const allFrames = frames
-    .map((f, i) => saveEvidenceFrame(state.gymCode, f, `${stamp}-${i}`))
+    .map((f, i) => saveEvidenceFrame(state.gymCode, f, `${stamp}-${i + 1}`))
     .filter(Boolean);
   const keep = evidence || frames[Math.floor(frames.length / 2)];
   const frame = saveEvidenceFrame(state.gymCode, keep, `${stamp}-main`) || allFrames[0];
@@ -849,7 +860,14 @@ async function pushBurst(frames, zoneCfg, evidence, force) {
       : await vision.analyzeEntryBurst(frames, cfg);
     state.captureCount += 1;
     state.lastError = null;
-    await handleEntryResult(result, cfg, { burstFrames: frames.length, zoneLabel: zoneCfg.label || null, frame, frames: allFrames });
+    await handleEntryResult(result, cfg, {
+      burstFrames: frames.length, zoneLabel: zoneCfg.label || null,
+      frame, frames: allFrames,
+      // When the camera saw it. The log's own timestamp is when we
+      // analysed it, which is up to a minute later.
+      capturedAt: (parsed && !isNaN(parsed)) ? parsed.toISOString() : null,
+      clockSkewMinutes: zoneCfg.clockSkewMinutes || null,
+    });
   } catch (err) {
     state.lastError = err.message;
     pushLog({
@@ -859,6 +877,8 @@ async function pushBurst(frames, zoneCfg, evidence, force) {
       zoneLabel: zoneCfg.label || null,
       frame,
       frames: allFrames,
+      capturedAt: (parsed && !isNaN(parsed)) ? parsed.toISOString() : null,
+      clockSkewMinutes: zoneCfg.clockSkewMinutes || null,
     });
   }
 }

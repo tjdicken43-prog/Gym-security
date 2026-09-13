@@ -9,3 +9,5 @@ Disallow: /create-checkout-session
 Disallow: /webhook
 
 Sitemap: https://your-domain-goes-here.com/sitemap.xml
+Disallow: /admin.html
+Disallow: /activity.html

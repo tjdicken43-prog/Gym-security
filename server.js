@@ -229,6 +229,7 @@ app.post('/monitor/test-alert', async (req, res) => {
 // and the newest few subjects — so a silent ingest can be diagnosed from
 // the dashboard instead of guessing.
 app.get('/monitor/mailbox-test', async (req, res) => {
+  if (!requireOperator(req, res)) return;
   const fsx = require('fs'); const pathx = require('path');
   const cfgPath = process.env.INGEST_CONFIG || pathx.join(__dirname, 'ingest-zones.json');
   if (!fsx.existsSync(cfgPath)) return res.json({ configured: false, reason: 'No ingest-zones.json found.' });
@@ -247,6 +248,7 @@ app.get('/monitor/mailbox-test', async (req, res) => {
 
 // Reprocesses the newest alarm email(s) regardless of read state.
 app.post('/monitor/process-latest', async (req, res) => {
+  if (!requireOperator(req, res)) return;
   const fsx = require('fs'); const pathx = require('path');
   const cfgPath = process.env.INGEST_CONFIG || pathx.join(__dirname, 'ingest-zones.json');
   if (!fsx.existsSync(cfgPath)) return res.status(400).json({ error: 'No ingest-zones.json found.' });
@@ -268,7 +270,20 @@ app.post('/monitor/process-latest', async (req, res) => {
 // One page that answers "why is the log empty" without needing to cross
 // reference the Render console. Everything that can stop an event
 // reaching the log, in one place.
+// Operator-only. These expose the mailbox address, config paths and cost
+// figures, none of which belong on a page a customer can open. When
+// ADMIN_TOKEN is unset they stay open so nothing breaks mid-setup — but
+// the response says so, and the ops page shows the warning.
+function requireOperator(req, res) {
+  const token = process.env.ADMIN_TOKEN;
+  if (!token) return true;                       // not configured yet
+  if (req.get('X-Admin-Token') === token) return true;
+  res.status(403).json({ error: 'Not authorized.' });
+  return false;
+}
+
 app.get('/monitor/debug', (req, res) => {
+  if (!requireOperator(req, res)) return;
   const fsx = require('fs'); const pathx = require('path');
   const st = monitor.getStatus();
   const dataDir = process.env.DATA_DIR || __dirname;
@@ -300,6 +315,7 @@ app.get('/monitor/debug', (req, res) => {
       if (!log.length) return 'Nothing has reached the log yet. If the Render console shows analyses, the service has restarted since — an unmounted disk loses the log on every deploy.';
       return 'Nothing obviously wrong — entries exist.';
     })(),
+    adminTokenSet: !!process.env.ADMIN_TOKEN,
     apiKeySet: !!process.env.ANTHROPIC_API_KEY,
     emailSendingConfigured: !!process.env.SMTP_HOST,
     gymCode: st.gymCode,
@@ -324,14 +340,38 @@ app.get('/monitor/debug', (req, res) => {
   });
 });
 
+// Status is read by the customer-facing activity page, so the default
+// response is redacted. The full object contains the operator's own alert
+// email and phone number, the running cost, the model and the whole
+// config — none of which a customer should be able to read out of the
+// network tab. Operators get everything by sending the admin token.
+function redactStatus(full) {
+  const cfg = full.config || {};
+  const detail = global.__securityaiIngest || null;
+  return {
+    running: full.running,
+    withinSchedule: full.withinSchedule,
+    gymCode: full.gymCode,
+    logRetentionHours: full.logRetentionHours,
+    heartbeatLost: full.heartbeatLost,
+    ingestMode: !!detail,
+    // How frames arrive, without naming the mailbox they arrive in.
+    ingestDetail: detail ? { transports: (detail.transports || []).map(t => String(t).replace(/\s*\([^)]*\)/, '')) } : null,
+    config: { scheduleStart: cfg.scheduleStart || null, scheduleEnd: cfg.scheduleEnd || null },
+    // A share of capacity, not a spend figure or a raw cap.
+    capacityUsedPct: (full.dailyBurstCap && typeof full.burstsLast24h === 'number')
+      ? Math.round((full.burstsLast24h / full.dailyBurstCap) * 100) : null,
+  };
+}
+
 app.get('/monitor/status', (req, res) => {
-  // ingestMode tells the dashboard that the server is receiving frames on
-  // its own — so it can stop asking the user to connect a camera, which
-  // is only relevant to the browser-capture routes.
-  res.json(Object.assign({}, monitor.getStatus(), {
+  const full = Object.assign({}, monitor.getStatus(), {
     ingestMode: !!global.__securityaiIngest,
     ingestDetail: global.__securityaiIngest || null,
-  }));
+  });
+  const token = process.env.ADMIN_TOKEN;
+  const isOperator = !token || req.get('X-Admin-Token') === token;
+  res.json(isOperator ? full : redactStatus(full));
 });
 
 // Serves an evidence frame for one logged event. Scoped to the gym code
@@ -674,6 +714,8 @@ scheduler.start();
           expectedCount: z.expectedCount || 1,
           accessibleGate: !!z.accessibleGate,
           durationSec: meta.durationSec,
+          capturedAt: meta.capturedAt || null,
+          clockSkewMinutes: meta.clockSkewMinutes || null,
         }, b64[b64.length - 1], meta.manual === true);
         const outcome = (r && r.skipped) ? `skipped (${r.skipped})` : `${meta.frameCount} frame(s) analyzed`;
         console.log(`[${new Date().toLocaleTimeString()}] ${z.label}: ${outcome}`);

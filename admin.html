@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<link rel="icon" type="image/svg+xml" href="logo.svg">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>Operations — SecurityAI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+  :root{--bg:#14171A;--panel:#1C2124;--panel-2:#22282C;--line:#31383D;
+        --text:#EDEFF1;--muted:#8B939B;--green:#3FCF8E;--red:#FF5A5A;--amber:#FFB020;}
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:'IBM Plex Sans',sans-serif;line-height:1.55;}
+  h1,h2{font-family:'Oswald',sans-serif;font-weight:600;margin:0;}
+  .mono{font-family:'IBM Plex Mono',monospace;}
+  a{color:inherit;}
+  .wrap{max-width:860px;margin:0 auto;padding:0 18px;}
+
+  nav{border-bottom:1px solid var(--line);}
+  nav .wrap{display:flex;align-items:center;justify-content:space-between;height:56px;}
+  .brand{display:flex;align-items:center;gap:9px;font-family:'Oswald';font-size:18px;font-weight:600;text-decoration:none;color:var(--text);}
+  .brand .tag{font-family:'IBM Plex Mono';font-size:10px;color:var(--amber);border:1px solid rgba(255,176,32,.4);
+              border-radius:100px;padding:1px 8px;letter-spacing:.6px;}
+  .navlink{color:var(--muted);font-size:13.5px;text-decoration:none;}
+  .navlink:hover{color:var(--text);}
+
+  main{padding:24px 0 80px;}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:18px;margin-bottom:14px;}
+  .card h2{font-size:16px;margin-bottom:4px;}
+  .card .sub{color:var(--muted);font-size:12.5px;margin-bottom:14px;}
+
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px;}
+  @media(max-width:700px){.stats{grid-template-columns:repeat(2,1fr);}}
+  .stat{background:var(--panel-2);border:1px solid var(--line);border-radius:7px;padding:12px 13px;}
+  .stat .n{font-family:'Oswald';font-size:22px;}
+  .stat .l{color:var(--muted);font-size:11px;letter-spacing:.3px;}
+  .stat.warn .n{color:var(--amber);}
+  .stat.good .n{color:var(--green);}
+
+  .row{display:flex;justify-content:space-between;gap:12px;padding:9px 0;border-bottom:1px solid var(--line);font-size:13.5px;}
+  .row:last-child{border-bottom:none;}
+  .row .k{color:var(--muted);}
+  .row .v{font-family:'IBM Plex Mono';font-size:12.5px;text-align:right;word-break:break-all;}
+  .v.ok{color:var(--green);} .v.bad{color:var(--red);} .v.warn{color:var(--amber);}
+
+  .btn{background:transparent;color:var(--text);font-weight:500;font-size:13px;padding:9px 14px;
+       border-radius:5px;border:1px solid var(--line);cursor:pointer;}
+  .btn:hover{border-color:#4a545b;}
+  .btn.primary{background:var(--green);color:#0C1512;border-color:var(--green);font-weight:600;}
+  input[type=password],input[type=text]{width:100%;background:#0F1214;border:1px solid var(--line);
+    border-radius:5px;color:var(--text);font-size:15px;padding:11px 12px;margin-bottom:10px;}
+  input:focus{outline:none;border-color:var(--green);}
+  .note{background:var(--panel-2);border-left:2px solid var(--amber);border-radius:0 5px 5px 0;
+        padding:11px 13px;font-size:12.5px;color:var(--muted);margin-top:12px;}
+  .note strong{color:var(--text);}
+  .empty{color:var(--muted);font-size:13.5px;padding:8px 0;}
+  #gate{max-width:420px;margin:60px auto;}
+</style>
+</head>
+<body>
+
+<nav><div class="wrap">
+  <a class="brand" href="activity.html">
+    <svg width="21" height="21" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" style="flex-shrink:0;">
+      <path d="M4 18V6a2 2 0 0 1 2-2h12" stroke="currentColor" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M44 18V6a2 2 0 0 0-2-2H30" stroke="currentColor" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M4 30v12a2 2 0 0 0 2 2h12" stroke="currentColor" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M44 30v12a2 2 0 0 1-2 2H30" stroke="currentColor" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/>
+      <line x1="10" y1="24" x2="38" y2="24" stroke="#3FCF8E" stroke-width="2.4" stroke-opacity=".4" stroke-linecap="round"/>
+      <circle cx="24" cy="24" r="5.5" fill="#3FCF8E"/>
+    </svg>SecurityAI <span class="tag">OPS</span>
+  </a>
+  <a class="navlink" href="activity.html">Customer view →</a>
+</div></nav>
+
+<main><div class="wrap">
+
+  <!-- Token gate. Not real authentication — see the note. -->
+  <div id="gate" class="card">
+    <h2>Operations</h2>
+    <div class="sub">Costs, diagnostics and tools. Not for customers.</div>
+    <input type="password" id="tok" placeholder="Admin token" autocomplete="off">
+    <button class="btn primary" style="width:100%;" onclick="unlock()">Open</button>
+    <p class="empty" id="gateMsg"></p>
+    <div class="note"><strong>This is the value of ADMIN_TOKEN</strong> from your hosting environment. If you haven't set one, leave this blank and press Open — but do set one before anyone else has your URL.</div>
+  </div>
+
+  <div id="panel" style="display:none;">
+
+    <div class="card">
+      <h2>Running cost</h2>
+      <div class="sub">Estimated from the analyses actually performed. Close enough to spot a problem tonight rather than at the end of the month — check the Anthropic console for the real figure.</div>
+      <div class="stats">
+        <div class="stat"><div class="n" id="cDay">—</div><div class="l">LAST 24 HOURS</div></div>
+        <div class="stat"><div class="n" id="cMonth">—</div><div class="l">AT THIS RATE / MONTH</div></div>
+        <div class="stat warn"><div class="n" id="cWorst">—</div><div class="l">WORST CASE / MONTH</div></div>
+        <div class="stat"><div class="n" id="cModel">—</div><div class="l">MODEL</div></div>
+      </div>
+      <div class="row"><span class="k">Analyses used today</span><span class="v" id="cUsed">—</span></div>
+      <div class="row"><span class="k">Margin at $199/month</span><span class="v" id="cMargin">—</span></div>
+      <div class="note" id="cNote" style="display:none;"></div>
+    </div>
+
+    <div class="card">
+      <h2>Health</h2>
+      <div class="sub">Everything that can stop an event reaching the log.</div>
+      <div id="health"><div class="empty">Loading…</div></div>
+      <div style="display:flex;gap:9px;flex-wrap:wrap;margin-top:12px;">
+        <button class="btn" onclick="refresh()">Refresh</button>
+        <button class="btn" onclick="checkMailbox()">Check the mailbox</button>
+      </div>
+      <div id="mailbox" style="margin-top:12px;"></div>
+    </div>
+
+    <div class="card">
+      <h2>Tools</h2>
+      <div class="sub">Re-analysing costs money — one analysis per email.</div>
+      <div style="display:flex;gap:9px;flex-wrap:wrap;">
+        <button class="btn" onclick="backfill(1)">Analyse newest email</button>
+        <button class="btn" onclick="backfill(null)">Re-analyse a number of emails…</button>
+      </div>
+      <div id="toolMsg" style="margin-top:12px;"></div>
+    </div>
+
+  </div>
+
+</div></main>
+
+<script>
+// The admin token is held in sessionStorage for this tab only and sent as
+// a header. Worth being straight about what this is: a shared secret that
+// keeps costs and mailbox details off the page customers see. It is not
+// user authentication, and it should not be the only thing standing
+// between anyone and something that actually matters.
+let token = '';
+
+function esc(v){
+  return String(v == null ? '' : v)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+function money(n){ return '$' + (Number(n) || 0).toFixed(2); }
+
+async function api(path, opts){
+  const o = Object.assign({ headers: {} }, opts || {});
+  if(token) o.headers['X-Admin-Token'] = token;
+  const r = await fetch(path, o);
+  if(r.status === 403) throw new Error('Token rejected.');
+  return r.json();
+}
+
+async function unlock(){
+  token = document.getElementById('tok').value.trim();
+  const msg = document.getElementById('gateMsg');
+  msg.textContent = 'Checking…';
+  try{
+    await api('/monitor/debug');
+    try{ sessionStorage.setItem('securityai:admin', token); }catch(e){}
+    document.getElementById('gate').style.display = 'none';
+    document.getElementById('panel').style.display = 'block';
+    refresh();
+    setInterval(refresh, 15000);
+  } catch(err){
+    msg.textContent = err.message;
+  }
+}
+
+async function refresh(){
+  try{
+    const [st, dbg] = await Promise.all([api('/monitor/status'), api('/monitor/debug')]);
+    renderCost(st);
+    renderHealth(st, dbg);
+  } catch(err){
+    document.getElementById('health').innerHTML = `<div class="empty">${esc(err.message)}</div>`;
+  }
+}
+
+function renderCost(s){
+  const c = s.costEstimate;
+  if(!c){
+    // Without the token the server redacts costs out of the response, so
+    // say that plainly rather than showing empty boxes.
+    document.getElementById('cNote').style.display = 'block';
+    document.getElementById('cNote').innerHTML = '<strong>Costs are hidden.</strong> The admin token was not accepted, so the server returned the customer-facing view. Check ADMIN_TOKEN.';
+    return;
+  }
+  document.getElementById('cDay').textContent = money(c.last24h);
+  document.getElementById('cMonth').textContent = money(c.projectedMonthly);
+  document.getElementById('cWorst').textContent = money(c.capMonthlyWorstCase);
+  document.getElementById('cModel').textContent = String(c.model || '').includes('haiku') ? 'Haiku' : 'Sonnet';
+  document.getElementById('cUsed').textContent = `${s.burstsLast24h ?? 0} of ${s.dailyBurstCap ?? '—'}`;
+  const margin = 199 - (c.projectedMonthly || 0);
+  const el = document.getElementById('cMargin');
+  el.textContent = money(margin) + ' (' + Math.round((margin / 199) * 100) + '%)';
+  el.className = 'v ' + (margin > 150 ? 'ok' : margin > 80 ? 'warn' : 'bad');
+
+  const note = document.getElementById('cNote');
+  if(c.projectedMonthly > 40){
+    note.style.display = 'block';
+    note.innerHTML = '<strong>Running higher than expected.</strong> Usually the detection region is picking up something that moves on its own, or the schedule is wider than intended. Switching the model to Haiku cuts this to roughly a third.';
+  } else { note.style.display = 'none'; }
+}
+
+function renderHealth(s, d){
+  const sum = d.summary || {};
+  const rows = [
+    ['Monitoring running', sum.monitoringRunning, sum.monitoringRunning ? 'yes' : 'NO'],
+    ['Ingest running', sum.ingestRunning, sum.ingestRunning ? 'yes' : 'NO'],
+    ['Within monitored hours', sum.withinSchedule !== false, sum.withinSchedule === false ? 'no — idle' : 'yes'],
+    ['Storage survives deploys', d.dataDirIsPersistent, d.dataDirIsPersistent ? 'yes' : 'NO — logs will be lost'],
+    ['Anthropic key set', d.apiKeySet, d.apiKeySet ? 'yes' : 'NO'],
+    ['Alert email configured', d.emailSendingConfigured, d.emailSendingConfigured ? 'yes' : 'no'],
+    ['Ops page protected', d.adminTokenSet, d.adminTokenSet ? 'yes' : 'NO — anyone with the URL can open this'],
+    ['Dashboard heartbeat', !s.heartbeatLost, s.heartbeatLost ? 'LOST' : 'ok'],
+    ['Events in log', true, String(sum.entriesInLog ?? 0)],
+    ['Failed analyses', !sum.entriesWithErrors, String(sum.entriesWithErrors ?? 0)],
+    ['Skipped, outside hours', true, String(sum.skippedOutsideHours ?? 0)],
+    ['Skipped, over cap', !sum.skippedOverCap, String(sum.skippedOverCap ?? 0)],
+    ['Schedule', true, esc(d.schedule || '—')],
+    ['Gym code', true, esc(d.gymCode || 'default')],
+    ['Data directory', true, esc(d.dataDir || '—')],
+  ];
+  let html = rows.map(([k, good, v]) =>
+    `<div class="row"><span class="k">${esc(k)}</span><span class="v ${good ? 'ok' : 'bad'}">${esc(v)}</span></div>`).join('');
+  (d.frameFolders || []).forEach(f =>
+    html += `<div class="row"><span class="k">Photos stored (${esc(f.folder)})</span><span class="v">${esc(f.photos)}</span></div>`);
+  document.getElementById('health').innerHTML = html;
+
+  if(d.likelyProblem && !/Nothing obviously wrong/i.test(d.likelyProblem)){
+    document.getElementById('health').insertAdjacentHTML('afterbegin',
+      `<div class="note"><strong>Likely problem:</strong> ${esc(d.likelyProblem)}</div>`);
+  }
+}
+
+async function checkMailbox(){
+  const el = document.getElementById('mailbox');
+  el.innerHTML = '<div class="empty">Checking…</div>';
+  try{
+    const r = await api('/monitor/mailbox-test');
+    if(!r.configured){ el.innerHTML = `<div class="note">${esc(r.reason)}</div>`; return; }
+    if(r.error || !r.loggedIn){
+      el.innerHTML = `<div class="note" style="border-left-color:var(--red);"><strong>Could not read the mailbox.</strong> ${esc(r.error || 'Login failed')}<br><br>Nearly always the app password in ingest-zones.json — it must be the 16-character app password, not the account password.</div>`;
+      return;
+    }
+    const rows = (r.recentSubjects || []).map(m =>
+      `<div class="row"><span class="k">${esc(m.subject)}</span><span class="v">${esc(m.attachments)} photo${m.attachments === 1 ? '' : 's'}</span></div>`).join('');
+    el.innerHTML = `<div class="row"><span class="k">Signed in as</span><span class="v ok">${esc(r.user)}</span></div>`
+      + `<div class="row"><span class="k">Messages in mailbox</span><span class="v">${esc(r.totalMessages || 0)}</span></div>`
+      + `<div class="row"><span class="k">Analysed up to message</span><span class="v">#${esc(r.lastProcessedUid ?? 0)}</span></div>`
+      + `<div class="row"><span class="k">Waiting to be analysed</span><span class="v ${r.awaitingAnalysis ? 'warn' : 'ok'}">${esc(r.awaitingAnalysis ?? 0)}</span></div>`
+      + rows;
+  } catch(err){
+    el.innerHTML = `<div class="note" style="border-left-color:var(--red);">${esc(err.message)}</div>`;
+  }
+}
+
+async function backfill(count){
+  const el = document.getElementById('toolMsg');
+  let n = count;
+  if(n === null){
+    const answer = window.prompt('How many of the most recent alarm emails should be re-analysed?\n\nEach one costs an analysis.', '10');
+    if(answer === null) return;
+    n = Math.max(1, Math.min(100, parseInt(answer, 10) || 10));
+  }
+  el.innerHTML = `<div class="empty">Re-analysing ${n} email(s)…</div>`;
+  try{
+    const r = await api('/monitor/process-latest?count=' + n, { method: 'POST' });
+    if(r.error){ el.innerHTML = `<div class="note" style="border-left-color:var(--red);">${esc(r.error)}</div>`; return; }
+    const done = r.processed || [];
+    const withPhotos = done.filter(x => x.frames).length;
+    el.innerHTML = `<div class="note"><strong>Done.</strong> ${done.length} read, ${withPhotos} had photos and were analysed. They appear on the <a href="activity.html">customer view</a>.</div>`;
+    refresh();
+  } catch(err){
+    el.innerHTML = `<div class="note" style="border-left-color:var(--red);">${esc(err.message)}</div>`;
+  }
+}
+
+// Remembered for this tab only, so a shared computer doesn't stay unlocked.
+(function restore(){
+  let saved = null;
+  try{ saved = sessionStorage.getItem('securityai:admin'); }catch(e){}
+  if(saved !== null){ document.getElementById('tok').value = saved; unlock(); }
+})();
+</script>
+</body>
+</html>

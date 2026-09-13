@@ -134,6 +134,82 @@ function extractJpegs(raw) {
   return out;
 }
 
+// When the camera actually saw it, not when we got round to analysing it.
+// Polling runs every 30s, so the two can differ by a minute — which is
+// exactly the kind of gap that makes an alert impossible to line up
+// against a check-in record. The NVR often writes its own timestamp into
+// the body; failing that the email's Date header is still far closer than
+// our processing time.
+// capturedAtFromMessage returns a string when the time is trustworthy, or
+// an object when the recorder's clock looks wrong. This flattens either
+// into the fields an event carries.
+function normaliseCapture(v) {
+  if (!v) return { capturedAt: null };
+  if (typeof v === 'string') return { capturedAt: v };
+  return { capturedAt: v.iso, clockSkewMinutes: v.clockSkewMinutes };
+}
+
+function capturedAtFromMessage(raw) {
+  // Only look at the headers and the first text part. Scanning the whole
+  // message means a date-shaped run of characters inside base64 image
+  // data can win, and the body of an alarm email routinely contains other
+  // dates (recording start, firmware build) that are not the event time.
+  const firstBoundary = raw.search(/\r?\n--/);
+  const searchable = raw.slice(0, firstBoundary > 0 ? Math.min(firstBoundary + 4000, raw.length) : Math.min(4000, raw.length));
+
+  // The email's own Date header is the reference point. It's set by the
+  // NVR too, but it's the value that travelled with the message, so it's
+  // the sanest thing to check the claimed alarm time against.
+  let headerTime = null, headerOffsetMin = null;
+  const hdr = searchable.match(/^Date:\s*(.+)$/im);
+  if (hdr) {
+    const d = new Date(hdr[1].trim());
+    if (!isNaN(d)) headerTime = d;
+    // The recorder writes its alarm time as bare local time with no zone.
+    // Parsing that with new Date() assumes THIS server's zone — UTC on
+    // most hosts — which silently shifts every event by the gym's offset.
+    // The Date header carries the recorder's actual offset, so use it.
+    const off = hdr[1].match(/([+-])(\d{2})(\d{2})\s*$/);
+    if (off) headerOffsetMin = (off[1] === '-' ? -1 : 1) * (parseInt(off[2], 10) * 60 + parseInt(off[3], 10));
+  }
+
+  // A labelled alarm time is preferred — it's the moment of the event
+  // rather than the moment the mail was sent. Must be labelled; a bare
+  // date floating in the body is not trustworthy enough to use.
+  let claimed = null;
+  const labelled = searchable.match(/(?:Alarm\s*Time|Event\s*Time|Capture\s*Time|Snapshot\s*Time)\s*[:=]\s*(\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2})/i);
+  if (labelled) {
+    const bare = labelled[1].replace(' ', 'T');
+    // Interpret the bare local time in the recorder's own offset where we
+    // know it; fall back to treating it as UTC only if we don't.
+    const withZone = (headerOffsetMin !== null)
+      ? bare + (headerOffsetMin < 0 ? '-' : '+')
+        + String(Math.floor(Math.abs(headerOffsetMin) / 60)).padStart(2, '0') + ':'
+        + String(Math.abs(headerOffsetMin) % 60).padStart(2, '0')
+      : bare + 'Z';
+    const d = new Date(withZone);
+    if (!isNaN(d)) claimed = d;
+  }
+
+  // Sanity. An alarm email arrives within seconds of the event, so a
+  // claimed time hours away means the recorder's clock is wrong — which
+  // is not hypothetical: the two recorders at the first site were two
+  // hours apart from each other. A wrong time here would silently corrupt
+  // the ordering, the filenames and any attempt to match a check-in.
+  // An alarm email leaves the recorder within seconds of the event, so a
+  // claimed time more than a few minutes from when the mail was sent means
+  // the clock is wrong, not that the event was genuinely that long ago.
+  const MAX_SKEW_MS = 10 * 60 * 1000;
+  const reference = headerTime || new Date();
+  if (claimed && Math.abs(claimed - reference) <= MAX_SKEW_MS) {
+    return claimed.toISOString();
+  }
+  if (claimed) {
+    return { iso: reference.toISOString(), clockSkewMinutes: Math.round((claimed - reference) / 60000) };
+  }
+  return headerTime ? headerTime.toISOString() : null;
+}
+
 // The NVR usually puts the channel or camera name in the subject line.
 function cameraFromMessage(raw) {
   const subj = (raw.match(/^Subject:\s*(.+)$/im) || [, ''])[1].trim();
@@ -214,6 +290,7 @@ function startEmailIngest(opts, handlers) {
         }
         await handlers.onEvent(cameraFromMessage(raw), jpegs.slice(0, 4), {
           durationSec: null, frameCount: jpegs.length, source: 'email', uid,
+          ...normaliseCapture(capturedAtFromMessage(raw)),
         });
       }
       await imap.logout();
@@ -295,6 +372,7 @@ async function processLatest(opts, handlers, count) {
       // and to report back whether the event actually landed.
       const outcome = await handlers.onEvent(cameraFromMessage(raw), jpegs.slice(0, 4), {
         durationSec: null, frameCount: jpegs.length, source: 'email-manual', manual: true,
+        ...normaliseCapture(capturedAtFromMessage(raw)),
       });
       done.push({ id, frames: jpegs.length, result: outcome || 'analysed' });
     }
@@ -306,4 +384,4 @@ async function processLatest(opts, handlers, count) {
   return done;
 }
 
-module.exports = { startEmailIngest, extractJpegs, cameraFromMessage, diagnose, processLatest, Imap };
+module.exports = { startEmailIngest, extractJpegs, cameraFromMessage, capturedAtFromMessage, diagnose, processLatest, Imap };

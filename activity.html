@@ -34,7 +34,8 @@
   .bar .main{font-size:14px;font-weight:500;}
   .bar .sub{color:var(--muted);font-size:12px;margin-left:auto;text-align:right;}
 
-  .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px;}
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px;}
+  @media(max-width:640px){.stats{grid-template-columns:repeat(2,1fr);}}
   @media(max-width:640px){.stats{grid-template-columns:repeat(2,1fr);}}
   .stat{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:13px 14px;}
   .stat .n{font-family:'Oswald';font-size:23px;}
@@ -50,7 +51,9 @@
   .shots img{width:88px;height:62px;object-fit:cover;border-radius:4px;border:1px solid var(--line);background:#0F1214;display:block;}
   .shots a:hover img{border-color:var(--green);}
   .ev .body{flex:1;min-width:0;}
-  .ev .concl{font-size:14px;color:var(--text);}
+  .ev .headline{font-size:14.5px;color:var(--text);font-weight:600;}
+  .ev .concl{font-size:13.5px;color:var(--muted);margin-top:3px;}
+  .ev .skew{font-size:11.5px;color:var(--amber);margin-top:3px;}
   .ev .meta{font-family:'IBM Plex Mono';font-size:11.5px;color:var(--muted);margin-top:4px;}
   .badge{font-size:11px;padding:2px 9px;border-radius:20px;font-weight:600;height:fit-content;flex-shrink:0;}
   .badge.ok{background:rgba(63,207,142,.14);color:var(--green);}
@@ -60,6 +63,15 @@
   .btn{background:transparent;color:var(--text);font-weight:500;font-size:13px;padding:9px 14px;
        border-radius:5px;border:1px solid var(--line);cursor:pointer;}
   .btn:hover{border-color:#4a545b;}
+  .btn.seg{padding:6px 11px;font-size:12px;}
+  .btn.seg.on{background:rgba(63,207,142,.13);border-color:rgba(63,207,142,.45);color:var(--green);}
+  .ev.flag{background:rgba(255,90,90,.045);margin:0 -18px;padding-left:16px;padding-right:18px;
+           border-left:2px solid var(--red);}
+  .ev.err{background:rgba(255,176,32,.04);margin:0 -18px;padding-left:16px;padding-right:18px;
+          border-left:2px solid var(--amber);}
+  .divider{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:11.5px;
+           font-family:'IBM Plex Mono';letter-spacing:.4px;padding:14px 0 6px;}
+  .divider::after{content:"";flex:1;height:1px;background:var(--line);}
   .note{background:var(--panel-2);border-left:2px solid var(--amber);border-radius:0 5px 5px 0;
         padding:11px 13px;font-size:12.5px;color:var(--muted);margin-top:12px;}
   .note strong{color:var(--text);}
@@ -94,17 +106,21 @@
     <div class="stat flag"><div class="n" id="sFlag">—</div><div class="l">FLAGGED</div></div>
     <div class="stat"><div class="n" id="sPeople">—</div><div class="l">PEOPLE SEEN</div></div>
     <div class="stat"><div class="n" id="sLast">—</div><div class="l">LAST EVENT</div></div>
-    <div class="stat"><div class="n" id="sCost">—</div><div class="l">EST. COST (24H)</div></div>
-    <div class="stat"><div class="n" id="sMonth">—</div><div class="l">AT THIS RATE / MONTH</div></div>
   </div>
 
   <div class="card">
-    <h2 id="listTitle">Recent activity</h2>
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px;">
+      <h2 id="listTitle" style="margin:0;">Recent activity</h2>
+      <div style="margin-left:auto;display:flex;gap:6px;">
+        <button class="btn seg on" id="segFlagged" onclick="setSort('flagged')">Flagged first</button>
+        <button class="btn seg" id="segTime" onclick="setSort('time')">Newest first</button>
+        <button class="btn seg" id="segOnly" onclick="setSort('only')">Flagged only</button>
+      </div>
+    </div>
     <div id="list"><div class="empty">Loading…</div></div>
     <div style="display:flex;gap:9px;flex-wrap:wrap;margin-top:14px;">
       <button class="btn" onclick="load()">Refresh</button>
-      <button class="btn" onclick="location.href='/monitor/debug'">Diagnostics</button>
-      <button class="btn" onclick="backfill()">Re-analyse recent emails</button>
+
     </div>
     <div class="note" id="hint" style="display:none;"></div>
   </div>
@@ -124,6 +140,11 @@ function fmtTime(iso){
   const d = new Date(iso);
   return d.toLocaleString([], { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit', second:'2-digit' });
 }
+
+// Prefer the time the camera saw it over the time we analysed it. Those
+// differ by up to a minute, and the camera's is the one that lines up
+// with a check-in record.
+function eventTime(e){ return e.capturedAt || e.timestamp; }
 function ago(iso){
   const s = Math.floor((Date.now() - new Date(iso)) / 1000);
   if(s < 60) return s + 's';
@@ -133,6 +154,23 @@ function ago(iso){
 }
 
 let gymCode = 'default';
+
+// Flagged events are the reason this page exists — a matched entry is
+// just confirmation nothing happened. Default to floating them to the
+// top, while keeping strict chronological order available, because when
+// you're reconciling against check-in times you need the timeline intact.
+let sortMode = 'flagged';
+let lastLog = [], lastStatus = {};
+
+let loaded = false;
+
+function setSort(mode){
+  sortMode = mode;
+  document.getElementById('segFlagged').classList.toggle('on', mode === 'flagged');
+  document.getElementById('segTime').classList.toggle('on', mode === 'time');
+  document.getElementById('segOnly').classList.toggle('on', mode === 'only');
+  if(loaded) renderLog(lastLog, lastStatus);
+}
 
 async function load(){
   try{
@@ -146,8 +184,11 @@ async function load(){
         document.getElementById('listTitle').textContent = `Last ${hrs} hours`;
         document.getElementById('lblTotal').textContent = `EVENTS (${hrs}H)`;
       }
+    lastStatus = st;
+    lastLog = Array.isArray(log) ? log : [];
+    loaded = true;
     renderStatus(st);
-    renderLog(Array.isArray(log) ? log : [], st);
+    renderLog(lastLog, st);
   } catch(err){
     document.getElementById('statusMain').textContent = 'Could not reach the server';
   }
@@ -168,13 +209,14 @@ function renderStatus(s){
   main.textContent = inWindow ? `Watching — ${where}` : 'Idle — outside monitored hours';
   const bits = [];
   if(s.config && s.config.scheduleStart) bits.push(`${s.config.scheduleStart}–${s.config.scheduleEnd}`);
-  if(typeof s.burstsLast24h === 'number') bits.push(`${s.burstsLast24h}/${s.dailyBurstCap} analyses used`);
-  if(s.heartbeatLost) bits.push('DISCONNECTED');
-  sub.textContent = bits.join(' · ');
-  if(s.costEstimate){
-    document.getElementById('sCost').textContent = '$' + s.costEstimate.last24h.toFixed(2);
-    document.getElementById('sMonth').textContent = '$' + s.costEstimate.projectedMonthly.toFixed(0);
+  // capacityUsedPct comes pre-computed from the server; the raw counts and
+  // the cap are deliberately not exposed to this page.
+  if(typeof s.capacityUsedPct === 'number' && s.capacityUsedPct >= 60){
+    bits.push(`${s.capacityUsedPct}% of today's capacity used`);
   }
+  if(s.heartbeatLost) bits.push('not receiving — needs attention');
+  sub.textContent = bits.join(' · ');
+
 }
 
 function renderLog(log, st){
@@ -187,7 +229,7 @@ function renderLog(log, st){
   document.getElementById('sTotal').textContent = real.length;
   document.getElementById('sFlag').textContent = flagged.length;
   document.getElementById('sPeople').textContent = people;
-  document.getElementById('sLast').textContent = log.length ? ago(log[0].timestamp) : '—';
+  document.getElementById('sLast').textContent = log.length ? ago(eventTime(log[0])) : '—';
 
   if(!log.length){
     el.innerHTML = '<div class="empty">Nothing in the retention window yet.</div>';
@@ -199,57 +241,92 @@ function renderLog(log, st){
   }
   hint.style.display = 'none';
 
-  el.innerHTML = log.map(e => {
-    const shots = (e.frames && e.frames.length) ? e.frames : (e.frame ? [e.frame] : []);
-    const imgs = shots.map((f, i) =>
-      `<a href="/monitor/frame/${encodeURIComponent(gymCode)}/${encodeURIComponent(f)}" target="_blank" rel="noopener" title="Frame ${i+1} of ${shots.length}"><img src="/monitor/frame/${encodeURIComponent(gymCode)}/${encodeURIComponent(f)}" alt="Frame ${i+1}"></a>`).join('');
-    const thumbs = imgs ? `<span class="shots">${imgs}</span>` : '';
-
-    if(e.error){
-      return `<div class="ev">${thumbs}<div class="body">
-        <div class="concl">Could not analyse this event</div>
-        <div class="meta">${fmtTime(e.timestamp)}${e.zoneLabel ? ' · ' + esc(e.zoneLabel) : ''} — ${esc(e.error)}</div>
-      </div><span class="badge bad">Error</span></div>`;
+  // Sorting happens on a copy — the underlying log stays newest-first so
+  // "last event" and the counters above are unaffected by the view.
+  const byTime = (a, b) => new Date(eventTime(b)) - new Date(eventTime(a));
+  let view, showDivider = false;
+  if(sortMode === 'only'){
+    view = log.filter(e => e.tailgate_flag).sort(byTime);
+    if(!view.length){
+      el.innerHTML = '<div class="empty">No flagged events in this window. Everything that came through matched what was expected.</div>';
+      return;
     }
+  } else if(sortMode === 'time'){
+    view = log.slice().sort(byTime);
+  } else {
+    // "Needs attention" is a flag OR a failed analysis. A failed one cost
+    // money and produced nothing, so burying it among routine matched
+    // entries is the wrong call.
+    const attention = e => e.tailgate_flag || e.error;
+    const top = log.filter(attention).sort(byTime);
+    const rest = log.filter(e => !attention(e)).sort(byTime);
+    showDivider = top.length > 0 && rest.length > 0;
+    view = top.concat(rest);
+  }
+  const firstUnflagged = showDivider ? view.findIndex(e => !(e.tailgate_flag || e.error)) : -1;
 
-    const kind = e.tailgate_flag ? 'bad' : (e.accessible_gate_used ? 'warn' : 'ok');
-    const label = e.tailgate_flag ? 'Flagged' : (e.accessible_gate_used ? 'Accessible gate' : 'Matched');
-    let alertNote = '';
-    if(e.alertResult){
-      const p = [];
-      if(e.alertResult.email) p.push('email ' + esc(e.alertResult.email));
-      if(e.alertResult.sms) p.push('sms ' + esc(e.alertResult.sms));
-      if(p.length) alertNote = ' · alert ' + p.join(', ');
-    }
-    return `<div class="ev">${thumbs}<div class="body">
-      <div class="concl">${esc(e.note || 'No description returned')}</div>
-      <div class="meta">${fmtTime(e.timestamp)}${e.zoneLabel ? ' · ' + esc(e.zoneLabel) : ''} — ${esc(e.people_count)} crossed, ${esc(e.expectedCount || 1)} expected${e.queued_count ? ', ' + esc(e.queued_count) + ' waiting' : ''}${e.burstFrames ? ' · ' + esc(e.burstFrames) + ' frame' + (e.burstFrames == 1 ? '' : 's') : ''}${alertNote}</div>
-    </div><span class="badge ${kind}">${label}</span></div>`;
+  el.innerHTML = view.map((e, idx) => {
+    const lead = (idx === firstUnflagged) ? '<div class="divider">EVERYTHING ELSE</div>' : '';
+    return lead + renderEvent(e);
   }).join('');
+}
+
+// A one-glance summary in ordinary words, above Claude's fuller
+// description. Reading "2 people went through when 1 was expected" is
+// faster than parsing counts out of a sentence at 9am.
+function headlineFor(e){
+  // Only state a count when there actually is one. Saying "0 people went
+  // through when 1 was expected" for an event whose counts are missing is
+  // confidently wrong, which is worse than saying nothing — the reader has
+  // no way to tell it apart from a genuine reading of zero.
+  const hasCount = Number.isFinite(Number(e.people_count)) && e.people_count !== null && e.people_count !== '';
+  const n = hasCount ? Number(e.people_count) : null;
+  const exp = Number.isFinite(Number(e.expectedCount)) ? Number(e.expectedCount) : 1;
+
+  if(e.tailgate_flag){
+    if(n === null) return 'Flagged — more people than expected';
+    if(n - exp === 1) return `Someone extra got in — ${n} people went through, ${exp} expected`;
+    return `${n} people went through when ${exp === 1 ? 'only 1 was' : exp + ' were'} expected`;
+  }
+  if(e.accessible_gate_used) return 'Someone used the accessible gate';
+  if(n === null) return 'Event recorded';
+  if(n === 0) return 'Nobody visible in the photo';
+  if(n === 1) return 'One person went through, as expected';
+  return `${n} people went through, which matches what was expected`;
+}
+
+function renderEvent(e){
+  const shots = (e.frames && e.frames.length) ? e.frames : (e.frame ? [e.frame] : []);
+  const imgs = shots.map((f, i) =>
+    `<a href="/monitor/frame/${encodeURIComponent(gymCode)}/${encodeURIComponent(f)}" target="_blank" rel="noopener" title="Frame ${i+1} of ${shots.length}"><img src="/monitor/frame/${encodeURIComponent(gymCode)}/${encodeURIComponent(f)}" alt="Frame ${i+1}"></a>`).join('');
+  const thumbs = imgs ? `<span class="shots">${imgs}</span>` : '';
+
+  if(e.error){
+    return `<div class="ev err">${thumbs}<div class="body">
+      <div class="concl">Could not analyse this event</div>
+      <div class="meta">${fmtTime(eventTime(e))}${e.zoneLabel ? ' · ' + esc(e.zoneLabel) : ''} — ${esc(e.error)}</div>
+    </div><span class="badge bad">Error</span></div>`;
+  }
+
+  const kind = e.tailgate_flag ? 'bad' : (e.accessible_gate_used ? 'warn' : 'ok');
+  const label = e.tailgate_flag ? 'Flagged' : (e.accessible_gate_used ? 'Accessible gate' : 'Matched');
+  let alertNote = '';
+  if(e.alertResult){
+    const p = [];
+    if(e.alertResult.email) p.push('email ' + esc(e.alertResult.email));
+    if(e.alertResult.sms) p.push('sms ' + esc(e.alertResult.sms));
+    if(p.length) alertNote = ' · alert ' + p.join(', ');
+  }
+  return `<div class="ev${e.tailgate_flag ? ' flag' : ''}">${thumbs}<div class="body">
+    <div class="headline">${esc(headlineFor(e))}</div>${e.clockSkewMinutes ? `<div class="skew">Recorder clock looks ${Math.abs(e.clockSkewMinutes) > 120 ? 'badly ' : ''}out by about ${esc(Math.abs(Math.round(e.clockSkewMinutes)))} minutes — time shown is when the alert was sent, not the recorder's own clock</div>` : ''}
+    <div class="concl">${esc(e.note || 'No description returned')}</div>
+    <div class="meta">${fmtTime(eventTime(e))}${e.zoneLabel ? ' · ' + esc(e.zoneLabel) : ''} — ${esc(e.people_count)} crossed, ${esc(e.expectedCount || 1)} expected${e.queued_count ? ', ' + esc(e.queued_count) + ' waiting' : ''}${e.burstFrames ? ' · ' + esc(e.burstFrames) + ' photo' + (e.burstFrames == 1 ? '' : 's') : ''}${alertNote}</div>
+  </div><span class="badge ${kind}">${label}</span></div>`;
 }
 
 // The alarm emails stay in Gmail even if the log is lost — a redeploy on
 // an unmounted disk wipes it. This pulls them back through so a night's
 // events can be recovered rather than gone for good.
-async function backfill(){
-  const n = window.prompt('How many of the most recent alarm emails should be re-analysed?\n\nEach one costs an analysis, so keep it to what you need.', '20');
-  if(n === null) return;
-  const count = Math.max(1, Math.min(100, parseInt(n, 10) || 20));
-  const hint = document.getElementById('hint');
-  hint.style.display = 'block';
-  hint.innerHTML = `<strong>Re-analysing the newest ${count} email(s)…</strong> This takes a few seconds each. The list updates as they finish.`;
-  try{
-    const r = await (await fetch('/monitor/process-latest?count=' + count, { method:'POST' })).json();
-    if(r.error){ hint.innerHTML = '<strong>Could not re-analyse.</strong> ' + esc(r.error); return; }
-    const done = (r.processed || []);
-    const withImages = done.filter(x => x.frames).length;
-    hint.innerHTML = `<strong>Done.</strong> ${done.length} message(s) read, ${withImages} had photos and were analysed. Anything without a photo was skipped.`;
-    load();
-  } catch(err){
-    hint.innerHTML = '<strong>Could not re-analyse.</strong> ' + esc(err.message);
-  }
-}
-
 load();
 setInterval(load, 5000);
 </script>
