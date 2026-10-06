@@ -73,8 +73,92 @@ function loadCheck(files) {
   return failed;
 }
 
+// Loads server.js against a stub express that RECORDS routes, then checks
+// the runner routes exist, the exports are right, and require() did not
+// start listening (Render's `node server.js` is the only path that should).
+function routeCheck() {
+  const Module = require('module');
+  const orig = Module._load;
+  const routes = []; let listened = 0;
+  const express = () => {
+    const app = () => {};
+    app.use = () => {};
+    app.get = (p) => { routes.push('GET ' + p); };
+    app.post = (p) => { routes.push('POST ' + p); };
+    app.listen = () => { listened++; return { close() {} }; };
+    return app;
+  };
+  express.json = () => () => {}; express.raw = () => () => {}; express.static = () => () => {};
+  const stubs = { express, cors: () => () => {}, stripe: () => ({}), dotenv: { config() {} },
+    nodemailer: { createTransport: () => ({ sendMail: async () => {} }) }, twilio: () => ({}) };
+  Module._load = function (req) {
+    if (Object.prototype.hasOwnProperty.call(stubs, req)) return stubs[req];
+    return orig.apply(this, arguments);
+  };
+  let failed = 0;
+  const say = (ok, msg) => { if (!ok) failed++; console.log(`${ok ? '[OK]' : '[FAIL]'} ${msg}`); };
+  try {
+    const f = require.resolve('./server.js');
+    delete require.cache[f];
+    const srv = require(f);
+    for (const r of ['POST /monitor/runner/heartbeat', 'POST /monitor/runner/burst', 'GET /monitor/status', 'GET /monitor/debug', 'GET /monitor/log',
+      'GET /admin/overview', 'GET /admin/gyms/:gym/settings', 'POST /admin/gyms/:gym/settings', 'POST /admin/gyms/:gym/adopt',
+      'POST /admin/gyms/:gym/new-code', 'POST /admin/gyms/:gym/unpair', 'POST /admin/test-alert', 'GET /gym/event/:id', 'GET /plans',
+      'POST /monitor/runner/test', 'POST /admin/gyms/:gym/tests/:runId/compare']) {
+      say(routes.includes(r), `route ${r}`);
+    }
+    say(srv && srv.app && typeof srv.start === 'function', 'server.js exports { app, start }');
+    say(listened === 0, 'require(\'./server\') does not listen');
+    // getStatus() once shipped a ReferenceError (an undefined constant)
+    // that load checks could not see because it only ran per request.
+    try { require('./monitor').getStatus(); say(true, 'monitor.getStatus() runs'); }
+    catch (e) { say(false, `monitor.getStatus() threw: ${e.message}`); }
+  } catch (err) {
+    say(false, `server.js route check threw: ${err.message}`);
+  }
+  Module._load = orig;
+  return failed;
+}
+
+// Syntax-only check for scripts that do real work when run (they spawn
+// ffmpeg, read config, or exit), so they are parsed but not required.
+function syntaxCheck(files) {
+  const { spawnSync } = require('child_process');
+  let failed = 0;
+  for (const f of files) {
+    const r = spawnSync(process.execPath, ['--check', f], { encoding: 'utf8' });
+    if (r.status === 0) console.log(`[OK] ${f} parses`);
+    else { failed++; console.log(`[FAIL] ${f} syntax: ${(r.stderr || '').trim().split('\n').slice(0, 5).join(' | ')}`); }
+  }
+  return failed;
+}
+
+const fsx = require('fs');
+const pathx = require('path');
+process.chdir(__dirname);
 const args = process.argv.slice(2);
-const html = args.filter(a => a.endsWith('.html'));
-const js = args.filter(a => a.endsWith('.js'));
+let html = args.filter(a => a.endsWith('.html'));
+let js = args.filter(a => a.endsWith('.js'));
+const noArgs = !args.length;
+if (noArgs) {
+  // No arguments: check everything. This used to print nothing at all.
+  html = fsx.readdirSync(__dirname).filter(f => f.endsWith('.html')).sort();
+  // Library modules: safe to require (no side effects beyond timers).
+  js = ['server.js', 'monitor.js', 'vision.js', 'gyms.js', 'mailer.js', 'report.js', 'scheduler.js',
+        'ingest.js', 'email-ingest.js', 'detect.js', 'rtsp.js'].filter(f => fsx.existsSync(f));
+}
+let failures = 0;
+const origLog = console.log;
+console.log = (...a) => { if (typeof a[0] === 'string' && a[0].startsWith('[FAIL]')) failures++; origLog(...a); };
 html.forEach(check);
-if (js.length) { console.log(''); loadCheck(js.map(f => f.startsWith('/') ? f : './' + f)); }
+console.log = origLog;
+if (js.length) { console.log(''); failures += loadCheck(js.map(f => f.startsWith('/') ? f : './' + f)); }
+if (noArgs) {
+  console.log('');
+  const scripts = fsx.readdirSync(__dirname).filter(f => f.endsWith('.js') && !js.includes(f)).sort();
+  failures += syntaxCheck(scripts);
+  console.log('');
+  failures += routeCheck();
+}
+console.log(`\n${failures ? failures + ' problem(s) found.' : 'All checks passed.'}`);
+process.exitCode = failures ? 1 : 0;

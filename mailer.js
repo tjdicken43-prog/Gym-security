@@ -20,6 +20,14 @@ function getTransport() {
   return transport;
 }
 
+// Plain words for why email can't go out. Render has no .env file, so
+// never tell anyone to edit one.
+function notConfiguredReason() {
+  if (!process.env.SMTP_HOST) return 'SMTP_HOST is not set on Render (Environment tab), so no email can be sent';
+  if (!nodemailer) return 'the nodemailer package is not installed on the server, so no email can be sent';
+  return 'email is not set up on the server';
+}
+
 function isConfigured() {
   return !!getTransport();
 }
@@ -29,7 +37,7 @@ function isConfigured() {
 // misconfigured mail server doesn't take down whatever called this.
 async function sendMail({ to, subject, text, html, replyTo, attachments }) {
   const t = getTransport();
-  if (!t) return { delivered: false, reason: 'SMTP not configured in .env (see .env.example)' };
+  if (!t) return { delivered: false, reason: notConfiguredReason() };
   try {
     await t.sendMail({
       from: process.env.SMTP_FROM || process.env.SMTP_USER,
@@ -46,4 +54,4 @@ async function sendMail({ to, subject, text, html, replyTo, attachments }) {
   }
 }
 
-module.exports = { sendMail, isConfigured };
+module.exports = { sendMail, isConfigured, notConfiguredReason };

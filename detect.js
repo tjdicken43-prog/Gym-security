@@ -36,6 +36,16 @@ const MOTION_CHECK_MS = 250;
 // again. The frames sent are spread across the whole event and weighted
 // toward the end, so the crossing itself is always in there.
 const EVENT_QUIET_TICKS = 3;      // ~750ms of stillness = the event is over
+// ...unless the motion stopped before reaching the far side of the zone.
+// That is someone standing at the turnstile scanning (or waiting for the
+// person in front), not someone who has left: frame
+// differencing cannot see a person standing still, so without this a 1-3 s
+// pause split one crossing into two events — billed twice, and a
+// tailgater's pass could be cut in half so neither half shows both people.
+// Motion that has already reached the far side of the zone (the person has
+// gone through) still ends after EVENT_QUIET_TICKS.
+const EVENT_PAUSE_QUIET_TICKS = 12;   // ~3s of stillness short of the far side = the event is over
+const PAUSE_EDGE_CELLS = 2.5;         // within this many grid cells of the far edge = "got to the far side"
 const EVENT_MAX_TICKS = 48;       // ~12s ceiling so a loiterer can't buffer forever
 const EVENT_MAX_BUFFER = 60;      // hard cap on retained crops
 const EVENT_FRAMES_SENT = 3;      // how many of the buffered crops go to Claude
@@ -233,6 +243,21 @@ function selectEventFrames(buf, n){
 }
 
 
+// Has the motion got all the way to the far side of the zone yet? Judged
+// on the axis it mostly travelled along, from the side it started on. Until
+// it has, a quiet spell is a pause (someone at the turnstile, or waiting
+// for the person in front), not the end of the crossing.
+function reachedFarSide(path) {
+  if (!path || !path.length) return true;
+  const xs = path.map(p => p.cx), ys = path.map(p => p.cy);
+  const useX = (Math.max(...xs) - Math.min(...xs)) >= (Math.max(...ys) - Math.min(...ys));
+  const vals = useX ? xs : ys;
+  const mid = (DIFF_GRID - 1) / 2;
+  return vals[0] < mid
+    ? Math.max(...vals) >= DIFF_GRID - 1 - PAUSE_EDGE_CELLS
+    : Math.min(...vals) <= PAUSE_EDGE_CELLS;
+}
+
 // Runs one tick of the per-zone state machine. Returns a burst to send,
 // or null. The caller supplies grabCells() and is responsible for the
 // actual image capture, which differs between browser and server.
@@ -271,7 +296,7 @@ function stepZone(z, cells, sens, opts) {
     z.eventTicks = (z.eventTicks || 0) + 1;
     if (typeof o.onCapture === 'function') o.onCapture();
 
-    const ended = z.quietTicks >= EVENT_QUIET_TICKS;
+    const ended = z.quietTicks >= (reachedFarSide(z.eventPath) ? EVENT_QUIET_TICKS : EVENT_PAUSE_QUIET_TICKS);
     const tooLong = z.eventTicks >= EVENT_MAX_TICKS;
     if (ended || tooLong) {
       const cross = didCrossThreshold(z.eventPath);

@@ -206,6 +206,9 @@ function startFtpServer(opts, handlers) {
     }
   });
 
+  // Without this, a busy port (EADDRINUSE) is an uncaught 'error' event
+  // and takes the whole website down with it.
+  server.on('error', err => { if (handlers.onError) handlers.onError(`FTP ingest could not start on port ${port}: ${err.message}`); });
   server.listen(port, () => {
     if (handlers.onReady) handlers.onReady({ transport: 'ftp', port, user });
   });
@@ -218,6 +221,11 @@ function startFtpServer(opts, handlers) {
 function startFolderWatch(dir, handlers) {
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
   const seen = new Set();
+  // Every photo is a paid analysis: never re-submit what is already in the
+  // folder after a restart (only the last 10 minutes are picked up), or
+  // after the "seen" list is trimmed (only files newer than the newest one
+  // already sent).
+  let floor = Date.now() - 10 * 60 * 1000, newest = floor;
 
   function scan() {
     const walk = d => {
@@ -233,6 +241,8 @@ function startFolderWatch(dir, handlers) {
         // half-written upload.
         if (Date.now() - st.mtimeMs < 1200) continue;
         seen.add(full);
+        if (st.mtimeMs <= floor) continue;
+        newest = Math.max(newest, st.mtimeMs);
         try {
           submit(cameraKeyFromPath(full, path.basename(d)), fs.readFileSync(full), handlers);
           if (handlers.onUpload) handlers.onUpload(cameraKeyFromPath(full, path.basename(d)), full, st.size);
@@ -240,7 +250,7 @@ function startFolderWatch(dir, handlers) {
       }
     };
     walk(dir);
-    if (seen.size > 5000) seen.clear();
+    if (seen.size > 5000) { seen.clear(); floor = newest; }
   }
 
   const timer = setInterval(scan, 1000);

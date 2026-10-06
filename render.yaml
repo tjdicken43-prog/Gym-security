@@ -1,12 +1,15 @@
 # Render deployment config for SecurityAI.
 #
-# The `disk` block below is what makes the 24-hour alert log survive a
-# REDEPLOY, not just a restart. Without a mounted disk, Render gives each
-# deploy a fresh filesystem and the log starts empty every time you push.
+# The `disk` block below is what makes the log, photos AND gym accounts
+# survive a REDEPLOY, not just a restart. Without a mounted disk, Render
+# gives each deploy a fresh filesystem and everything starts empty.
+# (The admin page's "Storage" line checks the disk really is separate.)
 #
 # Note honestly: persistent disks require a paid instance type. On the
-# free tier this block is ignored and the log will reset on each deploy
+# free tier this block is ignored and the data resets on each deploy
 # (it still survives ordinary restarts within a deploy).
+#
+# sync: false = Render asks you for the value (secrets; never in git).
 services:
   - type: web
     name: securityai
@@ -19,13 +22,75 @@ services:
       mountPath: /var/data
       sizeGB: 1
     envVars:
-      - key: DATA_DIR
-        value: /var/data   # monitor.js writes alert-log.json here
+      # ---- MUST HAVE ----
+      # Opens admin.html and monitor.html and lets camera computers pair
+      # with a 6-digit code. Render makes up a long random value for you
+      # (see it under Environment > eye icon). Changing it later un-pairs
+      # every camera computer (pair them again from the admin page).
+      - key: ADMIN_TOKEN
+        generateValue: true
       - key: ANTHROPIC_API_KEY
         sync: false
-      - key: DOMAIN
+      # Email is REQUIRED, not optional: tailgate alerts, "camera computer
+      # offline" / "no picture" / "back online" warnings, "Forgot your
+      # code?" and the monthly report all go by email. Easiest: a Gmail
+      # account with 2-step verification and an APP PASSWORD
+      # (myaccount.google.com > Security > App passwords):
+      #   SMTP_HOST smtp.gmail.com, SMTP_PORT 587,
+      #   SMTP_USER the Gmail address, SMTP_PASS the 16-letter app password,
+      #   SMTP_FROM the same Gmail address.
+      - key: SMTP_HOST
         sync: false
-      - key: STRIPE_SECRET_KEY
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_USER
         sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: SMTP_FROM
+        sync: false
+      # Your own address: gets every "camera computer offline" / "no
+      # picture" warning for every gym, and the admin page's test alert.
       - key: SUPPORT_EMAIL
         sync: false
+      # ---- RECOMMENDED (needs the disk above) ----
+      - key: DATA_DIR
+        value: /var/data   # log, photos, gym accounts, settings live here
+      # ---- OPTIONAL ----
+      # The site's public address (used in Stripe return links), e.g.
+      # https://gym-security.onrender.com
+      - key: DOMAIN
+        sync: false
+      # Backstop across ALL gyms: at most this many analyses a day in
+      # total (each gym also has its own daily limit on the admin page).
+      # Unset = no site-wide limit.
+      - key: MAX_TOTAL_DAILY_BURSTS
+        sync: false
+      # The public webcam demo on the home page is anonymous and every
+      # try is a paid analysis, outside every gym's daily limit. Defaults:
+      # 10 tries per visitor per hour, 50 per day for the whole site (at
+      # most about $20 a month). 0 for the daily cap = demo off.
+      - key: DEMO_PER_IP_PER_HOUR
+        value: "10"
+      - key: DEMO_DAILY_CAP
+        value: "50"
+      # Default time zone for gyms that don't have one set on the admin
+      # page (IANA name). Unset = America/Chicago (Central).
+      - key: GYM_TIMEZONE
+        value: America/Chicago
+      # Text-message alerts (only if you use Twilio).
+      - key: TWILIO_SID
+        sync: false
+      - key: TWILIO_AUTH_TOKEN
+        sync: false
+      - key: TWILIO_FROM_NUMBER
+        sync: false
+      # Card payments (only when you start selling on the website).
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+      # RUNNER_TOKEN is NOT needed: camera computers pair from the admin
+      # page. If it is still set from before, the admin page shows it
+      # amber: pair each computer, then delete RUNNER_TOKEN (it unlocks
+      # every gym and can't be unpaired).

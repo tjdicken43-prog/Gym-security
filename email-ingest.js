@@ -41,6 +41,14 @@ class Imap {
       });
       this.sock.on('error', reject);
       this.sock.setTimeout(30000, () => { this.sock.destroy(); reject(new Error('IMAP timed out')); });
+      // A dropped/timed-out connection must fail the command in progress;
+      // otherwise poll() waits forever (busy stays true) and the mailbox
+      // is never checked again.
+      this.sock.on('close', () => {
+        const w = this.waiters.splice(0);
+        w.forEach(x => x.reject(new Error('IMAP connection closed')));
+        reject(new Error('IMAP connection closed'));
+      });
     });
   }
 

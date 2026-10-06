@@ -36,7 +36,7 @@ function resolveModel(model) {
 
 async function callClaudeMulti({ base64Images, promptText, maxTokens, model }) {
   if (!process.env.ANTHROPIC_API_KEY) {
-    throw new Error('ANTHROPIC_API_KEY is not set in .env — required for analysis.');
+    throw new Error('ANTHROPIC_API_KEY is not set, so nothing can be analysed (website: Render > Environment; laptop local mode: the .env file).');
   }
 
   const imageBlocks = base64Images.map(img => ({
@@ -44,32 +44,78 @@ async function callClaudeMulti({ base64Images, promptText, maxTokens, model }) {
     source: { type: 'base64', media_type: 'image/jpeg', data: img },
   }));
 
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': process.env.ANTHROPIC_API_KEY,
-      'anthropic-version': '2023-06-01',
-    },
-    body: JSON.stringify({
-      model: resolveModel(model),
-      max_tokens: maxTokens,
-      messages: [{
-        role: 'user',
-        content: [...imageBlocks, { type: 'text', text: promptText }],
-      }],
-    }),
+  const body = JSON.stringify({
+    model: resolveModel(model),
+    max_tokens: maxTokens,
+    messages: [{
+      role: 'user',
+      content: [...imageBlocks, { type: 'text', text: promptText }],
+    }],
   });
 
-  if (!response.ok) {
-    const body = await response.text().catch(() => '');
-    throw new Error(`Anthropic API error ${response.status}: ${body.slice(0, 200)}`);
+  // One retry, only for answers that mean "not processed" (rate limit,
+  // overloaded, server error) — those are not billed, so a retry can't
+  // double-charge. A timeout is NOT retried: that call may have been billed.
+  let response;
+  for (let attempt = 1; ; attempt++) {
+    try {
+      response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': process.env.ANTHROPIC_API_KEY,
+          'anthropic-version': '2023-06-01',
+        },
+        body,
+        signal: AbortSignal.timeout(CALL_TIMEOUT_MS),
+      });
+    } catch (err) {
+      if (err && (err.name === 'TimeoutError' || err.name === 'AbortError')) throw new Error(`Anthropic did not answer within ${CALL_TIMEOUT_MS / 1000} s`);
+      throw new Error(`Could not reach Anthropic: ${err && err.message}`);
+    }
+    if (response.ok || attempt >= 2 || ![429, 500, 502, 503, 529].includes(response.status)) break;
+    const wait = Math.min(10, Math.max(1, parseInt(response.headers && response.headers.get && response.headers.get('retry-after'), 10) || 2));
+    await new Promise(r => setTimeout(r, wait * 1000));
   }
 
-  const data = await response.json();
-  const textBlock = (data.content || []).find(b => b.type === 'text');
-  const raw = textBlock ? textBlock.text.trim() : '{}';
-  return JSON.parse(raw.replace(/```json|```/g, '').trim());
+  if (!response.ok) {
+    const text = await response.text().catch(() => '');
+    throw new Error(`Anthropic API error ${response.status}: ${text.slice(0, 200)}`);
+  }
+
+  let data;
+  try { data = await response.json(); } catch (e) { throw new Error('Anthropic sent back something that is not JSON'); }
+  const textBlock = ((data && data.content) || []).find(b => b && b.type === 'text');
+  const raw = textBlock ? String(textBlock.text || '').trim() : '';
+  return parseModelJson(raw);
+}
+
+const CALL_TIMEOUT_MS = 60 * 1000;
+
+// The model is asked for bare JSON but sometimes wraps it in a sentence or
+// a ```json fence, or writes "false" as a string. A string "false" is
+// truthy in JavaScript — it would send a tailgate alert — so types are
+// made strict here.
+function parseModelJson(raw) {
+  const s = String(raw || '').replace(/```json|```/g, '').trim();
+  let obj = null;
+  try { obj = JSON.parse(s); } catch (e) {
+    const a = s.indexOf('{'), b = s.lastIndexOf('}');
+    if (a >= 0 && b > a) { try { obj = JSON.parse(s.slice(a, b + 1)); } catch (e2) { obj = null; } }
+  }
+  if (!obj || typeof obj !== 'object' || Array.isArray(obj)) {
+    throw new Error(`The model's answer could not be read: "${s.slice(0, 80)}"`);
+  }
+  const bool = v => v === true || (typeof v === 'string' && v.trim().toLowerCase() === 'true');
+  const int = v => { const n = typeof v === 'string' ? Number(v.trim()) : v; return (typeof n === 'number' && Number.isFinite(n)) ? Math.max(0, Math.round(n)) : null; };
+  for (const k of ['tailgate_flag', 'accessible_gate_used', 'flag']) if (k in obj) obj[k] = bool(obj[k]);
+  for (const k of ['people_count', 'queued_count']) if (k in obj) obj[k] = int(obj[k]);
+  if ('confidence' in obj) { const c = String(obj.confidence || '').toLowerCase(); obj.confidence = ['high', 'medium', 'low'].includes(c) ? c : null; }
+  if ('note' in obj && obj.note != null) obj.note = String(obj.note).slice(0, 500);
+  if (Array.isArray(obj.cameras)) {
+    obj.cameras = obj.cameras.filter(c => c && typeof c === 'object').map(c => Object.assign({}, c, { flag: bool(c.flag), people_count: int(c.people_count) }));
+  }
+  return obj;
 }
 
 // Single-entrance tailgate/queue/accessible-gate detection — the core
@@ -126,18 +172,30 @@ async function analyzeEntryBurst(framesInOrder, cfg) {
     ? `This entrance has a separate marked accessible/disabled-access gate (e.g. a wider gate, ramp, or push-button door) alongside the main scan point. If someone is visibly entering through that accessible gate rather than the main scan point, set accessible_gate_used to true and do NOT set tailgate_flag for that person — accessible gates are frequently not wired to the same scan hardware, so an unmatched entry there is expected, not a violation. Still describe it in the note so staff can confirm the check-in separately.`
     : `This entrance does not have a separate accessible gate — treat all visible entries as going through the single main scan point.`;
 
-  const promptText = `You are an entrance security camera analyzing a gym doorway. These ${framesInOrder.length} images are frames from the same fixed camera position, in chronological order, spanning one complete entry event${cfg.durationSec ? ` of about ${cfg.durationSec} seconds` : ''} — from when someone first appeared until the doorway went still again. Treat them as frames of a short video clip, not unrelated photos.
+  const gate = cfg.accessibleGate
+    ? 'There is also a separate accessible/disabled-access gate beside the main barrier. Someone using it is legitimate and is NOT tailgating.'
+    : '';
 
-The frames are spread across the event and weighted toward its end, because people commonly step into view, stop to find their phone or badge, scan, and only then walk through. So an early frame showing someone standing still with a phone is normal and is NOT an entry — judge how many distinct people actually crossed the threshold across the whole sequence, paying most attention to the later frames.
+  // Written for the real camera this was built on (J Street, CAM4): high
+  // up, looking down at an angle through a wide-angle lens at a
+  // full-height rotating turnstile with wire-mesh walls. Kept short: it is
+  // sent with every crossing. The accuracy test (accuracy.js) scores this
+  // same prompt: "two on one rotation" must flag, "two on separate
+  // rotations" must not.
+  const expected = cfg.expectedCount || 1;
+  const promptText = `These are ${framesInOrder.length} stills from a fixed security camera at a gym entrance, in time order${cfg.durationSec ? `, over about ${cfg.durationSec} seconds` : ''}. Such cameras usually sit high up and look down at an angle through a wide-angle lens: straight lines bend near the edges and people show mostly as heads and shoulders.
 
-The front desk expects ${cfg.expectedCount} check-in(s) for an event like this. ${gateInstruction}
+The entrance is usually a full-height turnstile: a cage of metal bars that turns round a post and lets one person through per turn after they scan. Turnstile bars, wire-mesh walls, doors, lights, reflections and shadows are not people. Count heads.
 
-A queue of people waiting nearby without crossing is not the same as unscanned entry and should not by itself cause a flag. Fast motion alone (someone moving quickly) is also not by itself a violation — the count of distinct people actually crossing during the burst is what matters.
+The stills are taken on a timer, so the moment someone passes may fall between two of them. Judge from where people are across the sequence: on one side early and the other side later means they went through; standing still in every frame means they have not (they may be scanning in or waiting).
+${gate}
+Count the DISTINCT people who got through. Expected per scan: ${expected}.
+Tailgating means more than ${expected} going through on the same turn (sharing one gap between the bars, or squeezed in right behind) or through a door held open. People who each get their own turn, even seconds apart, are not tailgating.
 
-Respond ONLY with strict JSON, no markdown fences, no other text:
-{"people_count": <int, distinct people who crossed the threshold during this burst>, "queued_count": <int, people visibly waiting nearby but not crossing>, "accessible_gate_used": <true|false>, "tailgate_flag": <true|false>, "note": "<one short plain-language sentence describing what happened across the burst>"}
+Respond with ONLY a JSON object, no other text:
+{"people_count": <number who got through>, "queued_count": <number waiting, not through>, "accessible_gate_used": <true|false>, "tailgate_flag": <true|false>, "confidence": "<high|medium|low>", "note": "<one plain sentence for gym staff saying what you see>"}
 
-Set tailgate_flag true only if people_count (excluding anyone using the accessible gate) is greater than ${cfg.expectedCount}. Never flag based on queued_count or fast motion alone.`;
+Set confidence "low" when no frame clearly shows the crossing, people overlap, or it is too dark. A confident wrong answer is worse than an admitted doubt: set tailgate_flag true only when you can see it, and say what makes you unsure in the note.`;
 
   return callClaudeMulti({ base64Images: framesInOrder, promptText, maxTokens: 400, model: cfg.model });
 }

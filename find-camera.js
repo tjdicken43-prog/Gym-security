@@ -1,142 +1,171 @@
 #!/usr/bin/env node
-// Finds the working RTSP address for your cameras.
+// Lists which RTSP address formats your recorder/camera answers to.
 //
-//   node find-camera.js 192.168.1.64 admin yourpassword
+//   RECOMMENDED INSTEAD:  node setup-camera.js
+//   (it does all of this, shows every channel, and writes rtsp-zones.json)
 //
-// Anpviz (and most budget IP camera brands) use several different RTSP
-// URL formats depending on the model and firmware, and the manual often
-// lists the wrong one. Rather than guess, this tries every format that's
-// known to work on these cameras and tells you which one actually
-// connects — plus the resolution, so you know you got the main stream
-// and not the low-res substream.
+//   node find-camera.js <recorder-ip> [username] [channel]
+//        -> asks for the password (hidden), so no shell quoting problems
+//   node find-camera.js <recorder-ip> <username> <password> [channel]
+//        -> old form still works, but a password with ! $ " ' in it can be
+//           mangled by the shell before this script sees it
+//   Flags: --pass-env VAR (read password from an environment variable),
+//          --port N, --out DIR (default ./camera-check), --timeout SECONDS
 //
-// Needs ffmpeg installed. Nothing else.
+// For each format it reports: WORKS (codec + size), password rejected
+// (401), not on this recorder (404), timeout or refused. Every working
+// address gets a snapshot in ./camera-check/ and is checked against a
+// second channel, so addresses that ignore the channel number (like the
+// bare rtsp://ip:554/ address, which always shows camera 1) are flagged.
+//
+// It STOPS at the first 401 — the recorder may lock the account after a
+// few wrong passwords, so we never keep trying.
+//
+// Needs ffmpeg. Node built-ins only.
 
-const { spawn } = require('child_process');
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
+const P = require('./camera-probe');
 
-const [ip, user, pass, chan] = process.argv.slice(2);
-if (!ip) {
+const argv = process.argv.slice(2);
+const flags = {};
+const pos = [];
+for (let i = 0; i < argv.length; i++) {
+  if (argv[i].startsWith('--')) flags[argv[i].slice(2)] = argv[i + 1] && !argv[i + 1].startsWith('--') ? argv[++i] : true;
+  else pos.push(argv[i]);
+}
+
+if (!pos.length || flags.help) {
   console.log(`
-Usage:  node find-camera.js <camera-ip> [username] [password] [channel]
+Easiest:  node setup-camera.js     (finds the camera AND writes rtsp-zones.json)
 
-Examples:
-  node find-camera.js 192.168.1.64 admin mypassword
-  node find-camera.js 192.168.1.64 admin mypassword 2     (second camera on an NVR)
-
-Don't know the IP? See the notes printed at the end.
+This tool only lists which address formats work:
+  node find-camera.js <recorder-ip> [username] [channel]
+  e.g.  node find-camera.js 192.168.2.54 admin 4
+It asks for the password without showing it.
 `);
   process.exit(0);
 }
 
-const u = user || 'admin';
-const p = pass || '';
-const ch = parseInt(chan, 10) || 1;
-const auth = p ? `${encodeURIComponent(u)}:${encodeURIComponent(p)}@` : `${encodeURIComponent(u)}@`;
-
-// Every format these cameras are known to use, main stream first.
-const CANDIDATES = [
-  { url: `rtsp://${auth}${ip}:554/Streaming/Channels/${ch}01`, note: 'Hikvision-style main stream (most common on Anpviz)' },
-  { url: `rtsp://${auth}${ip}:554/Streaming/Channels/${ch}02`, note: 'Hikvision-style sub stream (lower res)' },
-  { url: `rtsp://${auth}${ip}:554/stream0`,                    note: 'stream0 main' },
-  { url: `rtsp://${auth}${ip}:554/stream1`,                    note: 'stream1 sub' },
-  { url: `rtsp://${ip}:554/h264?username=${encodeURIComponent(u)}&password=${encodeURIComponent(p)}`, note: 'query-string auth, main' },
-  { url: `rtsp://${ip}:554/h264cif?username=${encodeURIComponent(u)}&password=${encodeURIComponent(p)}`, note: 'query-string auth, sub' },
-  { url: `rtsp://${auth}${ip}:554/live/mpeg4`,                 note: 'live/mpeg4' },
-  { url: `rtsp://${auth}${ip}:554/cam/realmonitor?channel=${ch}&subtype=0`, note: 'Dahua-style main' },
-  { url: `rtsp://${auth}${ip}:554/11`,                         note: 'short-form main' },
-  { url: `rtsp://${auth}${ip}:554/`,                           note: 'bare root' },
-];
-
-function mask(url) { return url.replace(/\/\/[^@]*@/, '//***:***@'); }
-
-// ffprobe would be tidier but isn't always installed alongside ffmpeg, so
-// this uses ffmpeg itself and reads what it reports on stderr.
-function test(url) {
+function readHidden(prompt) {
   return new Promise(resolve => {
-    const ff = spawn('ffmpeg', [
-      '-loglevel', 'info', '-rtsp_transport', 'tcp',
-      '-i', url, '-frames:v', '1', '-f', 'null', '-',
-    ]);
-    let err = '';
-    const timer = setTimeout(() => { try { ff.kill('SIGKILL'); } catch (e) {} }, 12000);
-    ff.stderr.on('data', d => { err += d.toString(); });
-    ff.on('error', () => { clearTimeout(timer); resolve({ ok: false, why: 'ffmpeg not found' }); });
-    ff.on('close', code => {
-      clearTimeout(timer);
-      const m = err.match(/Video:\s*([a-z0-9]+).*?(\d{3,4})x(\d{3,4})/i);
-      if (code === 0 && m) {
-        resolve({ ok: true, codec: m[1], w: +m[2], h: +m[3] });
-      } else {
-        let why = 'no response';
-        if (/401|[Uu]nauthorized/.test(err)) why = 'wrong username or password';
-        else if (/Connection refused/.test(err)) why = 'nothing listening on 554';
-        else if (/404|[Nn]ot [Ff]ound/.test(err)) why = 'wrong path for this model';
-        else if (/timed out|Timeout/i.test(err)) why = 'timed out';
-        resolve({ ok: false, why });
+    const stdin = process.stdin;
+    if (!stdin.isTTY) {
+      // piped: read one line
+      let buf = '';
+      process.stdout.write(prompt);
+      stdin.setEncoding('utf8');
+      const on = d => { buf += d; const i = buf.search(/\r?\n/); if (i !== -1) { stdin.removeListener('data', on); stdin.pause(); process.stdout.write('\n'); resolve(buf.slice(0, i)); } };
+      stdin.on('data', on);
+      stdin.on('end', () => resolve(buf));
+      return;
+    }
+    process.stdout.write(prompt);
+    let val = '';
+    stdin.setRawMode(true); stdin.resume();
+    const on = b => {
+      for (const ch of b.toString('utf8')) {
+        if (ch === '\r' || ch === '\n') { stdin.removeListener('data', on); stdin.setRawMode(false); stdin.pause(); process.stdout.write('\n'); return resolve(val); }
+        if (ch === '\u0003') { stdin.setRawMode(false); process.stdout.write('\n'); process.exit(130); }
+        if (ch === '\u007f' || ch === '\b') { if (val) { val = Array.from(val).slice(0, -1).join(''); process.stdout.write('\b \b'); } continue; }
+        if (ch >= ' ') { val += ch; process.stdout.write('*'); }
       }
-    });
+    };
+    stdin.on('data', on);
   });
 }
 
 (async () => {
-  console.log(`\nTesting ${CANDIDATES.length} known Anpviz address formats against ${ip}`);
-  console.log('This takes a minute. Each one gets up to 12 seconds.\n');
+  const h = P.parseHostInput(pos[0]);
+  if (h.error) { console.log(h.error); process.exit(1); }
+  const host = h.host, port = parseInt(flags.port, 10) || h.port || 554;
+  const user = P.normaliseInput(pos[1] || 'admin').value.trim();
+  let pass, chanArg;
+  // positional: ip user [channel]   or   ip user password [channel]
+  // (a 1-2 digit third argument is a channel; a real password is longer)
+  if (flags['pass-env']) {
+    pass = process.env[flags['pass-env']];
+    if (pass == null) { console.log(`--pass-env ${flags['pass-env']}: that environment variable is not set.`); process.exit(1); }
+    chanArg = pos[2];
+  } else if (pos.length >= 4) { pass = pos[2]; chanArg = pos[3]; }
+  else if (pos.length === 3 && /^\d{1,2}$/.test(pos[2])) { chanArg = pos[2]; }
+  else if (pos.length === 3) { pass = pos[2]; }
+  if (pass == null) pass = await readHidden('Password (typing shows *): ');
+  pass = P.normaliseInput(pass).value;
+  if (pass !== pass.trim()) { console.log('(Removed spaces from the start/end of the password.)'); pass = pass.trim(); }
+  const ch = parseInt(chanArg, 10) || 1;
+  const secrets = [pass];
+  const outDir = path.resolve(flags.out || 'camera-check');
+  const timeoutMs = (parseInt(flags.timeout, 10) || 15) * 1000;
 
-  const working = [];
-  for (const c of CANDIDATES) {
-    process.stdout.write('  trying ' + c.note.padEnd(52));
-    const r = await test(c.url);
-    if (r.ok) {
-      console.log(`WORKS  ${r.w}x${r.h} ${r.codec}`);
-      working.push(Object.assign({}, c, r));
-    } else {
-      console.log(`no  (${r.why})`);
-      if (r.why === 'ffmpeg not found') {
-        console.log('\nffmpeg is not installed. Install it first:');
-        console.log('  Windows:  download from ffmpeg.org, add to PATH');
-        console.log('  Mac:      brew install ffmpeg');
-        console.log('  Linux:    sudo apt install ffmpeg\n');
-        process.exit(1);
-      }
-    }
+  console.log('\nTip: node setup-camera.js does all of this for you and writes rtsp-zones.json.\n');
+
+  const ff = await P.ffmpegCheck();
+  if (!ff.ok) {
+    console.log('ffmpeg is not installed. Install it first:');
+    console.log('  Mac:    download from evermeet.cx, then  sudo cp ~/Downloads/ffmpeg /usr/local/bin/');
+    console.log('  Linux:  sudo apt install ffmpeg');
+    process.exit(1);
   }
+  const tcp = await P.tcpCheck(host, port, 4000);
+  if (!tcp.ok) {
+    console.log(tcp.code === 'refused'
+      ? `${host} answered but port ${port} is closed: RTSP is off or on another port (check System > Network on the recorder).`
+      : `Cannot reach ${host} (${tcp.code}): this computer is on a different network, the cable is out, or the IP is wrong.`);
+    const mine = P.localIPv4().map(a => a.address);
+    console.log(`This computer's address: ${mine.join(', ') || 'none (not connected)'}`);
+    process.exit(1);
+  }
+
+  fs.mkdirSync(outDir, { recursive: true });
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'findcam-'));
+  const creds = { host, port, user, pass };
+  const total = P.FORMATS.length * 2 + 1;
+  console.log(`Testing ${total} address formats on ${host}:${port}, channel ${ch}. Up to ${timeoutMs / 1000}s each.\n`);
+
+  const res = await P.testFormats(creds, ch, tmp, {
+    includeSub: true, includeRoot: true, checkChannels: true, timeoutMs,
+    otherChannels: ch === 1 ? [2, 3] : [ch === 2 ? 3 : 2, 1].filter(n => n !== ch),
+    onResult: e => {
+      const name = e.format.name + (e.sub ? ' - sub stream' : '');
+      let line = `  ${name.padEnd(56)} ${P.describe(e.result)}`;
+      if (e.result.status === 'ok') {
+        const snap = path.join(outDir, `find-${e.format.id}${e.sub ? '-sub' : ''}-ch${String(ch).padStart(2, '0')}.jpg`);
+        try { fs.copyFileSync(e.result.file, snap); e.snapshot = snap; } catch (err) { /* ignore */ }
+        if (e.channel_check && e.channel_check.aware === false) line += '\n      ^ IGNORES the channel number (always the same camera) - do not use';
+        else if (e.channel_check && e.channel_check.aware) line += '\n      ^ follows the channel number';
+      }
+      console.log(P.maskText(line, secrets));
+    },
+  });
+  try { fs.rmSync(tmp, { recursive: true, force: true }); } catch (e) { /* ignore */ }
 
   console.log('');
-  if (!working.length) {
-    console.log('Nothing connected. Most likely causes, in order:');
-    console.log('  1. Wrong password. Anpviz ships as admin / 123456 — but if it was');
-    console.log('     set up properly that was changed. Check the NVR or ask whoever installed it.');
-    console.log('  2. Wrong IP. See below.');
-    console.log('  3. RTSP switched off in the camera settings. Log into the camera in a');
-    console.log('     browser (http://' + ip + ') and look under Network > Advanced.');
-    console.log('  4. This computer is on a different network from the cameras.');
-  } else {
-    // Prefer the highest resolution that connected — that's the main stream.
-    working.sort((a, b) => (b.w * b.h) - (a.w * a.h));
-    const best = working[0];
-    console.log('USE THIS ONE:\n');
-    console.log('  ' + best.url);
-    console.log(`  (${best.w}x${best.h} ${best.codec} — ${best.note})\n`);
-    console.log('Paste it into rtsp-zones.json as "cameraUrl". For your other cameras,');
-    console.log('the address is usually the same with a different channel number:');
-    console.log('  ...Channels/101  = camera 1');
-    console.log('  ...Channels/201  = camera 2');
-    console.log('  ...Channels/301  = camera 3');
-    console.log('\nOr re-run this with a channel number:  node find-camera.js ' + ip + ' ' + u + ' <pass> 2');
-    if (working.length > 1) {
-      console.log('\nOthers that also worked (lower resolution, usable if you want to save bandwidth):');
-      working.slice(1).forEach(w => console.log(`  ${w.w}x${w.h}  ${mask(w.url)}`));
-    }
+  if (res.authFailed) {
+    console.log('STOPPED: the recorder rejected the username or password (401).');
+    console.log('Not trying anything else - this recorder locks the account after a few wrong tries.');
+    console.log('Do this: check the login you use on the recorder web page, then run  node setup-camera.js');
+    console.log('If it keeps failing: System > User Management on the recorder - is the account enabled / locked?');
+    process.exit(2);
   }
-
-  console.log(`
---- Finding your camera's IP address ---
-  * Log into your router and look at connected devices for something named
-    like IPC, ANPVIZ, or an unfamiliar device.
-  * Or in the NVR's own menu: Network, or Camera / Channel Management —
-    each camera's IP is listed there.
-  * Anpviz cameras ship at 192.168.0.123 if never configured.
-  * On Windows you can also run:  arp -a
-    and look for addresses in your camera's range.
-`);
-})();
+  const good = res.results.filter(e => e.result.status === 'ok');
+  if (!good.length) {
+    const s = res.results.map(e => e.result.status);
+    console.log('Nothing gave a picture.');
+    if (s.every(x => x === 'notfound')) console.log('The recorder knows none of these formats. Send a photo of this screen for help.');
+    else console.log('Close any other live view of the recorder (web page, phone app) and try again.');
+    process.exit(1);
+  }
+  const aware = good.filter(e => !e.channel_check || e.channel_check.aware !== false);
+  const best = aware.find(e => !e.sub) || aware[0];
+  if (best) {
+    console.log(`BEST: ${best.format.name}${best.sub ? ' (sub stream)' : ''}  ${best.result.width}x${best.result.height}`);
+    console.log(`  ${P.buildUrl({ host, port, user: 'USER', pass: 'PASSWORD' }, best.format, ch, { sub: best.sub })}`);
+  } else {
+    console.log('WARNING: the only working addresses IGNORE the channel number - they always show camera 1.');
+  }
+  console.log(`\nSnapshots of each working address are in ${outDir}`);
+  console.log('Next: run  node setup-camera.js  - it builds this address for you (no typing it by hand)');
+  console.log('and writes rtsp-zones.json.');
+})().catch(err => { console.error('Error: ' + P.maskUrl(err && err.message)); process.exit(1); });
