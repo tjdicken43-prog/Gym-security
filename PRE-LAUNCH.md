@@ -22,7 +22,9 @@ errors & omissions**. You're touching systems a business relies on for
 security. If your software misses an incident, or a camera gets
 misconfigured, "I'm just a guy with a script" is not a defence.
 
-**Terms of Service and a Privacy Policy** on the site. You handle images of
+**Terms of Service and a Privacy Policy** on the site. A plain-language
+draft is at `terms.html` (linked from checkout); it has not been reviewed by a
+lawyer. You handle images of
 members. At minimum: what you collect, how long you keep it, who can see
 it, what you don't do (no facial recognition, no identification), and that
 you disclaim responsibility for security outcomes.

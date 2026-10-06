@@ -2,333 +2,930 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<title>Entrance activity — SecurityAI</title>
 <link rel="icon" type="image/svg+xml" href="logo.svg">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Activity — SecurityAI</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#14171A">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="SecurityAI">
 <style>
-  :root{--bg:#14171A;--panel:#1C2124;--panel-2:#22282C;--line:#31383D;
-        --text:#EDEFF1;--muted:#8B939B;--green:#3FCF8E;--red:#FF5A5A;--amber:#FFB020;}
+  :root{--bg:#14171A;--panel:#1C2124;--panel-2:#242B30;--line:#353D43;
+        --text:#EDEFF1;--muted:#A3ABB3;--green:#3FCF8E;--red:#FF6B6B;--amber:#FFB54A;--blue:#7FB2FF;}
   *{box-sizing:border-box;}
-  body{margin:0;background:var(--bg);color:var(--text);font-family:'IBM Plex Sans',sans-serif;line-height:1.55;}
-  h1,h2{font-family:'Oswald',sans-serif;font-weight:600;margin:0;}
-  .mono{font-family:'IBM Plex Mono',monospace;}
-  a{color:inherit;}
-  .wrap{max-width:860px;margin:0 auto;padding:0 18px;}
+  html{-webkit-text-size-adjust:100%;}
+  body{margin:0;background:var(--bg);color:var(--text);font:16px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+       padding-bottom:env(safe-area-inset-bottom);}
+  a{color:var(--text);}
+  button,input{font:inherit;}
+  .wrap{max-width:760px;margin:0 auto;padding:0 16px;padding-left:max(16px,env(safe-area-inset-left));padding-right:max(16px,env(safe-area-inset-right));}
+  .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;}
 
-  nav{border-bottom:1px solid var(--line);position:sticky;top:0;background:rgba(20,23,26,.96);backdrop-filter:blur(8px);z-index:20;}
-  nav .wrap{display:flex;align-items:center;justify-content:space-between;height:56px;}
-  .brand{display:flex;align-items:center;gap:9px;font-family:'Oswald';font-size:18px;font-weight:600;text-decoration:none;color:var(--text);}
-  .navlink{color:var(--muted);font-size:13.5px;text-decoration:none;}
-  .navlink:hover{color:var(--text);}
+  header{border-bottom:1px solid var(--line);background:var(--bg);padding-top:env(safe-area-inset-top);}
+  header .wrap{display:flex;align-items:center;gap:10px;min-height:60px;}
+  header svg{flex-shrink:0;}
+  header h1{font-size:19px;font-weight:700;margin:0;line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;flex:1;}
+  .hbtn{flex-shrink:0;min-height:44px;padding:8px 14px;border-radius:10px;border:1px solid var(--line);background:var(--panel-2);color:var(--text);font-weight:600;font-size:15px;cursor:pointer;}
+  header .by{color:var(--muted);font-size:13px;display:block;font-weight:400;}
+  main{padding:16px 0 40px;}
 
-  main{padding:24px 0 80px;}
-  .bar{display:flex;align-items:center;gap:11px;background:var(--panel);border:1px solid var(--line);
-       border-radius:8px;padding:14px 16px;margin-bottom:16px;flex-wrap:wrap;}
-  .dot{width:9px;height:9px;border-radius:50%;background:var(--muted);flex-shrink:0;}
-  .dot.live{background:var(--green);animation:pulse 1.6s infinite;}
-  .dot.idle{background:var(--amber);}
-  @keyframes pulse{50%{opacity:.4;}}
-  .bar .main{font-size:14px;font-weight:500;}
-  .bar .sub{color:var(--muted);font-size:12px;margin-left:auto;text-align:right;}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:14px;}
+  .card h2{font-size:18px;margin:0 0 6px;}
+  .muted{color:var(--muted);}
+  .small{font-size:14px;}
 
-  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px;}
-  @media(max-width:640px){.stats{grid-template-columns:repeat(2,1fr);}}
-  @media(max-width:640px){.stats{grid-template-columns:repeat(2,1fr);}}
-  .stat{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:13px 14px;}
-  .stat .n{font-family:'Oswald';font-size:23px;}
-  .stat .l{color:var(--muted);font-size:11.5px;letter-spacing:.3px;}
-  .stat.flag .n{color:var(--red);}
+  /* status line */
+  .status{display:flex;gap:12px;align-items:flex-start;}
+  .dot{width:12px;height:12px;border-radius:50%;background:var(--muted);flex-shrink:0;margin-top:7px;}
+  .dot.ok{background:var(--green);box-shadow:0 0 0 4px rgba(63,207,142,.15);}
+  .dot.warn{background:var(--amber);}
+  .dot.off{background:#6d767e;}
+  .status .t{font-weight:600;font-size:17px;}
+  .status .s{color:var(--muted);font-size:15px;}
 
-  .card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:18px;margin-bottom:14px;}
-  .card h2{font-size:16px;margin-bottom:12px;}
+  /* one-glance summary */
+  .summary{padding:18px 16px;}
+  .summary .big{font-size:24px;font-weight:700;line-height:1.25;}
+  .summary .big.bad{color:var(--red);}
+  .summary .big.good{color:var(--green);}
+  .summary .s{color:var(--muted);font-size:15px;margin-top:4px;}
+  .summary .older{color:var(--amber);font-size:16px;font-weight:600;margin-top:6px;}
+  .retention{color:var(--muted);font-size:14px;margin:-4px 2px 14px;}
 
-  .ev{display:flex;gap:12px;padding:14px 0;border-bottom:1px solid var(--line);}
-  .ev:last-child{border-bottom:none;}
-  .shots{display:flex;gap:4px;flex-shrink:0;flex-wrap:wrap;max-width:186px;}
-  .shots img{width:88px;height:62px;object-fit:cover;border-radius:4px;border:1px solid var(--line);background:#0F1214;display:block;}
-  .shots a:hover img{border-color:var(--green);}
-  .ev .body{flex:1;min-width:0;}
-  .ev .headline{font-size:14.5px;color:var(--text);font-weight:600;}
-  .ev .concl{font-size:13.5px;color:var(--muted);margin-top:3px;}
-  .ev .skew{font-size:11.5px;color:var(--amber);margin-top:3px;}
-  .ev .meta{font-family:'IBM Plex Mono';font-size:11.5px;color:var(--muted);margin-top:4px;}
-  .badge{font-size:11px;padding:2px 9px;border-radius:20px;font-weight:600;height:fit-content;flex-shrink:0;}
-  .badge.ok{background:rgba(63,207,142,.14);color:var(--green);}
-  .badge.bad{background:rgba(255,90,90,.14);color:var(--red);}
-  .badge.warn{background:rgba(255,176,32,.14);color:var(--amber);}
-  .empty{color:var(--muted);font-size:13.5px;padding:10px 0;}
-  .btn{background:transparent;color:var(--text);font-weight:500;font-size:13px;padding:9px 14px;
-       border-radius:5px;border:1px solid var(--line);cursor:pointer;}
-  .btn:hover{border-color:#4a545b;}
-  .btn.seg{padding:6px 11px;font-size:12px;}
-  .btn.seg.on{background:rgba(63,207,142,.13);border-color:rgba(63,207,142,.45);color:var(--green);}
-  .ev.flag{background:rgba(255,90,90,.045);margin:0 -18px;padding-left:16px;padding-right:18px;
-           border-left:2px solid var(--red);}
-  .ev.err{background:rgba(255,176,32,.04);margin:0 -18px;padding-left:16px;padding-right:18px;
-          border-left:2px solid var(--amber);}
-  .divider{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:11.5px;
-           font-family:'IBM Plex Mono';letter-spacing:.4px;padding:14px 0 6px;}
-  .divider::after{content:"";flex:1;height:1px;background:var(--line);}
-  .note{background:var(--panel-2);border-left:2px solid var(--amber);border-radius:0 5px 5px 0;
-        padding:11px 13px;font-size:12.5px;color:var(--muted);margin-top:12px;}
-  .note strong{color:var(--text);}
+  .seg{display:flex;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:3px;margin:0 0 14px;}
+  .seg button{flex:1;min-height:44px;border:0;background:transparent;color:var(--muted);border-radius:8px;font-size:15px;font-weight:600;cursor:pointer;}
+  .seg button[aria-pressed="true"]{background:var(--panel-2);color:var(--text);}
+
+  .section-title{font-size:14px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:var(--muted);margin:22px 2px 10px;}
+
+  /* incident card */
+  .inc{background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--red);border-radius:12px;overflow:hidden;margin-bottom:16px;}
+  .inc.possible,.inc.unchecked{border-left-color:var(--amber);}
+  .inc.done{border-left-color:var(--line);}
+  .inc .photo{position:relative;background:#0c0e10;display:block;width:100%;border:0;padding:0;cursor:zoom-in;}
+  .inc .photo img{display:block;width:100%;aspect-ratio:4/3;object-fit:contain;background:#0c0e10;}
+  .inc .photo .n{position:absolute;right:10px;bottom:10px;background:rgba(0,0,0,.72);color:#fff;font-size:13px;padding:3px 9px;border-radius:12px;}
+  .thumbs{display:flex;gap:6px;padding:8px 10px 0;overflow-x:auto;}
+  .thumbs button{border:2px solid transparent;padding:0;border-radius:6px;background:none;cursor:pointer;flex-shrink:0;}
+  .thumbs button[aria-current="true"]{border-color:var(--text);}
+  .thumbs img{display:block;width:64px;height:48px;object-fit:cover;border-radius:4px;}
+  .inc .body{padding:12px 16px 16px;}
+  .clock{color:var(--muted);font-size:13px;padding:6px 10px 0;}
+  .kept{color:var(--muted);font-size:13px;margin-top:2px;}
+  .ynote{margin:10px 0 0;font-size:15px;overflow-wrap:anywhere;}
+  .ynote b{font-weight:600;color:var(--muted);font-size:14px;}
+  .noteIn{width:100%;min-height:46px;margin-top:12px;padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:#101315;color:var(--text);font-size:16px;}
+  .noteIn:focus{outline:2px solid var(--green);outline-offset:1px;}
+  .inc.hl,.row.hl{outline:3px solid var(--blue);outline-offset:2px;}
+  .from{font-size:14px;font-weight:700;color:var(--blue);margin:0 2px 8px;display:flex;justify-content:space-between;align-items:center;gap:8px;}
+  .row.gate{background:rgba(255,181,74,.06);border:1px dashed rgba(255,181,74,.35);margin-bottom:8px;}
+  .row.gate:hover{background:rgba(255,181,74,.1);}
+  .inc h3{font-size:19px;line-height:1.3;margin:0 0 4px;}
+  .when{color:var(--muted);font-size:15px;}
+  .said{margin:10px 0 0;font-size:16px;}
+  .said b{font-weight:600;color:var(--muted);font-size:14px;display:block;}
+  .todo{margin:12px 0 0;background:var(--panel-2);border-radius:8px;padding:10px 12px;font-size:15px;}
+  .actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px;}
+  .actions .share{grid-column:1 / -1;}
+  .btn{min-height:48px;padding:10px 14px;border-radius:10px;border:1px solid var(--line);background:var(--panel-2);color:var(--text);
+       font-weight:600;font-size:16px;cursor:pointer;text-align:center;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:6px;}
+  .btn:active{transform:scale(.98);}
+  .btn.red{background:rgba(255,107,107,.14);border-color:rgba(255,107,107,.5);color:#FFB3B3;}
+  .btn.green{background:rgba(63,207,142,.12);border-color:rgba(63,207,142,.45);color:#8CE8BD;}
+  .btn.primary{background:var(--green);border-color:var(--green);color:#0b1f15;}
+  .btn.link{background:none;border:0;color:var(--muted);text-decoration:underline;font-weight:500;min-height:44px;padding:8px 4px;}
+  .btn[disabled]{opacity:.6;}
+  .verdict{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:12px;background:var(--panel-2);border-radius:8px;padding:6px 6px 6px 12px;font-size:15px;}
+  .verdict strong{font-weight:700;}
+
+  /* compact rows (normal entries / timeline) */
+  details.group{background:var(--panel);border:1px solid var(--line);border-radius:12px;margin-bottom:14px;}
+  details.group > summary{list-style:none;cursor:pointer;min-height:56px;padding:14px 16px;display:flex;align-items:center;gap:10px;font-weight:600;font-size:16px;}
+  details.group > summary::-webkit-details-marker{display:none;}
+  details.group > summary::after{content:"";margin-left:auto;width:9px;height:9px;border-right:2px solid var(--muted);border-bottom:2px solid var(--muted);transform:rotate(45deg);transition:transform .15s;}
+  details.group[open] > summary::after{transform:rotate(-135deg);}
+  .rows{padding:0 8px 8px;}
+  .day{font-size:13px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;padding:10px 8px 4px;}
+  .row{display:flex;align-items:center;gap:12px;padding:8px;border-radius:8px;width:100%;border:0;background:none;color:inherit;text-align:left;cursor:pointer;min-height:64px;}
+  .row:hover{background:var(--panel-2);}
+  .row img{width:72px;height:54px;object-fit:cover;border-radius:6px;flex-shrink:0;background:#0c0e10;}
+  .row .noimg{width:72px;height:54px;border-radius:6px;background:#0c0e10;flex-shrink:0;}
+  .row .rt{font-weight:600;font-size:16px;}
+  .row .rs{color:var(--muted);font-size:14px;}
+  .row .tag{margin-left:auto;font-size:13px;font-weight:700;padding:3px 9px;border-radius:12px;flex-shrink:0;}
+  .tag.bad{background:rgba(255,107,107,.16);color:#FFB3B3;}
+  .tag.warn{background:rgba(255,181,74,.16);color:var(--amber);}
+  .tag.ok{background:rgba(63,207,142,.13);color:#8CE8BD;}
+
+  .empty{padding:22px 16px;text-align:center;color:var(--muted);}
+  .empty .big{color:var(--text);font-size:18px;font-weight:600;margin-bottom:4px;}
+
+  /* forms */
+  label.f{display:block;font-weight:600;margin:10px 0 6px;}
+  input.in{width:100%;min-height:50px;padding:12px 14px;border-radius:10px;border:1px solid var(--line);background:#101315;color:var(--text);font-size:17px;}
+  input.in:focus{outline:2px solid var(--green);outline-offset:1px;}
+  .formrow{display:flex;gap:8px;margin-top:8px;}
+  .formrow input{flex:1;min-width:0;}
+  .msg{margin-top:10px;font-size:15px;min-height:0;}
+  .msg.bad{color:#FFB3B3;} .msg.good{color:#8CE8BD;}
+  .sub{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:10px 0;border-bottom:1px solid var(--line);}
+  .sub:last-child{border-bottom:0;}
+  .sub .who{flex:1 1 100%;min-width:0;overflow-wrap:anywhere;font-weight:600;}
+  .sub .btn{flex:1;}
+  .msg.info{color:var(--text);}
+  .sub .btn{min-height:44px;padding:8px 12px;font-size:15px;}
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:12px 0;}
+  @media (max-width:520px){.stats{grid-template-columns:repeat(2,1fr);}}
+  .stats div{background:var(--panel-2);border-radius:8px;padding:10px;text-align:center;}
+  .stats b{display:block;font-size:24px;}
+  .stats span{font-size:13px;color:var(--muted);}
+
+  footer{color:var(--muted);font-size:14px;text-align:center;padding:10px 0 30px;}
+  footer a{display:inline-block;padding:12px 4px;}
+  footer .btn.link{font-size:15px;}
+
+  /* full-screen photo viewer */
+  .viewer{position:fixed;inset:0;background:rgba(0,0,0,.94);z-index:50;display:none;flex-direction:column;}
+  .viewer.open{display:flex;}
+  .viewer .bar{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;padding-top:max(10px,env(safe-area-inset-top));color:#fff;}
+  .viewer .bar span{min-width:0;overflow-wrap:anywhere;padding-right:10px;}
+  .viewer .stage{flex:1;display:flex;min-height:0;min-width:0;}
+  .viewer img{display:block;width:100%;height:100%;object-fit:contain;}
+  .viewer .vclock{color:#c9ced3;font-size:13px;text-align:center;padding:4px 12px 0;}
+  /* Phone on its side: the photo gets the whole screen, controls float over it. */
+  @media (max-height:500px){
+    .viewer .bar,.viewer .nav,.viewer .vclock{position:absolute;left:0;right:0;z-index:2;}
+    .viewer .bar{top:0;background:linear-gradient(rgba(0,0,0,.75),rgba(0,0,0,0));}
+    .viewer .nav{bottom:0;background:linear-gradient(rgba(0,0,0,0),rgba(0,0,0,.75));}
+    .viewer .vclock{bottom:62px;text-shadow:0 1px 3px #000;}
+    .viewer .stage{height:100%;}
+  }
+  .viewer .nav{display:flex;justify-content:space-between;padding:10px 12px;padding-bottom:max(10px,env(safe-area-inset-bottom));}
+  .viewer .btn{background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.25);color:#fff;min-width:96px;}
+
+  .sheet{position:fixed;left:0;right:0;bottom:0;z-index:60;background:var(--panel);border-top:1px solid var(--line);border-radius:16px 16px 0 0;
+         padding:18px 16px;padding-bottom:max(18px,env(safe-area-inset-bottom));display:none;box-shadow:0 -10px 30px rgba(0,0,0,.4);}
+  .sheet.open{display:block;}
+  .sheet .inner{max-width:640px;margin:0 auto;}
+  .sheet input{font-size:15px;}
+
+  @media (min-width:700px){
+    .inc{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);}
+    .inc .media{border-right:1px solid var(--line);}
+    .inc .photo img{aspect-ratio:4/3;}
+  }
+  @media (orientation:landscape) and (max-height:500px){
+    .inc{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);}
+    .inc .photo img{max-height:70vh;}
+  }
 </style>
 </head>
 <body>
 
-<nav><div class="wrap">
-  <a class="brand" href="securityai.html">
-    <svg width="21" height="21" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" style="flex-shrink:0;">
-      <path d="M4 18V6a2 2 0 0 1 2-2h12" stroke="currentColor" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/>
-      <path d="M44 18V6a2 2 0 0 0-2-2H30" stroke="currentColor" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/>
-      <path d="M4 30v12a2 2 0 0 0 2 2h12" stroke="currentColor" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/>
-      <path d="M44 30v12a2 2 0 0 1-2 2H30" stroke="currentColor" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/>
-      <line x1="10" y1="24" x2="38" y2="24" stroke="#3FCF8E" stroke-width="2.4" stroke-opacity=".4" stroke-linecap="round"/>
-      <circle cx="24" cy="24" r="5.5" fill="#3FCF8E"/>
-    </svg>SecurityAI
-  </a>
-  <a class="navlink" href="monitor.html">Settings →</a>
-</div></nav>
+<header><div class="wrap">
+  <svg width="30" height="30" viewBox="0 0 48 48" fill="none" aria-hidden="true">
+    <path d="M4 18V6a2 2 0 0 1 2-2h12M44 18V6a2 2 0 0 0-2-2H30M4 30v12a2 2 0 0 0 2 2h12M44 30v12a2 2 0 0 1-2 2H30" stroke="#EDEFF1" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+    <line x1="10" y1="24" x2="38" y2="24" stroke="#3FCF8E" stroke-width="2.4" stroke-opacity=".4" stroke-linecap="round"/>
+    <circle cx="24" cy="24" r="5.5" fill="#3FCF8E"/>
+  </svg>
+  <h1><span id="gymName">Entrance activity</span><span class="by">SecurityAI entrance watch</span></h1>
+  <button class="hbtn" type="button" id="alertsLink" hidden aria-controls="alertsCard">Get alerts</button>
+</div></header>
 
 <main><div class="wrap">
 
-  <div class="bar">
-    <span class="dot" id="dot"></span>
-    <span class="main" id="statusMain">Loading…</span>
-    <span class="sub" id="statusSub"></span>
-  </div>
+  <!-- Sign in: shown only when this device hasn't been given the gym code yet. -->
+  <section id="gate" hidden>
+    <div class="card">
+      <h2>Enter your gym code</h2>
+      <p class="muted" style="margin:0 0 6px;">It's in the message SecurityAI sent you: your gym's name, a dash, then 6 letters and numbers. You only need to do this once on each phone or computer.</p>
+      <p style="margin:0 0 6px;" id="homeHint">Opened from your home screen? Enter the code once more.</p>
+      <form id="signInForm" autocomplete="off">
+        <label class="f" for="codeIn">Gym code</label>
+        <input class="in" id="codeIn" name="code" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="go" required>
+        <button class="btn primary" type="submit" style="width:100%;margin-top:12px;" id="signInBtn">Open</button>
+        <div class="msg" id="signInMsg" role="alert"></div>
+      </form>
+      <button class="btn link" type="button" id="forgotBtn" aria-expanded="false" aria-controls="forgotBox">Forgot your code?</button>
+      <form id="forgotBox" hidden>
+        <label class="f" for="forgotEmail">Your email (the one SecurityAI has for your gym)</label>
+        <div class="formrow">
+          <input class="in" id="forgotEmail" type="email" inputmode="email" autocomplete="email" required>
+          <button class="btn" type="submit">Send</button>
+        </div>
+        <div class="msg" id="forgotMsg" role="status"></div>
+      </form>
+    </div>
+  </section>
 
-  <div class="stats">
-    <div class="stat"><div class="n" id="sTotal">—</div><div class="l" id="lblTotal">EVENTS</div></div>
-    <div class="stat flag"><div class="n" id="sFlag">—</div><div class="l">FLAGGED</div></div>
-    <div class="stat"><div class="n" id="sPeople">—</div><div class="l">PEOPLE SEEN</div></div>
-    <div class="stat"><div class="n" id="sLast">—</div><div class="l">LAST EVENT</div></div>
-  </div>
+  <section id="app" hidden>
+    <div class="card"><div class="status">
+      <span class="dot" id="dot"></span>
+      <div><div class="t" id="statusT">Loading…</div><div class="s" id="statusS"></div></div>
+    </div></div>
 
-  <div class="card">
-    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px;">
-      <h2 id="listTitle" style="margin:0;">Recent activity</h2>
-      <div style="margin-left:auto;display:flex;gap:6px;">
-        <button class="btn seg on" id="segFlagged" onclick="setSort('flagged')">Flagged first</button>
-        <button class="btn seg" id="segTime" onclick="setSort('time')">Newest first</button>
-        <button class="btn seg" id="segOnly" onclick="setSort('only')">Flagged only</button>
+    <div class="card summary" id="summary" aria-live="polite"></div>
+
+    <div class="seg" role="group" aria-label="How to list entries">
+      <button type="button" id="viewFlagged" aria-pressed="true">Flagged first</button>
+      <button type="button" id="viewTimeline" aria-pressed="false">Timeline</button>
+    </div>
+
+    <p class="retention" id="retention"></p>
+    <div id="list"></div>
+
+    <div class="card" id="monthCard" hidden>
+      <h2>Last 30 days</h2>
+      <div class="stats">
+        <div><b id="mFlag">0</b><span>flagged</span></div>
+        <div><b id="mConf">0</b><span>you marked Tailgate</span></div>
+        <div><b id="mFine">0</b><span>you marked fine</span></div>
+        <div><b id="mOpen">0</b><span>not checked</span></div>
       </div>
+      <p class="muted small" id="mNote" style="margin:0 0 12px;"></p>
+      <a class="btn" href="/monitor/report/preview" style="width:100%;">Open monthly report</a>
     </div>
-    <div id="list"><div class="empty">Loading…</div></div>
-    <div style="display:flex;gap:9px;flex-wrap:wrap;margin-top:14px;">
-      <button class="btn" onclick="load()">Refresh</button>
 
+    <div class="card" id="alertsCard" hidden>
+      <h2>Get alerts</h2>
+      <p class="muted" style="margin:0;" id="alertsCopy">When something's flagged, we'll email or text these people with a photo.</p>
+      <div id="subs" style="margin-top:8px;"></div>
+      <form id="addForm" autocomplete="off">
+        <label class="f" for="addIn">Add an email or mobile number</label>
+        <div class="formrow">
+          <input class="in" id="addIn" inputmode="email" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="Email or mobile number" required>
+          <button class="btn primary" type="submit" id="addBtn">Add</button>
+        </div>
+        <div class="muted small" style="margin-top:6px;">They'll get a test message straight away, with a link to stop alerts any time.</div>
+      </form>
+      <div class="msg" id="alertMsg" role="status"></div>
     </div>
-    <div class="note" id="hint" style="display:none;"></div>
-  </div>
 
+    <footer>
+      <div id="tzNote"></div>
+      <button class="btn link" type="button" id="signOutBtn" hidden>Sign out on this device</button>
+      <div>Questions? <a href="securityai.html#support">Contact SecurityAI</a></div>
+    </footer>
+  </section>
 </div></main>
 
+<!-- Full-screen photo viewer -->
+<div class="viewer" id="viewer" role="dialog" aria-modal="true" aria-label="Photo">
+  <div class="bar"><span id="vCap"></span><button class="btn" type="button" id="vClose">Close</button></div>
+  <div class="stage"><img id="vImg" alt=""></div>
+  <div class="vclock" id="vClock" hidden></div>
+  <div class="nav"><button class="btn" type="button" id="vPrev">‹ Previous</button><button class="btn" type="button" id="vNext">Next ›</button></div>
+</div>
+
+<!-- Share sheet (fallback where the phone has no share button) -->
+<div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetT">
+  <div class="inner">
+    <h2 id="sheetT" style="margin:0 0 6px;font-size:18px;">Send this entry</h2>
+    <p class="muted small" style="margin:0 0 10px;" id="sheetExp">Anyone with this link can see this one entry and its photos — nothing else.</p>
+    <input class="in" id="sheetUrl" readonly>
+    <div class="actions" style="margin-top:10px;">
+      <button class="btn primary" type="button" id="sheetCopy">Copy link</button>
+      <button class="btn" type="button" id="sheetClose">Done</button>
+    </div>
+  </div>
+</div>
+
 <script>
-// This page does one job: show what happened, with the pictures the
-// conclusion was drawn from. No setup, no camera steps — those live on
-// monitor.html and don't apply when the server receives snapshots itself.
+// The gym's page. One job: "is everything OK, and did anything happen?"
+// Everything the camera computer, the model or the gym typed (zone names,
+// notes, clock note) goes through esc() before it becomes HTML.
 function esc(v){
   return String(v == null ? '' : v)
     .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
     .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
-function fmtTime(iso){
-  const d = new Date(iso);
-  return d.toLocaleString([], { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit', second:'2-digit' });
+const $ = id => document.getElementById(id);
+function store(k, v){ try{ if(v === undefined) return localStorage.getItem(k); if(v === null) localStorage.removeItem(k); else localStorage.setItem(k, v); }catch(e){ return null; } }
+
+let data = null, lastJson = '', gymCode = null, codeRequired = false;
+let view = store('sai:view') === 'timeline' ? 'timeline' : 'flagged';
+let timeZone;          // the gym's zone; undefined = this device's own
+let effSchedule = null; // the watch hours actually in force ({start,end} or null = always)
+let pinned = null;      // an event opened from an alert/report link that isn't in the 48-hour list
+const drafts = {};      // typed-but-unsent review notes, by event id
+
+// ---- time, in the gym's own zone --------------------------------------
+function fmt(iso, o){
+  const d = new Date(iso); if(isNaN(d)) return '';
+  try{ return d.toLocaleString('en-US', Object.assign({ timeZone }, o)); }
+  catch(e){ return d.toLocaleString('en-US', o); }
+}
+// Seconds matter: staff match these against the check-in log (G3).
+function timeOf(iso){ return fmt(iso, { hour:'numeric', minute:'2-digit', second:'2-digit' }); }
+function dayKey(iso){ return fmt(iso, { year:'numeric', month:'2-digit', day:'2-digit' }); }
+function dayWords(iso){
+  const k = dayKey(iso), now = Date.now();
+  if(k === dayKey(new Date(now).toISOString())) return 'Today';
+  if(k === dayKey(new Date(now - 864e5).toISOString())) return 'Yesterday';
+  return fmt(iso, { weekday:'long', month:'short', day:'numeric' });
+}
+function whenWords(iso){
+  const s = Math.round((Date.now() - new Date(iso)) / 1000);
+  const ago = s < 90 ? 'just now' : s < 3600 ? Math.round(s/60) + ' min ago' : s < 86400 ? Math.round(s/3600) + ' h ago' : (Math.round(s/86400) === 1 ? '1 day ago' : Math.round(s/86400) + ' days ago');
+  return `${dayWords(iso)}, ${timeOf(iso)} · ${ago}`;
+}
+function hhmmWords(v){
+  const m = /^(\d{1,2}):(\d{2})$/.exec(v || ''); if(!m) return v;
+  const h = +m[1], ap = h < 12 ? 'AM' : 'PM', h12 = h % 12 || 12;
+  return `${h12}:${m[2]} ${ap}`;
+}
+function tzName(){
+  try{
+    const p = new Intl.DateTimeFormat('en-US', { timeZone, timeZoneName:'long' }).formatToParts(new Date()).find(x => x.type === 'timeZoneName');
+    return p ? p.value.replace(/ (Daylight|Standard) /, ' ') : '';
+  }catch(e){ return ''; }
+}
+// Wall-clock parts of an instant in the gym's zone.
+function partsAt(ms){
+  let f;
+  try{ f = new Intl.DateTimeFormat('en-US', { timeZone, hourCycle:'h23', year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit', second:'2-digit' }); }
+  catch(e){ f = new Intl.DateTimeFormat('en-US', { hourCycle:'h23', year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit', second:'2-digit' }); }
+  const o = {}; f.formatToParts(new Date(ms)).forEach(p => { o[p.type] = +p.value; });
+  return { y:o.year, mo:o.month, d:o.day, h:o.hour % 24, mi:o.minute, s:o.second };
+}
+// The instant when the gym's clock reads y-mo-d h:mi.
+function zonedMs(y, mo, d, h, mi){
+  const want = Date.UTC(y, mo - 1, d, h, mi);
+  let t = want;
+  for(let i = 0; i < 3; i++){
+    const p = partsAt(t);
+    t += want - Date.UTC(p.y, p.mo - 1, p.d, p.h, p.mi, p.s);
+  }
+  return t;
+}
+// The most recent watch window that has started: {start, end, active}.
+// No hours set (or 00:00–00:00) = watched all day: use the last 24 hours.
+function watchWindow(){
+  const now = Date.now();
+  const m1 = /^(\d{1,2}):(\d{2})$/.exec((effSchedule && effSchedule.start) || '');
+  const m2 = /^(\d{1,2}):(\d{2})$/.exec((effSchedule && effSchedule.end) || '');
+  if(!m1 || !m2 || (m1[1] * 60 + +m1[2]) === (m2[1] * 60 + +m2[2])) return { start: now - 864e5, end: now, active: true, always: true };
+  const sMin = m1[1] * 60 + +m1[2], eMin = m2[1] * 60 + +m2[2];
+  const p = partsAt(now);
+  const day = off => { const d = new Date(Date.UTC(p.y, p.mo - 1, p.d + off)); return [d.getUTCFullYear(), d.getUTCMonth() + 1, d.getUTCDate()]; };
+  for(const off of [0, -1, -2]){
+    const [y, mo, d] = day(off);
+    const start = zonedMs(y, mo, d, +m1[1], +m1[2]);
+    if(start > now) continue;
+    const [y2, mo2, d2] = eMin <= sMin ? day(off + 1) : [y, mo, d];
+    const end = zonedMs(y2, mo2, d2, +m2[1], +m2[2]);
+    return { start, end, active: now < end };
+  }
+  return null;
+}
+function scheduleWords(){ return effSchedule && effSchedule.start && effSchedule.end && effSchedule.start !== effSchedule.end ? `${hhmmWords(effSchedule.start)} – ${hhmmWords(effSchedule.end)}` : null; }
+
+// ---- plain words for an entry -----------------------------------------
+function headline(e){
+  const n = e.people, exp = e.expected || 1;
+  if(e.kind === 'flag'){
+    if(n == null) return 'More people came in than expected';
+    if(n - exp === 1) return exp === 1 ? 'Someone may have followed a member in' : `One extra person came in (${n}, expected ${exp})`;
+    return `${n} people came in, only ${exp} expected`;
+  }
+  if(e.kind === 'possible') return n == null ? 'Maybe more than one person — not certain' : `Maybe ${n} people came in — not certain`;
+  if(e.kind === 'unchecked') return 'Entry we couldn’t check automatically';
+  if(e.kind === 'gate') return 'Accessible gate used';
+  if(n === 0) return 'Nobody visible';
+  if(n === 1) return '1 person — normal';
+  if(n == null) return 'Entry — normal';
+  return `${n} people — normal (${exp} expected)`;
+}
+function todo(e){
+  const t = timeOf(e.at);
+  if(e.kind === 'unchecked') return `Have a look at the photos. If more than one person came through, check your check-in log around ${t}.`;
+  if(e.kind === 'possible') return `The photos aren't clear. Worth a quick look, and your check-in log around ${t}.`;
+  return `Check your check-in log around ${t}: if only one person scanned, it's a tailgate. Then tap a button below.`;
+}
+const needsLook = e => (e.kind === 'flag' || e.kind === 'possible' || e.kind === 'unchecked');
+const photoUrl = f => `/monitor/frame/${encodeURIComponent(gymCode)}/${encodeURIComponent(f)}`;
+const clockNote = () => ((data && data.gym && data.gym.cameraClockNote) || '').trim();
+function keptWords(e){
+  if(!e.keptUntil) return '';
+  const t = Date.parse(e.keptUntil); if(isNaN(t)) return '';
+  return `Photos kept until ${fmt(e.keptUntil, { weekday:'short', month:'short', day:'numeric', hour:'numeric', minute:'2-digit' })}`;
 }
 
-// Prefer the time the camera saw it over the time we analysed it. Those
-// differ by up to a minute, and the camera's is the one that lines up
-// with a check-in record.
-function eventTime(e){ return e.capturedAt || e.timestamp; }
-function ago(iso){
-  const s = Math.floor((Date.now() - new Date(iso)) / 1000);
-  if(s < 60) return s + 's';
-  if(s < 3600) return Math.floor(s/60) + 'm';
-  if(s < 86400) return Math.floor(s/3600) + 'h';
-  return Math.floor(s/86400) + 'd';
-}
-
-let gymCode = 'default';
-
-// Flagged events are the reason this page exists — a matched entry is
-// just confirmation nothing happened. Default to floating them to the
-// top, while keeping strict chronological order available, because when
-// you're reconciling against check-in times you need the timeline intact.
-let sortMode = 'flagged';
-let lastLog = [], lastStatus = {};
-
-let loaded = false;
-
-function setSort(mode){
-  sortMode = mode;
-  document.getElementById('segFlagged').classList.toggle('on', mode === 'flagged');
-  document.getElementById('segTime').classList.toggle('on', mode === 'time');
-  document.getElementById('segOnly').classList.toggle('on', mode === 'only');
-  if(loaded) renderLog(lastLog, lastStatus);
+// ---- loading ---------------------------------------------------------
+async function api(url, opts){
+  const r = await fetch(url, Object.assign({ credentials:'same-origin', headers:{ 'Content-Type':'application/json' } }, opts || {}));
+  let body = {}; try{ body = await r.json(); }catch(e){}
+  return { status: r.status, ok: r.ok, body };
 }
 
 async function load(){
-  try{
-    const [st, log] = await Promise.all([
-      fetch('/monitor/status').then(r => r.json()).catch(() => ({})),
-      fetch('/monitor/log').then(r => r.json()).catch(() => []),
-    ]);
-        if(st.gymCode) gymCode = st.gymCode;
-      const hrs = st.logRetentionHours;
-      if(hrs){
-        document.getElementById('listTitle').textContent = `Last ${hrs} hours`;
-        document.getElementById('lblTotal').textContent = `EVENTS (${hrs}H)`;
-      }
-    lastStatus = st;
-    lastLog = Array.isArray(log) ? log : [];
-    loaded = true;
-    renderStatus(st);
-    renderLog(lastLog, st);
-  } catch(err){
-    document.getElementById('statusMain').textContent = 'Could not reach the server';
+  let st;
+  try{ st = await api('/monitor/status'); }
+  catch(e){ return showOffline(); }
+  if(!st.ok || st.body.codeRequired && !st.body.signedIn) return showGate();
+  const s = st.body;
+  codeRequired = !!s.codeRequired;
+  // The watch hours in force (the website's settings win over the laptop's).
+  const c = s.config || {};
+  const statusSched = (c.scheduleStart && c.scheduleEnd) ? { start: c.scheduleStart, end: c.scheduleEnd } : null;
+  const act = await api('/gym/activity').catch(() => null);
+  if(!act) return showOffline();
+  if(act.status === 401) return showGate();
+  if(!act.ok) return showOffline();
+  // /gym/activity's gymCode is the gym's KEY: where its photos live.
+  gymCode = act.body.gymCode || 'default';
+  effSchedule = statusSched || (act.body.gym && act.body.gym.schedule) || null;
+  const json = JSON.stringify(act.body) + JSON.stringify(effSchedule);
+  $('gate').hidden = true; $('app').hidden = false;
+  if(json === lastJson) { renderStatus(act.body.gym); openPendingLink(); return; }   // nothing new: leave the page (and scroll, open sections) alone
+  lastJson = json; data = act.body;
+  render();
+  openPendingLink();
+}
+
+function showOffline(){
+  $('gate').hidden = true; $('app').hidden = false;
+  $('dot').className = 'dot warn';
+  $('statusT').textContent = 'Can’t reach SecurityAI right now';
+  $('statusS').textContent = 'Check this phone has signal. The page will try again by itself.';
+}
+
+function showGate(msg){
+  $('app').hidden = true; $('gate').hidden = false; $('alertsLink').hidden = true;
+  if(msg){ $('signInMsg').textContent = msg; $('signInMsg').className = 'msg bad'; }
+}
+
+// ---- render -------------------------------------------------------------
+function render(){
+  const g = data.gym || {};
+  timeZone = g.timeZone || undefined;
+  $('gymName').textContent = g.name || 'Entrance activity';
+  document.title = (g.name ? g.name + ' — ' : '') + 'Entrance activity';
+  $('tzNote').textContent = tzName() ? `Times are ${tzName()}.` : '';
+  $('signOutBtn').hidden = !codeRequired;
+  $('retention').textContent = (data.retention && data.retention.text) || 'Photos are deleted after 48 hours. Flagged entries, and any you mark Tailgate, are kept 35 days for the monthly report.';
+  renderStatus(g);
+  renderSummary();
+  renderList();
+  renderMonth();
+  $('alertsCard').hidden = !data.canManageAlerts;
+  $('alertsLink').hidden = !data.canManageAlerts;
+  const sw = scheduleWords();
+  $('alertsCopy').textContent = sw
+    ? `We watch ${sw} each night. When something's flagged in those hours, we'll email or text these people with a photo. They're also told if the camera computer goes offline then.`
+    : `We watch all day and night. When something's flagged, we'll email or text these people with a photo. They're also told if the camera computer goes offline.`;
+  if(data.canManageAlerts && !alertsLoaded) loadAlerts();
+}
+
+function renderStatus(g){
+  g = g || {};
+  const dot = $('dot'), t = $('statusT'), s = $('statusS');
+  const sched = scheduleWords() || (g.schedule ? `${hhmmWords(g.schedule.start)} – ${hhmmWords(g.schedule.end)}` : null);
+  const bad = (g.zones || []).filter(z => z.picture ? z.picture === 'no-picture' : !z.ok).map(z => z.label);
+  switch(g.state){
+    case 'watching':
+      dot.className = 'dot ok'; t.textContent = 'Watching your entrance';
+      s.textContent = sched ? `Every night ${sched}. Camera picture OK.` : 'All day and night. Camera picture OK.'; break;
+    case 'off-hours':
+      dot.className = 'dot off'; t.textContent = 'Not watching right now';
+      s.textContent = sched ? `Watching runs ${sched} each night.` : 'Outside the watched hours.'; break;
+    case 'starting':
+      dot.className = 'dot off'; t.textContent = 'Camera starting up…';
+      s.textContent = 'The camera computer has just started. Pictures usually come through within a minute.'; break;
+    case 'offline':
+      dot.className = 'dot warn';
+      t.textContent = g.since ? `Camera computer offline since ${dayWords(g.since) === 'Today' ? '' : dayWords(g.since) + ' '}${timeOf(g.since)}` : 'Camera computer offline';
+      s.textContent = 'Joseph at SecurityAI has been told. If it’s still offline when you open, check the laptop in the back room is plugged in with the lid open.'; break;
+    case 'no-picture':
+      dot.className = 'dot warn'; t.textContent = `No picture from ${bad.length ? bad.join(', ') : 'the camera'}`;
+      s.textContent = 'Joseph at SecurityAI is told when a camera has had no picture for 5 minutes. If it’s still like this when you open, check the camera recorder in the back room is switched on.'; break;
+    case 'problem':
+      dot.className = 'dot warn'; t.textContent = 'Not recording right now';
+      s.textContent = 'Something on SecurityAI’s side needs fixing, and it shows on their screen too. Nothing you need to do.'; break;
+    case 'paused':
+      dot.className = 'dot off'; t.textContent = 'Watching is paused';
+      s.textContent = 'SecurityAI paused it. Contact us if you didn’t expect this.'; break;
+    case 'connecting':
+      dot.className = 'dot off'; t.textContent = 'Reconnecting to your camera…';
+      s.textContent = 'This usually takes under a minute.'; break;
+    default:
+      dot.className = 'dot off'; t.textContent = 'Setup in progress';
+      s.textContent = 'Your camera isn’t connected yet. Anything flagged will show up here once it is.';
   }
 }
 
-function renderStatus(s){
-  const dot = document.getElementById('dot');
-  const main = document.getElementById('statusMain');
-  const sub = document.getElementById('statusSub');
-  if(!s.running){
-    dot.className = 'dot'; main.textContent = 'Not running';
-    sub.textContent = ''; return;
-  }
-  const inWindow = s.withinSchedule !== false;
-  dot.className = inWindow ? 'dot live' : 'dot idle';
-  const where = s.ingestDetail && s.ingestDetail.transports
-    ? s.ingestDetail.transports.join(', ') : 'monitoring';
-  main.textContent = inWindow ? `Watching — ${where}` : 'Idle — outside monitored hours';
-  const bits = [];
-  if(s.config && s.config.scheduleStart) bits.push(`${s.config.scheduleStart}–${s.config.scheduleEnd}`);
-  // capacityUsedPct comes pre-computed from the server; the raw counts and
-  // the cap are deliberately not exposed to this page.
-  if(typeof s.capacityUsedPct === 'number' && s.capacityUsedPct >= 60){
-    bits.push(`${s.capacityUsedPct}% of today's capacity used`);
-  }
-  if(s.heartbeatLost) bits.push('not receiving — needs attention');
-  sub.textContent = bits.join(' · ');
-
-}
-
-function renderLog(log, st){
-  const el = document.getElementById('list');
-  const hint = document.getElementById('hint');
-
-  const real = log.filter(e => !e.error);
-  const flagged = real.filter(e => e.tailgate_flag);
-  const people = real.reduce((n, e) => n + (Number(e.people_count) || 0), 0);
-  document.getElementById('sTotal').textContent = real.length;
-  document.getElementById('sFlag').textContent = flagged.length;
-  document.getElementById('sPeople').textContent = people;
-  document.getElementById('sLast').textContent = log.length ? ago(eventTime(log[0])) : '—';
-
-  if(!log.length){
-    el.innerHTML = '<div class="empty">Nothing in the retention window yet.</div>';
-    hint.style.display = 'block';
-    hint.innerHTML = (st && st.withinSchedule === false)
-      ? '<strong>Currently outside monitored hours.</strong> Events during this time are deliberately discarded without being analysed, so nothing will appear until the window opens.'
-      : '<strong>No events yet.</strong> If the server console shows analyses but nothing appears here, open Diagnostics below — it reports exactly what is stopping them.';
+function plural(n, one, many){ return `${n} ${n === 1 ? one : many}`; }
+function renderSummary(){
+  const ev = data.events || [];
+  const hours = (data.gym && data.gym.retentionHours) || 48;
+  const el = $('summary');
+  const w = watchWindow();
+  const inW = e => { const t = Date.parse(e.at); return w && t >= w.start && t <= w.end; };
+  const label = !w ? `Last ${hours} hours` : w.always ? 'Last 24 hours' : `${w.active ? 'Tonight so far' : 'Last night'} (${scheduleWords()})`;
+  const open = ev.filter(e => needsLook(e) && !e.review);
+  const openNow = w ? open.filter(inW) : open;
+  const earlier = open.filter(e => !openNow.includes(e));
+  const winEv = w ? ev.filter(inW) : ev;
+  const normal = winEv.filter(e => !needsLook(e) && e.kind !== 'gate').length;
+  const gates = winEv.filter(e => e.kind === 'gate').length;
+  const checked = winEv.filter(e => needsLook(e) && e.review).length;
+  if(!ev.length){
+    el.innerHTML = `<div class="big">Nothing yet</div><div class="s">No entries in the last ${esc(hours)} hours.</div>`;
     return;
   }
-  hint.style.display = 'none';
-
-  // Sorting happens on a copy — the underlying log stays newest-first so
-  // "last event" and the counters above are unaffected by the view.
-  const byTime = (a, b) => new Date(eventTime(b)) - new Date(eventTime(a));
-  let view, showDivider = false;
-  if(sortMode === 'only'){
-    view = log.filter(e => e.tailgate_flag).sort(byTime);
-    if(!view.length){
-      el.innerHTML = '<div class="empty">No flagged events in this window. Everything that came through matched what was expected.</div>';
-      return;
-    }
-  } else if(sortMode === 'time'){
-    view = log.slice().sort(byTime);
+  const bits = [plural(normal, 'normal entry', 'normal entries')];
+  if(checked) bits.push(`${checked} flagged, checked`);
+  if(gates) bits.push(`${plural(gates, 'accessible-gate entry', 'accessible-gate entries')} to match to your log`);
+  const older = earlier.length
+    ? `<div class="older">${esc(plural(earlier.length, 'more', 'more'))} still open from ${w && !w.always ? 'earlier' : 'before that'}</div>` : '';
+  if(openNow.length){
+    el.innerHTML = `<div class="big bad">${esc(label)}: ${openNow.length} ${openNow.length === 1 ? 'needs' : 'need'} a look</div>${older}
+      <div class="s">${esc(bits.join(' · '))}</div>`;
+  } else if(earlier.length){
+    el.innerHTML = `<div class="big">${esc(label)}: nothing needs a look</div>${older}
+      <div class="s">${esc(bits.join(' · '))}</div>`;
   } else {
-    // "Needs attention" is a flag OR a failed analysis. A failed one cost
-    // money and produced nothing, so burying it among routine matched
-    // entries is the wrong call.
-    const attention = e => e.tailgate_flag || e.error;
-    const top = log.filter(attention).sort(byTime);
-    const rest = log.filter(e => !attention(e)).sort(byTime);
-    showDivider = top.length > 0 && rest.length > 0;
-    view = top.concat(rest);
+    el.innerHTML = `<div class="big good">All clear</div>
+      <div class="s">${esc(label)}: ${esc(bits.join(' · '))}${checked ? '' : ' · nothing flagged'}</div>`;
   }
-  const firstUnflagged = showDivider ? view.findIndex(e => !(e.tailgate_flag || e.error)) : -1;
-
-  el.innerHTML = view.map((e, idx) => {
-    const lead = (idx === firstUnflagged) ? '<div class="divider">EVERYTHING ELSE</div>' : '';
-    return lead + renderEvent(e);
-  }).join('');
 }
 
-// A one-glance summary in ordinary words, above Claude's fuller
-// description. Reading "2 people went through when 1 was expected" is
-// faster than parsing counts out of a sentence at 9am.
-function headlineFor(e){
-  // Only state a count when there actually is one. Saying "0 people went
-  // through when 1 was expected" for an event whose counts are missing is
-  // confidently wrong, which is worse than saying nothing — the reader has
-  // no way to tell it apart from a genuine reading of zero.
-  const hasCount = Number.isFinite(Number(e.people_count)) && e.people_count !== null && e.people_count !== '';
-  const n = hasCount ? Number(e.people_count) : null;
-  const exp = Number.isFinite(Number(e.expectedCount)) ? Number(e.expectedCount) : 1;
-
-  if(e.tailgate_flag){
-    if(n === null) return 'Flagged — more people than expected';
-    if(n - exp === 1) return `Someone extra got in — ${n} people went through, ${exp} expected`;
-    return `${n} people went through when ${exp === 1 ? 'only 1 was' : exp + ' were'} expected`;
+function renderList(){
+  $('viewFlagged').setAttribute('aria-pressed', view === 'flagged');
+  $('viewTimeline').setAttribute('aria-pressed', view === 'timeline');
+  const ev = data.events || [];
+  const el = $('list');
+  const openState = {};
+  el.querySelectorAll('details[data-k]').forEach(d => openState[d.dataset.k] = d.open);
+  const pin = pinned && !byId(pinned.id, true) ? pinned : null;
+  const pinHtml = pin ? `<div class="from"><span>From your alert or report</span><button class="btn link" type="button" data-unpin="1">Hide</button></div>${card(pin)}` : '';
+  if(!ev.length){
+    const st = (data.gym || {}).state;
+    el.innerHTML = pinHtml + `<div class="card empty"><div class="big">${st === 'watching' || st === 'off-hours' ? 'No entries yet' : 'Nothing to show yet'}</div>
+      Each time someone comes through the entrance while we're watching, it shows up here with photos. Anything unusual goes to the top.</div>`;
+    return;
   }
-  if(e.accessible_gate_used) return 'Someone used the accessible gate';
-  if(n === null) return 'Event recorded';
-  if(n === 0) return 'Nobody visible in the photo';
-  if(n === 1) return 'One person went through, as expected';
-  return `${n} people went through, which matches what was expected`;
+  if(view === 'timeline'){
+    el.innerHTML = pinHtml + group('all', `Everything, newest first (${ev.length})`, ev, true);
+  } else {
+    const open = ev.filter(e => needsLook(e) && !e.review);
+    const gates = ev.filter(e => e.kind === 'gate');
+    const done = ev.filter(e => needsLook(e) && e.review);
+    const normal = ev.filter(e => !needsLook(e) && e.kind !== 'gate');
+    let h = pinHtml;
+    if(open.length || gates.length){
+      h += `<h2 class="section-title">Needs a look</h2>` + open.map(card).join('');
+      // Accessible-gate entries: nothing to judge, but they should be
+      // matched to a manual check-in (G10).
+      if(gates.length) h += `<div class="rows" style="padding:0;">${rows(gates, true)}</div>`;
+    }
+    if(done.length) h += `<h2 class="section-title">Checked</h2>` + done.map(card).join('');
+    if(normal.length) h += group('normal', `Normal entries (${normal.length})`, normal, !!openState.normal);
+    el.innerHTML = h;
+  }
+  // Rows inside a closed section are only drawn when it's opened, so a
+  // busy gym's 60 entries don't all load photos on a phone at once.
+  el.querySelectorAll('details[data-k]').forEach(d => {
+    if(openState[d.dataset.k]) d.open = true;
+    d.addEventListener('toggle', () => { if(d.open) fillGroup(d); });
+    if(d.open) fillGroup(d);
+  });
+}
+function fillGroup(d){
+  const box = d.querySelector('.rows');
+  if(!box.dataset.done){ box.dataset.done = '1'; box.innerHTML = rows(JSON.parse(d.dataset.ids).map(id => byId(id))); }
+}
+function byId(id, listOnly){
+  const e = (data && data.events || []).find(x => x.id === id);
+  if(e || listOnly) return e;
+  return pinned && pinned.id === id ? pinned : undefined;
 }
 
-function renderEvent(e){
-  const shots = (e.frames && e.frames.length) ? e.frames : (e.frame ? [e.frame] : []);
-  const imgs = shots.map((f, i) =>
-    `<a href="/monitor/frame/${encodeURIComponent(gymCode)}/${encodeURIComponent(f)}" target="_blank" rel="noopener" title="Frame ${i+1} of ${shots.length}"><img src="/monitor/frame/${encodeURIComponent(gymCode)}/${encodeURIComponent(f)}" alt="Frame ${i+1}"></a>`).join('');
-  const thumbs = imgs ? `<span class="shots">${imgs}</span>` : '';
-
-  if(e.error){
-    return `<div class="ev err">${thumbs}<div class="body">
-      <div class="concl">Could not analyse this event</div>
-      <div class="meta">${fmtTime(eventTime(e))}${e.zoneLabel ? ' · ' + esc(e.zoneLabel) : ''} — ${esc(e.error)}</div>
-    </div><span class="badge bad">Error</span></div>`;
+function group(k, title, list, open){
+  return `<details class="group" data-k="${esc(k)}" data-ids='${esc(JSON.stringify(list.map(e => e.id)))}'${open ? ' open' : ''}>
+    <summary>${esc(title)}</summary><div class="rows"></div></details>`;
+}
+function rows(list, gateRows){
+  let last = '', h = '';
+  for(const e of list){
+    if(!e) continue;
+    const d = dayWords(e.at);
+    if(!gateRows && d !== last){ h += `<div class="day">${esc(d)}</div>`; last = d; }
+    const tag = needsLook(e)
+      ? (e.review ? `<span class="tag ${e.review.verdict === 'tailgate' ? 'bad' : 'ok'}">${e.review.verdict === 'tailgate' ? 'Tailgate' : 'Fine'}</span>`
+                  : `<span class="tag ${e.kind === 'flag' ? 'bad' : 'warn'}">${e.kind === 'flag' ? 'Flagged' : 'Check'}</span>`)
+      : (e.kind === 'gate' ? '<span class="tag warn">Gate</span>' : '');
+    const img = e.photos.length ? `<img src="${esc(photoUrl(e.photos[0]))}" alt="" loading="lazy">` : '<span class="noimg"></span>';
+    const sub = gateRows ? `Accessible gate used · ${dayWords(e.at)} — match to your check-in log` : headline(e);
+    h += `<button type="button" class="row${gateRows ? ' gate' : ''}" id="row-${esc(e.id)}" data-open="${esc(e.id)}" aria-label="${esc(headline(e) + ', ' + timeOf(e.at))}. Show photos">${img}
+      <span style="min-width:0;"><span class="rt">${esc(timeOf(e.at))}</span> <span class="rs">${esc(e.zone || '')}</span><br><span class="rs">${esc(sub)}</span></span>${tag}</button>`;
   }
-
-  const kind = e.tailgate_flag ? 'bad' : (e.accessible_gate_used ? 'warn' : 'ok');
-  const label = e.tailgate_flag ? 'Flagged' : (e.accessible_gate_used ? 'Accessible gate' : 'Matched');
-  let alertNote = '';
-  if(e.alertResult){
-    const p = [];
-    if(e.alertResult.email) p.push('email ' + esc(e.alertResult.email));
-    if(e.alertResult.sms) p.push('sms ' + esc(e.alertResult.sms));
-    if(p.length) alertNote = ' · alert ' + p.join(', ');
-  }
-  return `<div class="ev${e.tailgate_flag ? ' flag' : ''}">${thumbs}<div class="body">
-    <div class="headline">${esc(headlineFor(e))}</div>${e.clockSkewMinutes ? `<div class="skew">Recorder clock looks ${Math.abs(e.clockSkewMinutes) > 120 ? 'badly ' : ''}out by about ${esc(Math.abs(Math.round(e.clockSkewMinutes)))} minutes — time shown is when the alert was sent, not the recorder's own clock</div>` : ''}
-    <div class="concl">${esc(e.note || 'No description returned')}</div>
-    <div class="meta">${fmtTime(eventTime(e))}${e.zoneLabel ? ' · ' + esc(e.zoneLabel) : ''} — ${esc(e.people_count)} crossed, ${esc(e.expectedCount || 1)} expected${e.queued_count ? ', ' + esc(e.queued_count) + ' waiting' : ''}${e.burstFrames ? ' · ' + esc(e.burstFrames) + ' photo' + (e.burstFrames == 1 ? '' : 's') : ''}${alertNote}</div>
-  </div><span class="badge ${kind}">${label}</span></div>`;
+  return h;
 }
 
-// The alarm emails stay in Gmail even if the log is lost — a redeploy on
-// an unmounted disk wipes it. This pulls them back through so a night's
-// events can be recovered rather than gone for good.
-load();
-setInterval(load, 5000);
+function card(e){
+  const p = e.photos;
+  const cls = e.review ? 'done' : e.kind;
+  const max = data.reviewNoteMax || 120;
+  const note = clockNote();
+  const main = p.length
+    ? `<button type="button" class="photo" data-open="${esc(e.id)}" data-i="0" aria-label="Show photos full screen"><img src="${esc(photoUrl(p[0]))}" alt="Entrance photo, ${esc(timeOf(e.at))}" loading="lazy">${p.length > 1 ? `<span class="n">${p.length} photos</span>` : ''}</button>`
+    : '';
+  const thumbs = p.length > 1 ? `<div class="thumbs">${p.map((f, i) => `<button type="button" data-swap="${esc(e.id)}" data-i="${i}" aria-label="Photo ${i+1}"${i === 0 ? ' aria-current="true"' : ''}><img src="${esc(photoUrl(f))}" alt="" loading="lazy"></button>`).join('')}</div>` : '';
+  const clock = note && p.length ? `<div class="clock">${esc(note)}</div>` : '';
+  const verdict = e.review
+    ? `<div class="verdict"><span>You marked this: <strong>${e.review.verdict === 'tailgate' ? 'Tailgate' : 'It was fine'}</strong></span>
+         <button class="btn link" type="button" data-review="${esc(e.id)}" data-v="">Change</button></div>
+       ${e.review.note ? `<p class="ynote"><b>Your note:</b> ${esc(e.review.note)}</p>` : ''}`
+    : `<div class="todo">${esc(todo(e))}</div>
+       <label class="sr" for="note-${esc(e.id)}">Optional note</label>
+       <input class="noteIn" id="note-${esc(e.id)}" data-note="${esc(e.id)}" maxlength="${esc(max)}" autocomplete="off" enterkeyhint="done"
+         placeholder="Optional note, e.g. who it was" value="${esc(drafts[e.id] || '')}">
+       <div class="actions">
+         <button class="btn red" type="button" data-review="${esc(e.id)}" data-v="tailgate">Yes, tailgate</button>
+         <button class="btn green" type="button" data-review="${esc(e.id)}" data-v="fine">It was fine</button>
+       </div>`;
+  const kept = keptWords(e);
+  return `<article class="inc ${esc(cls)}" id="ev-${esc(e.id)}">
+    <div class="media">${main}${thumbs}${clock}</div>
+    <div class="body">
+      <h3>${esc(headline(e))}</h3>
+      <div class="when">${esc(whenWords(e.at))}${e.zone ? ' · ' + esc(e.zone) : ''}</div>
+      ${kept ? `<div class="kept">${esc(kept)}</div>` : ''}
+      ${e.note ? `<p class="said"><b>What the camera saw</b>${esc(e.note)}</p>` : ''}
+      ${verdict}
+      <div class="actions"><button class="btn share" type="button" data-share="${esc(e.id)}">Send this</button></div>
+    </div></article>`;
+}
+
+function renderMonth(){
+  const m = data.month;
+  $('monthCard').hidden = !m && !(data.events || []).length;
+  if(!m) return;
+  // One consistent set: flagged = marked Tailgate + marked fine + not checked.
+  const confirmed = m.confirmed || 0, fine = m.fine || 0, open = m.notReviewed || 0;
+  $('mFlag').textContent = confirmed + fine + open;
+  $('mConf').textContent = confirmed; $('mFine').textContent = fine; $('mOpen').textContent = open;
+  const watched = m.nightsWatched ? `Watched ${plural(m.nightsWatched, 'night', 'nights')} and checked ${plural(m.entriesChecked || 0, 'entry', 'entries')}. ` : '';
+  $('mNote').textContent = watched + ((confirmed + fine + open)
+    ? (open ? `${open} not checked yet. What you mark here goes into the monthly report, emailed on the 1st. ` : 'All checked. The report is emailed to you on the 1st of each month. ')
+    : 'Nothing flagged. The report is emailed to you on the 1st of each month. ')
+    + '“Not certain” entries nobody marked are deleted after 48 hours and aren’t counted here.';
+}
+
+// ---- actions ------------------------------------------------------------
+document.addEventListener('input', ev => {
+  const t = ev.target;
+  if(t && t.dataset && t.dataset.note) drafts[t.dataset.note] = t.value;
+});
+document.addEventListener('click', async ev => {
+  const t = ev.target.closest('button'); if(!t) return;
+  if(t.dataset.review !== undefined){
+    const id = t.dataset.review, v = t.dataset.v || null;
+    const body = { id, verdict: v };
+    const prev = byId(id);
+    if(v){ const box = $('note-' + id); body.note = (box ? box.value : (drafts[id] || '')).trim(); }
+    else if(prev && prev.review && prev.review.note) drafts[id] = prev.review.note;   // "Change": keep the note to hand
+    t.disabled = true;
+    const r = await api('/gym/review', { method:'POST', body: JSON.stringify(body) }).catch(() => null);
+    if(!r || !r.ok){ t.disabled = false; alert((r && r.body.error) || 'Couldn’t save that — check your signal and try again.'); return; }
+    if(v) delete drafts[id];
+    const e = byId(id); if(e){ e.review = r.body.review; if(r.body.keptUntil) e.keptUntil = r.body.keptUntil; }
+    render();
+    lastJson = ''; await load();              // re-sync, incl. the 30-day counts
+    const c = $('ev-' + id); if(c) c.scrollIntoView({ block:'center' });
+    return;
+  }
+  if(t.dataset.unpin){ pinned = null; renderList(); return; }
+  if(t.dataset.share) return share(t.dataset.share, t);
+  if(t.dataset.swap){
+    const e = byId(t.dataset.swap), i = +t.dataset.i, c = $('ev-' + e.id);
+    c.querySelector('.photo img').src = photoUrl(e.photos[i]);
+    c.querySelector('.photo').dataset.i = i;
+    c.querySelectorAll('.thumbs button').forEach(b => b.setAttribute('aria-current', b === t));
+    return;
+  }
+  if(t.dataset.open) return openViewer(t.dataset.open, +(t.dataset.i || 0));
+});
+
+async function share(id, btn){
+  btn.disabled = true;
+  const r = await api('/gym/share', { method:'POST', body: JSON.stringify({ id }) }).catch(() => null);
+  btn.disabled = false;
+  if(!r || !r.ok){ alert((r && r.body.error) || 'Couldn’t make a link just now.'); return; }
+  const url = location.origin + r.body.url, e = byId(id);
+  const works = r.body.expiresText ? `This link works ${r.body.expiresText}` : 'This link works for a limited time';
+  const until = r.body.expiresAt ? ` (until ${fmt(r.body.expiresAt, { weekday:'short', month:'short', day:'numeric', hour:'numeric', minute:'2-digit' })})` : '';
+  const title = `${(data.gym && data.gym.name) || 'Entrance'}: ${timeOf(e.at)} ${dayWords(e.at).toLowerCase()}`;
+  if(navigator.share){
+    try{ await navigator.share({ title, text: `${headline(e)} — ${title}. ${works}.`, url }); return; }
+    catch(err){ if(err && err.name === 'AbortError') return; }
+  }
+  $('sheetExp').textContent = `Anyone with this link can see this one entry and its photos — nothing else. ${works}${until}.`;
+  $('sheetUrl').value = url; $('sheet').classList.add('open'); $('sheetCopy').focus();
+}
+$('sheetCopy').onclick = async () => {
+  try{ await navigator.clipboard.writeText($('sheetUrl').value); $('sheetCopy').textContent = 'Copied'; }
+  catch(e){ $('sheetUrl').select(); document.execCommand && document.execCommand('copy'); $('sheetCopy').textContent = 'Copied'; }
+  setTimeout(() => $('sheetCopy').textContent = 'Copy link', 2000);
+};
+$('sheetClose').onclick = () => $('sheet').classList.remove('open');
+
+// ---- photo viewer ----------------------------------------------------------
+// Photo 1 is the large copy (up to 1024 px) when the camera computer sent
+// one; the others are the smaller frames that were analysed.
+let vEvent = null, vIndex = 0, vReturn = null;
+function openViewer(id, i){
+  vEvent = byId(id); if(!vEvent || !vEvent.photos.length) return;
+  vReturn = document.activeElement; vIndex = i || 0;
+  const n = clockNote();
+  $('vClock').textContent = n; $('vClock').hidden = !n;
+  $('viewer').classList.add('open'); showPhoto(); $('vClose').focus();
+}
+function showPhoto(){
+  const p = vEvent.photos;
+  $('vImg').src = photoUrl(p[vIndex]);
+  $('vImg').alt = `Photo ${vIndex + 1} of ${p.length}`;
+  $('vCap').textContent = `${dayWords(vEvent.at)}, ${timeOf(vEvent.at)} · photo ${vIndex + 1} of ${p.length}`;
+  $('vPrev').disabled = vIndex === 0; $('vNext').disabled = vIndex >= p.length - 1;
+}
+function closeViewer(){ $('viewer').classList.remove('open'); $('vImg').removeAttribute('src'); if(vReturn) vReturn.focus(); }
+$('vClose').onclick = closeViewer;
+$('vPrev').onclick = () => { if(vIndex > 0){ vIndex--; showPhoto(); } };
+$('vNext').onclick = () => { if(vIndex < vEvent.photos.length - 1){ vIndex++; showPhoto(); } };
+document.addEventListener('keydown', e => {
+  if(!$('viewer').classList.contains('open')){ if(e.key === 'Escape') $('sheet').classList.remove('open'); return; }
+  if(e.key === 'Escape') closeViewer();
+  if(e.key === 'ArrowLeft') $('vPrev').click();
+  if(e.key === 'ArrowRight') $('vNext').click();
+});
+// Swipe left/right between photos on a phone.
+let sx = null;
+$('viewer').addEventListener('touchstart', e => { sx = e.touches[0].clientX; }, { passive:true });
+$('viewer').addEventListener('touchend', e => {
+  if(sx == null) return; const dx = e.changedTouches[0].clientX - sx; sx = null;
+  if(Math.abs(dx) > 50) (dx < 0 ? $('vNext') : $('vPrev')).click();
+});
+
+$('viewFlagged').onclick = () => { view = 'flagged'; store('sai:view', view); renderList(); };
+$('viewTimeline').onclick = () => { view = 'timeline'; store('sai:view', view); renderList(); };
+$('alertsLink').onclick = () => {
+  const c = $('alertsCard'); if(c.hidden) return;
+  c.scrollIntoView({ block:'start', behavior:'smooth' });
+  setTimeout(() => $('addIn').focus({ preventScroll:true }), 400);
+};
+
+// ---- links from alerts and the monthly report: #ev-<id> ----------------
+// Kept through sign-in (and for a few minutes, in case this phone opens
+// the page again from the home screen), then opened once the list is drawn.
+function rememberLink(){
+  const m = /^#ev-([A-Za-z0-9_-]{1,64})$/.exec(location.hash || '');
+  if(m) store('sai:pendingEv', JSON.stringify({ id: m[1], at: Date.now() }));
+}
+let linkBusy = false;
+async function openPendingLink(){
+  if(linkBusy || !data) return;
+  let p = null; try{ p = JSON.parse(store('sai:pendingEv') || 'null'); }catch(e){}
+  if(!p || !p.id || Date.now() - p.at > 15 * 60e3){ if(p) store('sai:pendingEv', null); return; }
+  store('sai:pendingEv', null);
+  linkBusy = true;
+  try{
+    let e = byId(p.id, true);
+    if(!e){
+      const r = await api('/gym/event/' + encodeURIComponent(p.id)).catch(() => null);
+      if(r && r.status === 401){ store('sai:pendingEv', JSON.stringify(p)); return showGate(); }
+      if(!r || !r.ok){ alert((r && r.body && r.body.error) || 'That entry is no longer stored.'); return; }
+      pinned = r.body.event; renderList();
+    }
+    highlight(p.id);
+  } finally { linkBusy = false; }
+}
+function highlight(id){
+  let el = $('ev-' + id);
+  if(!el){
+    // A normal entry: open its section so the row exists.
+    if(view === 'flagged'){ const d = $('list').querySelector('details[data-k="normal"]'); if(d){ d.open = true; fillGroup(d); } }
+    else { const d = $('list').querySelector('details[data-k]'); if(d){ d.open = true; fillGroup(d); } }
+    el = $('row-' + id);
+  }
+  if(!el) return;
+  el.classList.add('hl');
+  el.scrollIntoView({ block:'center' });
+  setTimeout(() => el.classList.remove('hl'), 6000);
+}
+
+// ---- sign in / out ----------------------------------------------------------
+async function signIn(code){
+  const r = await api('/gym/sign-in', { method:'POST', body: JSON.stringify({ code }) }).catch(() => null);
+  if(!r) return 'Can’t reach SecurityAI — check your signal and try again.';
+  if(!r.ok) return r.body.error || 'That code didn’t work.';
+  return null;
+}
+$('signInForm').onsubmit = async ev => {
+  ev.preventDefault();
+  const code = $('codeIn').value.trim(); if(!code) return;
+  $('signInBtn').disabled = true; $('signInMsg').textContent = '';
+  const err = await signIn(code);
+  $('signInBtn').disabled = false;
+  if(err){ $('signInMsg').textContent = err; $('signInMsg').className = 'msg bad'; return; }
+  lastJson = ''; alertsLoaded = false; load();
+};
+$('forgotBtn').onclick = () => {
+  const box = $('forgotBox'); box.hidden = !box.hidden;
+  $('forgotBtn').setAttribute('aria-expanded', !box.hidden);
+  if(!box.hidden) $('forgotEmail').focus();
+};
+$('forgotBox').onsubmit = async ev => {
+  ev.preventDefault();
+  const r = await api('/gym/recover-code', { method:'POST', body: JSON.stringify({ email: $('forgotEmail').value.trim() }) }).catch(() => null);
+  $('forgotMsg').textContent = r ? 'If that email is on file, your code is on its way. Check your inbox (and spam) in a minute. Nothing after 10 minutes? Contact SecurityAI.' : 'Can’t reach SecurityAI right now — try again shortly.';
+  $('forgotMsg').className = 'msg good';
+};
+$('signOutBtn').onclick = async () => {
+  if(!confirm('Sign out on this device? You’ll need the gym code to open this page again.')) return;
+  await api('/gym/sign-out', { method:'POST' }).catch(() => {});
+  lastJson = ''; data = null; pinned = null; alertsLoaded = false; showGate();
+};
+
+// ---- alert list ---------------------------------------------------------------
+let alertsLoaded = false;
+async function loadAlerts(){
+  alertsLoaded = true;
+  const r = await api('/gym/alerts').catch(() => null);
+  if(!r || !r.ok){ $('alertsCard').hidden = true; $('alertsLink').hidden = true; alertsLoaded = false; return; }
+  renderSubs(r.body.subscribers || []);
+}
+function renderSubs(list){
+  $('subs').innerHTML = list.length
+    ? list.map(s => `<div class="sub"><span class="who">${s.kind === 'sms' ? '📱' : '✉️'} ${esc(s.to)}</span>
+        <button class="btn" type="button" data-test="${esc(s.id)}">Send test</button>
+        <button class="btn" type="button" data-remove="${esc(s.id)}" aria-label="Remove ${esc(s.to)}">Remove</button></div>`).join('')
+    : '<p class="muted small" style="margin:8px 0 0;">Nobody yet — add yourself below.</p>';
+}
+// "Saved, but..." isn't a failure: the address is on the list.
+function alertMsg(text, good){ $('alertMsg').textContent = text; $('alertMsg').className = 'msg ' + (good ? 'good' : /^Saved/.test(text || '') ? 'info' : 'bad'); }
+$('addForm').onsubmit = async ev => {
+  ev.preventDefault();
+  const to = $('addIn').value.trim(); if(!to) return;
+  $('addBtn').disabled = true; alertMsg('Adding…', true);
+  const r = await api('/gym/alerts', { method:'POST', body: JSON.stringify({ action:'add', to }) }).catch(() => null);
+  $('addBtn').disabled = false;
+  if(!r || !r.ok) return alertMsg((r && r.body.error) || 'Couldn’t add that just now.', false);
+  $('addIn').value = '';
+  renderSubs(r.body.subscribers);
+  alertMsg(r.body.message, r.body.delivered !== false);
+};
+$('subs').addEventListener('click', async ev => {
+  const b = ev.target.closest('button'); if(!b) return;
+  if(b.dataset.remove){
+    const who = b.closest('.sub').querySelector('.who').textContent.trim();
+    if(!confirm(`Stop sending alerts to ${who}?`)) return;
+    const r = await api('/gym/alerts', { method:'POST', body: JSON.stringify({ action:'remove', id: b.dataset.remove }) }).catch(() => null);
+    if(r && r.ok){ renderSubs(r.body.subscribers); alertMsg('Removed.', true); } else alertMsg('Couldn’t remove that just now.', false);
+  }
+  if(b.dataset.test){
+    b.disabled = true; alertMsg('Sending…', true);
+    const r = await api('/gym/alerts', { method:'POST', body: JSON.stringify({ action:'test', id: b.dataset.test }) }).catch(() => null);
+    b.disabled = false;
+    if(!r || !r.ok) return alertMsg((r && r.body.error) || 'Couldn’t send just now.', false);
+    alertMsg(r.body.message, r.body.delivered);
+  }
+});
+
+// ---- start --------------------------------------------------------------------
+// A link from SecurityAI can carry the code (#code=... or ?code=...): sign
+// in with it once, then take it out of the address bar so it isn't left
+// in the browser history or a screenshot.
+async function start(){
+  rememberLink();
+  const h = new URLSearchParams(location.hash.slice(1)), q = new URLSearchParams(location.search);
+  const code = h.get('code') || q.get('code');
+  if(code){
+    q.delete('code');
+    history.replaceState(null, '', location.pathname + (q.toString() ? '?' + q : ''));
+    const err = await signIn(code);
+    if(err){ $('codeIn').value = code; showGate(err); return; }
+    lastJson = ''; alertsLoaded = false;
+  }
+  load();
+}
+start();
+// A link tapped while this page is already open only changes the #part.
+window.addEventListener('hashchange', () => {
+  if(/code=/.test(location.hash)) return start();
+  if(/^#ev-/.test(location.hash)){ rememberLink(); openPendingLink(); }
+});
+
+// Refresh every 30 s while the page is on screen, and straight away when
+// the phone comes back to it. Nothing runs in a background tab.
+const typing = () => document.activeElement && document.activeElement.classList && document.activeElement.classList.contains('noteIn');
+setInterval(() => { if(!document.hidden && !$('app').hidden && !$('viewer').classList.contains('open') && !typing()) load(); }, 30000);
+document.addEventListener('visibilitychange', () => { if(!document.hidden && !$('app').hidden) load(); });
 </script>
 </body>
 </html>

@@ -8,7 +8,6 @@
 <meta name="keywords" content="gym tailgating detection, gym access control, 24 hour gym security, unauthorized gym entry, gym door monitoring, piggybacking detection, fitness club security camera">
 <meta name="author" content="SecurityAI">
 <meta name="theme-color" content="#14171A">
-<meta name="description" content="SecurityAI watches your gym's entrance camera and flags unscanned entries in real time, using Claude to tell a scanned member apart from a tailgater. $250/month for a single gym, discounted multi-gym contracts available.">
 <meta name="robots" content="index, follow">
 <link rel="canonical" href="https://your-domain-goes-here.com/securityai.html">
 <link rel="icon" type="image/svg+xml" href="logo.svg">
@@ -498,6 +497,18 @@
     .trustbar .wrap { gap: 10px 18px; padding: 14px 18px; }
     .trustbar span { font-size: 12px; }
     .plan.highlight::after { right: 10px; font-size: 9px; }
+    /* Tighter rhythm on phones: same content, less scrolling */
+    section { padding: 44px 0; }
+    .step { padding: 20px 18px; }
+    .step-n { margin-bottom: 8px; }
+    .frow { padding: 18px 0; }
+    .setup-card { padding: 16px 16px; }
+    .setup-card .sc-n { margin-bottom: 6px; }
+    .plan { padding: 22px 20px; }
+    .plan ul { margin-top: 14px; gap: 8px; }
+    .faq { padding: 16px 0; }
+    .closing { padding: 56px 0; }
+    .scanner .verdict { font-size: 11px; }
   }
 
   /* --- Phone held sideways: short but wide. Vertical space is the scarce
@@ -525,6 +536,22 @@
     .log-list { max-height: 200px; }
   }
 
+  /* Hero/closing CTAs are links now */
+  .hero-ctas a{text-decoration:none;text-align:center;display:inline-block;}
+  @media (max-width: 780px){ .hero-ctas a{display:block;width:100%;} }
+  @media (max-height: 480px) and (orientation: landscape){ .hero-ctas a{display:inline-block;width:auto;} }
+
+  /* Optional webcam demo, closed by default so it doesn't dominate the page */
+  .try-live{margin-top:26px;border:1px solid var(--line);border-radius:6px;background:var(--panel);}
+  .try-live > summary{cursor:pointer;list-style:none;padding:16px 20px;font-size:14.5px;color:var(--text);display:flex;align-items:center;gap:10px;}
+  .try-live > summary::-webkit-details-marker{display:none;}
+  .try-live > summary::before{content:"▸";color:var(--green);font-size:12px;transition:transform .15s;}
+  .try-live[open] > summary::before{transform:rotate(90deg);}
+  .try-body{padding:0 20px 20px;}
+  .try-body .demo{box-shadow:none;}
+  @media (max-width: 780px){ .try-body{padding:0 12px 14px;} .try-live > summary{padding:14px 14px;} }
+  footer a{color:var(--muted);}
+
   /* --- Big screens: stop lines getting uncomfortably long --- */
   @media (min-width: 1440px){
     .wrap { max-width: 1180px; }
@@ -541,7 +568,7 @@
       "name": "SecurityAI",
       "applicationCategory": "SecurityApplication",
       "operatingSystem": "Web",
-      "description": "Entrance monitoring for gyms. Detects tailgating and unexpected entries on cameras you already have, and sends alerts with the photo that triggered them.",
+      "description": "Hosted entrance monitoring for gyms. Flags when more people come through a door than expected, using the cameras you already have, and sends alerts with the photo.",
       "offers": [
         {"@type": "Offer", "name": "One entrance", "price": "99", "priceCurrency": "USD"},
         {"@type": "Offer", "name": "Whole gym", "price": "199", "priceCurrency": "USD"},
@@ -549,8 +576,8 @@
       ],
       "featureList": [
         "Tailgating detection at gym entrances",
-        "Works with existing cameras, no new hardware",
-        "Alerts by email and SMS with an evidence photo",
+        "Works with the cameras and recorder you already have",
+        "Alerts by email and text message with the photo",
         "Scheduled overnight monitoring",
         "No facial recognition"
       ]
@@ -559,15 +586,15 @@
       "@type": "FAQPage",
       "mainEntity": [
         {"@type": "Question", "name": "Is this facial recognition?",
-         "acceptedAnswer": {"@type": "Answer", "text": "No. SecurityAI counts people and reads behavior at your door. It does not identify anyone and cannot tell you whether a specific person is a member, an employee or a stranger."}},
+         "acceptedAnswer": {"@type": "Answer", "text": "No. SecurityAI counts people and describes what they did at your door. It does not identify anyone and cannot tell you whether a specific person is a member, an employee or a stranger."}},
         {"@type": "Question", "name": "Do I need to buy new cameras?",
-         "acceptedAnswer": {"@type": "Answer", "text": "No. SecurityAI works from the cameras you already have, whether they are shown on a computer, a locked-down NVR box, or available as an RTSP stream."}},
+         "acceptedAnswer": {"@type": "Answer", "text": "No. SecurityAI reads your entrance camera from the recorder (NVR) you already have. The only thing added at your gym is a small computer, a laptop or a Raspberry Pi, next to the recorder."}},
         {"@type": "Question", "name": "How much does gym tailgating detection cost?",
-         "acceptedAnswer": {"@type": "Answer", "text": "SecurityAI starts at 99 US dollars per month for a single entrance, 199 per month for a whole gym with unlimited entrances, and 169 per gym per month for three or more locations."}},
+         "acceptedAnswer": {"@type": "Answer", "text": "SecurityAI starts at 99 US dollars per month for a single entrance, 199 per month for every entrance at one gym, and 169 per gym per month for three or more locations."}},
         {"@type": "Question", "name": "Does it replace my check-in system?",
-         "acceptedAnswer": {"@type": "Answer", "text": "No. It sits alongside whatever check-in system you already use and flags entries that do not match what you expect."}},
+         "acceptedAnswer": {"@type": "Answer", "text": "No. It sits alongside whatever check-in system you already use and flags crossings where more people came through than expected."}},
         {"@type": "Question", "name": "What happens to the footage?",
-         "acceptedAnswer": {"@type": "Answer", "text": "Individual frames are analyzed and discarded. What is retained is an alert log with the photo that triggered each alert, kept on a rolling 24-hour basis."}}
+         "acceptedAnswer": {"@type": "Answer", "text": "No video is stored. Photos of each crossing are kept for 48 hours and then deleted. Entries flagged as tailgating are kept for 35 days for the monthly report."}}
       ]
     },
     {
@@ -598,16 +625,14 @@
     </div>
     <div class="navlinks">
       <a href="#how">How it works</a>
-      <a href="#demo">Demo</a>
-      <a href="#compare">Demo vs Paid</a>
+      <a href="sample-report.html">Sample report</a>
+      <a href="#setup">Setup</a>
       <a href="#pricing">Pricing</a>
-      <a href="#setup">Set up alerts</a>
       <a href="#faq">FAQ</a>
       <a href="#support">Support</a>
-      <a href="activity.html">Activity</a>
-      <a href="monitor.html">Live Monitor</a>
+      <a href="activity.html">Your gym's activity</a>
     </div>
-    <a class="navcta" href="#demo">See it in action</a>
+    <a class="navcta" href="sample-report.html">See a sample</a>
   </div>
 </nav>
 
@@ -616,18 +641,18 @@
     <div>
       <div class="eyebrow">For 24-hour gyms &amp; fitness clubs</div>
       <h1>Nobody watches the door at <span class="grad">2am.</span><br>Something should.</h1>
-      <p>SecurityAI watches the entrances you choose on the cameras you already own. It only looks when something actually moves, tells you who came through when they shouldn't have, and sends the picture with it.</p>
+      <p>SecurityAI watches the entrance you choose on the cameras you already own. It only looks when something moves, tells you when more people came through than should have, and sends the photo with it.</p>
       <div class="hero-ctas">
-        <button class="btn-primary" onclick="document.getElementById('demo').scrollIntoView()">Try the live demo</button>
-        <button class="btn-ghost" onclick="document.getElementById('how').scrollIntoView()">How it works</button>
+        <a class="btn-primary" href="sample-report.html">See a sample morning report</a>
+        <a class="btn-ghost" href="#how">How it works</a>
       </div>
       <div class="hero-facts">
-        <div><span class="dot"></span>Uses cameras you already have</div>
-        <div><span class="dot"></span>Set up in an evening</div>
+        <div><span class="dot"></span>Uses the cameras you already have</div>
+        <div><span class="dot"></span>We set it up with you</div>
         <div><span class="dot"></span>From $99/month</div>
       </div>
     </div>
-    <div class="scanner">
+    <div class="scanner" aria-hidden="true">
       <div class="scan-head">
         <span>ENTRANCE MONITOR</span>
         <span class="live">WATCHING</span>
@@ -658,10 +683,10 @@
 
 <div class="trustbar">
   <div class="wrap">
-    <span>No new hardware</span>
+    <span>No new cameras</span>
     <span>Nothing analyzed while the door is empty</span>
     <span>No facial recognition, ever</span>
-    <span>Hard monthly spending cap</span>
+    <span>Photos deleted after 48 hours unless flagged</span>
     <span>Cancel anytime</span>
   </div>
 </div>
@@ -670,55 +695,24 @@
   <div class="wrap">
     <div class="sec-head">
       <div class="tag">HOW IT WORKS</div>
-      <h2>Three steps, no new hardware</h2>
-      <p>SecurityAI sits alongside your existing check-in system. It doesn't replace your key fobs or front desk — it watches the door and tells you when someone slips past them.</p>
+      <h2>Three steps, no new cameras</h2>
+      <p>SecurityAI sits alongside your check-in system. It doesn't replace your key fobs or front desk. It watches the door and tells you when more people came through than you expect.</p>
     </div>
     <div class="steps">
       <div class="step">
         <div class="step-n">01</div>
-        <h3>Point a camera at the door</h3>
-        <p>Use the camera already mounted over your entrance, or a $60 IP camera. No turnstile or new access hardware required.</p>
+        <h3>A small computer reads your entrance camera</h3>
+        <p>A laptop or a Raspberry Pi sits next to your camera recorder in the back room and watches the one camera that covers your door. Nothing new is mounted and nothing is wired into your door.</p>
       </div>
       <div class="step">
         <div class="step-n">02</div>
-        <h3>Claude watches the feed</h3>
-        <p>Motion at the doorway triggers a short burst of frames, which Claude reads together as a sequence and counts how many people actually crossed. You tell it how many to expect at that door; more than that is a flag. Nothing is analyzed while the door sits empty.</p>
+        <h3>Claude counts who crossed</h3>
+        <p>When something moves in the doorway, a few photos of that moment are sent to Claude, which counts how many people actually came through. You say how many to expect at that door (usually one). More than that is a flag. Nothing is analyzed while the door is empty.</p>
       </div>
       <div class="step">
         <div class="step-n">03</div>
-        <h3>Front desk gets the alert</h3>
-        <p>An unmatched entry pushes a notification to the front desk screen, a manager's phone, or Slack — with a timestamp and camera name, in seconds.</p>
-      </div>
-    </div>
-  </div>
-</section>
-
-<section id="demo-sim">
-  <div class="wrap">
-    <div class="sec-head">
-      <div class="tag">ILLUSTRATION</div>
-      <h2>What it's actually looking for</h2>
-      <p>An animation, not a real camera — three buttons showing the distinction the system makes at a doorway. The third one matters most: a queue of people waiting their turn to scan is normal, and shouldn't trigger anything.</p>
-    </div>
-    <div class="demo">
-      <div class="demo-feed">
-        <div class="feed-frame" id="frameSim">
-          <div class="doorframe"></div>
-          <div class="door"></div>
-        </div>
-        <div class="status-line"><span class="status-dot" id="statusDotSim"></span><span id="statusTextSim">Waiting for entry...</span></div>
-        <div class="demo-actions">
-          <button class="btn-primary" onclick="simulate('ok')">Simulate scanned member</button>
-          <button class="btn-ghost" onclick="simulate('bad')">Simulate tailgater</button>
-          <button class="btn-ghost" onclick="simulateQueue()">Simulate people waiting in line</button>
-        </div>
-        <div class="fineprint" style="text-align:left;margin-top:10px;">Scripted outcome — no camera, no API call, no real analysis.</div>
-      </div>
-      <div class="demo-log">
-        <h3>Alert log</h3>
-        <div class="log-list" id="logListSim">
-          <div class="log-empty">No entries yet — run a simulation.</div>
-        </div>
+        <h3>You get the photo</h3>
+        <p>A flag goes out by email or text message to whoever you choose, with the photo and the time. In the morning, your gym's activity page lists everything from overnight, flagged entries first.</p>
       </div>
     </div>
   </div>
@@ -727,102 +721,111 @@
 <section id="demo">
   <div class="wrap">
     <div class="sec-head">
-      <div class="tag">TRY IT — FREE, IN THIS BROWSER</div>
-      <h2>Point it at something and see what it reads</h2>
-      <p>Real analysis, not a script: use your webcam or share a screen, then capture a frame. This is the same detection the paid service runs — just triggered by a button instead of by motion, and running in this tab instead of on a server.</p>
-      <div class="notice" style="margin-top:24px;">
-        <div class="mark">NOTE</div>
-        <p>A demo, not the product. It stops when you close this tab, you press the button yourself, and no alerts go anywhere. The paid service watches for motion on its own, runs on a server overnight, and texts or emails you. Full comparison below.</p>
-      </div>
+      <div class="tag">ILLUSTRATION</div>
+      <h2>What it's actually looking for</h2>
+      <p>An animation, not a real camera. A queue of people waiting their turn is normal and shouldn't trigger anything; two people crossing on one expected entry should.</p>
     </div>
     <div class="demo">
       <div class="demo-feed">
-        <div class="start-here">
-          <span><strong>1.</strong> Enable your camera or share a screen</span>
-          <span><strong>2.</strong> Say how many people you expect</span>
-          <span><strong>3.</strong> Capture &amp; analyze</span>
+        <div class="feed-frame" id="frameSim">
+          <div class="doorframe"></div>
+          <div class="door"></div>
         </div>
-        <div class="feed-frame" id="frame">
-          <video id="video" autoplay playsinline muted style="width:100%;height:100%;object-fit:cover;display:none;"></video>
-          <canvas id="canvas" style="display:none;"></canvas>
-          <div id="camPlaceholder" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:13px;text-align:center;padding:20px;">No source active — enable your camera or share a screen below</div>
-        </div>
-        <div class="status-line"><span class="status-dot" id="statusDot"></span><span id="statusText">No source selected</span></div>
-        <div class="row2" style="margin-top:14px;">
-          <div><label>Expected check-ins for this entry</label><input type="text" id="expectedCount" value="1" inputmode="numeric"></div>
-        </div>
+        <div class="status-line"><span class="status-dot" id="statusDotSim"></span><span id="statusTextSim">Waiting for someone at the door...</span></div>
         <div class="demo-actions">
-          <button class="btn-ghost" id="camBtn" onclick="toggleCamera()">Enable camera</button>
-          <button class="btn-ghost" id="screenBtn" onclick="toggleScreenShare()">Share a screen or window</button>
-          <button class="btn-primary" id="analyzeBtn" onclick="analyzeFrame()" disabled>Capture &amp; analyze</button>
+          <button class="btn-primary" onclick="simulate('ok')">One person</button>
+          <button class="btn-ghost" onclick="simulate('bad')">Someone follows close behind</button>
+          <button class="btn-ghost" onclick="simulateQueue()">People waiting in line</button>
         </div>
-        <div class="fineprint" style="text-align:left;margin-top:10px;">"Share a screen or window" mirrors your screen, a specific window, or a browser tab — useful if the footage you want analyzed is already showing in some other app or camera dashboard. Your browser's own sharing indicator and stop button stay visible the whole time a share is active, and either source is entirely local until you press a button above.</div>
-
-        <details class="advanced-panel">
-          <summary>Advanced options — accessible gate, multi-camera scan, continuous monitoring</summary>
-          <div class="advanced-body">
-            <div>
-              <div style="display:flex;align-items:center;gap:10px;">
-                <input type="checkbox" id="accessibleGateToggle" style="width:16px;height:16px;flex-shrink:0;accent-color:var(--green);cursor:pointer;">
-                <label for="accessibleGateToggle" style="margin:0;cursor:pointer;">This entrance has a marked accessible/disabled-access gate</label>
-              </div>
-              <p class="fineprint" style="margin-top:8px;">Checking this stops SecurityAI from treating that gate's unmatched entries as tailgating — it logs them for a manual check instead, since accessible gates are often outside the main scan hardware.</p>
-            </div>
-
-            <div style="border-top:1px solid var(--line);margin-top:20px;padding-top:20px;">
-              <h3 class="advanced-h">MULTI-CAMERA SCAN</h3>
-              <p class="fineprint" style="margin:0 0 14px;">Watching several cameras at once is what the paid <a href="monitor.html" style="color:var(--text);text-decoration:underline;">Live Monitor</a> does by default — you draw a box on each entrance across your whole camera wall, and each one gets its own rules and its own alerts.</p>
-              <p class="fineprint" style="margin:0 0 14px;">If your screen share shows a dashboard with several camera tiles (an NVR wall, a security app), this reads each tile separately — count of people, what they're doing, and whether it matches rules you set below. This can't tell who someone is, only whether a tile has people where your rules say it shouldn't.</p>
-
-              <label>Zones/cameras that should currently show no one</label>
-              <div id="zoneList" style="margin-bottom:10px;"></div>
-              <button type="button" class="btn-ghost-sm" onclick="addZoneRow()">+ Add a zone</button>
-              <p class="fineprint" style="margin-top:10px;">Each zone can optionally have a "temporarily authorized until" time — set one when you know people will legitimately be there (a delivery, restocking, maintenance) and it won't be flagged until that time passes. This list lives only in this browser tab for this session — it isn't shared with other devices or saved after you close the page.</p>
-
-              <div class="demo-actions" style="margin-top:14px;">
-                <button class="btn-primary" id="scanBtn" onclick="scanCameraWall()" disabled>Scan visible cameras</button>
-              </div>
-              <p class="fineprint" style="margin-top:10px;">Flags are based only on your stated rules and directly observed behavior (forcing a door, propping it open, following someone through without pausing) — never on appearance, clothing, or who Claude thinks a person might be. This doesn't identify individuals.</p>
-              <div id="wallResults" style="margin-top:16px;"></div>
-            </div>
-
-          </div>
-        </details>
+        <div class="fineprint" style="text-align:left;margin-top:10px;">Scripted outcome: no camera, no real analysis.</div>
       </div>
       <div class="demo-log">
         <h3>Alert log</h3>
-        <div class="log-list" id="logList">
-          <div class="log-empty">No entries yet — enable your camera and capture a frame.</div>
+        <div class="log-list" id="logListSim">
+          <div class="log-empty">No entries yet. Press a button.</div>
         </div>
       </div>
     </div>
-  </div>
-</section>
 
+    <p style="color:var(--muted);font-size:14.5px;margin:22px 0 0;">Want to see what the real thing sends you? <a href="sample-report.html" style="color:var(--text);text-decoration:underline;">Open a sample morning report</a>.</p>
 
-<section id="compare">
-  <div class="wrap">
-    <div class="sec-head">
-      <div class="tag">DEMO VS SUBSCRIPTION</div>
-      <h2>What you just tried, and what you'd actually get</h2>
-      <p>The demo above runs the same detection, so what you see is honest. The difference is everything around it — what triggers it, where it runs, and whether anyone finds out when something happens at 3am.</p>
-    </div>
-    <table class="cmp">
-      <thead>
-        <tr><th></th><th>Free demo (this page)</th><th>SecurityAI subscription</th></tr>
-      </thead>
-      <tbody>
-        <tr><th>What starts a check</th><td class="dim" data-l="Free demo">You press a button</td><td class="paid" data-l="Subscription">Motion at the doorway</td></tr>
-        <tr><th>Where it runs</th><td class="dim" data-l="Free demo">This browser tab</td><td class="paid" data-l="Subscription">A server, unattended</td></tr>
-        <tr><th>When it stops</th><td class="dim" data-l="Free demo">The moment you close the tab</td><td class="paid" data-l="Subscription">When you stop it</td></tr>
-        <tr><th>What Claude sees</th><td class="dim" data-l="Free demo">One still frame</td><td class="paid" data-l="Subscription">A burst of frames read as a sequence, so fast movement is visible</td></tr>
-        <tr><th>How you find out</th><td class="dim" data-l="Free demo">On-screen log only</td><td class="paid" data-l="Subscription">Email and SMS to whoever you choose</td></tr>
-        <tr><th>Hours</th><td class="dim" data-l="Free demo">Whenever you're sitting there</td><td class="paid" data-l="Subscription">A schedule you set — overnight windows supported</td></tr>
-        <tr><th>Entrances</th><td class="dim" data-l="Free demo">Whatever's in frame</td><td class="paid" data-l="Subscription">Draw a box per entrance on your camera wall</td></tr>
-        <tr><th>Record</th><td class="dim" data-l="Free demo">Gone when you close the tab</td><td class="paid" data-l="Subscription">A rolling 24-hour timestamped log that survives restarts, plus every alert in your email or texts</td></tr>
-      </tbody>
-    </table>
-    <p style="color:var(--muted);font-size:13.5px;margin-top:18px;">One thing that's identical in both: neither identifies anyone. It counts people and describes behavior — it can't tell you <em>who</em> came in, only that the number entering didn't match the number who scanned.</p>
+    <details class="try-live">
+      <summary>Optional: try the counting on your own webcam</summary>
+      <div class="try-body">
+        <p class="fineprint" style="font-size:13.5px;margin:0 0 16px;color:var(--muted);">Real analysis, not a script: point a webcam at a doorway (or share a screen showing a camera) and press the button. It uses the same counting as the service, but on one still photo you capture yourself. Nothing is saved and no alerts go anywhere.</p>
+        <div class="demo">
+          <div class="demo-feed">
+            <div class="start-here">
+              <span><strong>1.</strong> Enable your camera or share a screen</span>
+              <span><strong>2.</strong> Say how many people you expect</span>
+              <span><strong>3.</strong> Capture &amp; analyze</span>
+            </div>
+            <div class="feed-frame" id="frame">
+              <video id="video" autoplay playsinline muted style="width:100%;height:100%;object-fit:cover;display:none;"></video>
+              <canvas id="canvas" style="display:none;"></canvas>
+              <div id="camPlaceholder" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:13px;text-align:center;padding:20px;">No source active. Enable your camera or share a screen below.</div>
+            </div>
+            <div class="status-line"><span class="status-dot" id="statusDot"></span><span id="statusText">No source selected</span></div>
+            <div class="row2" style="margin-top:14px;">
+              <div><label for="expectedCount">How many people you expect through at once</label><input type="text" id="expectedCount" value="1" inputmode="numeric"></div>
+            </div>
+            <div class="demo-actions">
+              <button class="btn-ghost" id="camBtn" onclick="toggleCamera()">Enable camera</button>
+              <button class="btn-ghost" id="screenBtn" onclick="toggleScreenShare()">Share a screen or window</button>
+              <button class="btn-primary" id="analyzeBtn" onclick="analyzeFrame()" disabled>Capture &amp; analyze</button>
+            </div>
+            <div class="fineprint" style="text-align:left;margin-top:10px;">Your camera or screen stays in this tab until you press "Capture &amp; analyze". Then one photo is sent for counting and not kept.</div>
+
+            <details class="advanced-panel">
+              <summary>Advanced: accessible gate, several camera tiles</summary>
+              <div class="advanced-body">
+                <div>
+                  <div style="display:flex;align-items:center;gap:10px;">
+                    <input type="checkbox" id="accessibleGateToggle" style="width:16px;height:16px;flex-shrink:0;accent-color:var(--green);cursor:pointer;">
+                    <label for="accessibleGateToggle" style="margin:0;cursor:pointer;">This entrance has a marked accessible/disabled-access gate</label>
+                  </div>
+                  <p class="fineprint" style="margin-top:8px;">Checking this stops an extra person at that gate being treated as tailgating. It's logged for a manual check instead, since accessible gates are often outside the main scan hardware.</p>
+                </div>
+
+                <div style="border-top:1px solid var(--line);margin-top:20px;padding-top:20px;">
+                  <h3 class="advanced-h">SEVERAL CAMERA TILES</h3>
+                  <p class="fineprint" style="margin:0 0 14px;">If your screen share shows a grid of camera tiles, this counts people in each tile and checks them against rules you set below. It can't tell who someone is. (The service itself watches the one entrance camera you choose.)</p>
+
+                  <label>Zones/cameras that should currently show no one</label>
+                  <div id="zoneList" style="margin-bottom:10px;"></div>
+                  <button type="button" class="btn-ghost-sm" onclick="addZoneRow()">+ Add a zone</button>
+                  <p class="fineprint" style="margin-top:10px;">Give a zone an "authorized until" time if people will legitimately be there (a delivery, maintenance) and it won't be flagged before then. This list lives only in this tab.</p>
+
+                  <div class="demo-actions" style="margin-top:14px;">
+                    <button class="btn-primary" id="scanBtn" onclick="scanCameraWall()" disabled>Scan visible cameras</button>
+                  </div>
+                  <p class="fineprint" style="margin-top:10px;">Flags come only from your rules and directly observed behavior (forcing a door, propping it open, following someone through), never from appearance or who someone might be.</p>
+                  <div id="wallResults" style="margin-top:16px;"></div>
+                </div>
+              </div>
+            </details>
+          </div>
+          <div class="demo-log">
+            <h3>Alert log</h3>
+            <div class="log-list" id="logList">
+              <div class="log-empty">No entries yet. Enable your camera and capture a frame.</div>
+            </div>
+          </div>
+        </div>
+
+        <table class="cmp" id="compare" style="margin-top:22px;">
+          <thead>
+            <tr><th></th><th>This webcam demo</th><th>SecurityAI subscription</th></tr>
+          </thead>
+          <tbody>
+            <tr><th>What starts a check</th><td class="dim" data-l="Demo">You press a button</td><td class="paid" data-l="Subscription">Movement in the doorway</td></tr>
+            <tr><th>What Claude sees</th><td class="dim" data-l="Demo">One still photo</td><td class="paid" data-l="Subscription">A few photos across the crossing, so someone close behind is visible</td></tr>
+            <tr><th>Where it runs</th><td class="dim" data-l="Demo">This browser tab</td><td class="paid" data-l="Subscription">A laptop or Raspberry Pi at your gym, plus our hosted website, every night</td></tr>
+            <tr><th>How you find out</th><td class="dim" data-l="Demo">On-screen only</td><td class="paid" data-l="Subscription">Email or text with the photo, and your activity page in the morning</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </details>
   </div>
 </section>
 
@@ -835,81 +838,71 @@
     <div class="flist">
       <div class="frow">
         <h3>Works with cameras you already have</h3>
-        <p>If your cameras are already up on a screen somewhere — an NVR wall, a security app, a browser dashboard — SecurityAI reads that. No new cameras, no access-control wiring, nothing mounted.</p>
+        <p>It reads your entrance camera from the recorder (NVR) your cameras already feed. No new cameras and no access-control wiring. The only addition is a small computer beside the recorder. We check your recorder works with it during setup.</p>
       </div>
       <div class="frow">
         <h3>Flags more people than expected</h3>
-        <p>You set how many people should come through a door at once — usually one. If a burst shows more, that's an alert, with a plain-language note and the frame that triggered it so you can check for yourself.</p>
+        <p>You set how many people should come through the door at once, usually one. If more cross, you get a flag with a plain-language note of what was seen and the photos, so you can check for yourself.</p>
       </div>
       <div class="frow">
-        <h3>Tells a queue from a violation</h3>
-        <p>People standing near the door waiting their turn to scan aren't the same as people entering unscanned. SecurityAI separates the two so a busy front desk doesn't turn into a wall of false alerts.</p>
+        <h3>Tells a queue from a problem</h3>
+        <p>People waiting near the door for their turn aren't the same as extra people coming through. SecurityAI tells the two apart so a busy doorway doesn't turn into a wall of false alerts.</p>
       </div>
       <div class="frow">
         <h3>Understands your accessible gate</h3>
-        <p>If your entrance has a separate accessible or disabled-access gate, tell SecurityAI once — it stops treating that gate's unmatched scans as violations and instead logs them for a manual check-in match, since accessible gates are often wired outside the main scan hardware.</p>
+        <p>If your entrance has a separate accessible gate, tell us once. An extra person there isn't treated as tailgating; it's listed for you to match against your check-in log instead.</p>
       </div>
       <div class="frow">
-        <h3>Alerts with a picture attached</h3>
-        <p>Nobody is expected to watch a camera wall overnight. Alerts go out by email and SMS only when something needs a look — and every one keeps the frame that set it off, so staff can confirm it rather than take it on faith.</p>
-      </div>
-      <div class="frow">
-        <h3>A log of flags, not a library of footage</h3>
-        <p>The searchable record is entry events — time, camera, outcome — not stored video, which keeps the system out of the business of archiving footage of members.</p>
+        <h3>Photos kept briefly, not a video archive</h3>
+        <p>No video is stored. Photos of each crossing are deleted after 48 hours. Entries flagged as tailgating are kept for 35 days so they can go in your monthly report.</p>
       </div>
     </div>
-  </div>
-</section>
-
-<section>
-  <div class="wrap">
-    <div class="notice">
+    <div class="notice" style="margin-top:28px;">
       <div class="mark">NOTE</div>
-      <p><strong>Cameras pointed at an entrance are subject to local surveillance and signage laws.</strong> Before installing, check your state and municipal requirements for posted notice, retention limits, and employee/member consent — these vary widely and SecurityAI doesn't handle legal compliance on your behalf.</p>
+      <p><strong>Cameras pointed at an entrance are subject to local surveillance and signage laws.</strong> Check your state and city requirements for posted notice and member/employee consent. SecurityAI doesn't handle legal compliance for you.</p>
     </div>
   </div>
 </section>
-
 
 <section id="setup">
   <div class="wrap">
     <div class="sec-head">
-      <div class="tag">Getting set up</div>
-      <h2>Alerts, running by tonight</h2>
-      <p>No installer, no site visit. You do this yourself on whichever computer already has your cameras up, and it takes about a quarter of an hour.</p>
+      <div class="tag">GETTING SET UP</div>
+      <h2>What setup involves</h2>
+      <p>This is a hosted service: we run the website, the counting and the alerts. The one thing at your gym is a small computer next to your camera recorder, and we set that up with you.</p>
     </div>
 
     <div class="setup-flow">
       <div class="setup-card">
         <div class="sc-n">01</div>
-        <h3>Open the Live Monitor</h3>
-        <p>On the back-office computer that already shows your cameras. Nothing to install — it runs in the browser that's already there.</p>
+        <h3>A computer by your recorder</h3>
+        <p>A laptop or a Raspberry Pi goes on your network next to the recorder (NVR). It connects to our website with a one-time 6-digit code: no passwords to type in.</p>
       </div>
       <div class="setup-card">
         <div class="sc-n">02</div>
-        <h3>Draw your entrances</h3>
-        <p>Share your screen, take a still, then drag a box around each door you want watched. Everything outside those boxes is ignored completely.</p>
-      </div>
-      <div class="setup-card accent">
-        <div class="sc-n">03</div>
-        <h3>Say where alerts go</h3>
-        <p>Your email, a phone for texts, or both — and more than one address if several people should know. There's a button right there to send yourself a test alert so you know it works before you rely on it.</p>
+        <h3>Pick the door</h3>
+        <p>We find the camera that shows your entrance and mark the doorway on it. Everything else in the picture is ignored.</p>
       </div>
       <div class="setup-card">
+        <div class="sc-n">03</div>
+        <h3>Set the hours</h3>
+        <p>9 PM to 5 AM by default, and we can change it for your gym. Outside those hours nothing is analyzed.</p>
+      </div>
+      <div class="setup-card accent">
         <div class="sc-n">04</div>
-        <h3>Set your hours and start</h3>
-        <p>Usually overnight, when nobody's at the desk. Outside those hours it watches nothing and costs nothing.</p>
+        <h3>Say who gets alerts</h3>
+        <p>On your activity page, add an email or mobile number for anyone who should know. Each one gets a test message straight away.</p>
       </div>
     </div>
 
     <div class="setup-cta">
       <div>
-        <div class="sc-h">Alerts are set up in step 3 of the Live Monitor</div>
-        <p>Email and SMS, to as many people as you like. If monitoring ever stops overnight — tab closed, computer restarted — you get told within about three minutes rather than finding out in the morning.</p>
+        <div class="sc-h">Already a customer? Your activity page is your morning report</div>
+        <p>Open it on your phone to see last night's entries, flagged ones first, and add people under <strong>Get alerts</strong>. If the camera computer goes offline during watched hours, an alert goes out.</p>
       </div>
-      <a class="btn-primary" href="monitor.html" style="text-decoration:none;white-space:nowrap;">Open the Live Monitor →</a>
+      <a class="btn-primary" href="activity.html" style="text-decoration:none;white-space:nowrap;text-align:center;">Open your activity page →</a>
     </div>
-    <p style="color:var(--muted);font-size:13.5px;margin-top:14px;">Don't have an access code yet? <a href="#support" style="color:var(--text);text-decoration:underline;">Ask us for one</a> — we'll set your gym up and send it over. Already have one and lost it? There's a "Forgot your code?" link on the monitor page.</p>
+    <p style="color:var(--muted);font-size:13.5px;margin-top:14px;">No gym code yet? You get one when we set your gym up. Lost it? Use "Forgot your code?" on the activity page, or <a href="#support" style="color:var(--text);text-decoration:underline;">ask us</a>.</p>
   </div>
 </section>
 
@@ -918,45 +911,45 @@
     <div class="sec-head">
       <div class="tag">PRICING</div>
       <h2>Priced against what you'd actually pay elsewhere</h2>
-      <p>Camera-based tailgating tools are typically sold per door, around $125/door/month. If you only have one entrance to watch, that's the number to beat — so there's a tier for exactly that. If you have several, flat-rate wins.</p>
+      <p>Camera-based tailgating tools are typically sold per door, around $125/door/month. If you have one entrance, there's a tier for exactly that. If you have several, flat-rate wins.</p>
     </div>
     <div class="pricing pricing-3">
       <div class="plan">
         <div class="plan-name">ONE ENTRANCE</div>
         <div class="plan-price">$99<span>/month</span></div>
         <ul>
-          <li>One monitored entrance zone</li>
-          <li>Email and SMS alerts</li>
-          <li>Scheduled hours, including overnight</li>
-          <li>Rolling 24-hour alert log</li>
-          <li>Hard daily spending cap</li>
+          <li>One monitored entrance</li>
+          <li>Email and text alerts with the photo</li>
+          <li>Watched hours you choose, overnight by default</li>
+          <li>48-hour activity page with photos</li>
+          <li>Monthly summary by email</li>
         </ul>
-        <a class="btn-ghost" style="display:block;text-align:center;margin-top:22px;text-decoration:none;" href="checkout.html?plan=single-door&price=99">Get started</a>
+        <a class="btn-ghost" style="display:block;text-align:center;margin-top:22px;text-decoration:none;" href="checkout.html?plan=single-door">Get started</a>
       </div>
       <div class="plan highlight">
         <div class="plan-name">WHOLE GYM</div>
         <div class="plan-price">$199<span>/month</span></div>
         <ul>
-          <li>Unlimited entrance zones at one location</li>
-          <li>Everything in the single-entrance plan</li>
-          <li>Cheaper than two doors priced individually anywhere else</li>
+          <li>Every entrance at one location</li>
+          <li>Everything in the one-entrance plan</li>
+          <li>Cheaper than two doors priced individually elsewhere</li>
           <li>Priority email support</li>
         </ul>
-        <a class="btn-primary" style="display:block;text-align:center;margin-top:22px;text-decoration:none;box-sizing:border-box;" href="checkout.html?plan=gym&price=199">Get started</a>
+        <a class="btn-primary" style="display:block;text-align:center;margin-top:22px;text-decoration:none;box-sizing:border-box;" href="checkout.html?plan=gym">Get started</a>
       </div>
       <div class="plan">
         <div class="plan-name">MULTI-GYM · 3+ LOCATIONS</div>
         <div class="plan-price">$169<span>/gym/month</span></div>
         <ul>
           <li>15% off the whole-gym rate, per location</li>
-          <li>Unlimited zones at every location</li>
-          <li>Per-location alert routing</li>
+          <li>Every entrance at every location</li>
+          <li>Separate alert list per location</li>
           <li>Setup call for each location</li>
         </ul>
-        <a class="btn-ghost" style="display:block;text-align:center;margin-top:22px;text-decoration:none;" href="checkout.html?plan=multi&price=169">Get started</a>
+        <a class="btn-ghost" style="display:block;text-align:center;margin-top:22px;text-decoration:none;" href="checkout.html?plan=multi">Get started</a>
       </div>
     </div>
-    <p style="color:var(--muted);font-size:13.5px;margin-top:18px;">Two gyms, or something that doesn't fit these? <a href="#contact" style="color:var(--text);text-decoration:underline;">Talk to us</a> about a custom rate.</p>
+    <p style="color:var(--muted);font-size:13.5px;margin-top:18px;">Two gyms, or something that doesn't fit these? <a href="#support" style="color:var(--text);text-decoration:underline;">Talk to us</a> about a custom rate.</p>
   </div>
 </section>
 
@@ -965,86 +958,81 @@
     <div class="sec-head">
       <div class="tag">WHY THIS APPROACH</div>
       <h2>What's actually different here</h2>
-      <p>Most tools in this space fall into two camps: dedicated hardware sensors mounted at the door, or software tied to a fixed, trained detection model. This sits in a third spot, and it's worth being specific about the real trade-off rather than just claiming it's better.</p>
+      <p>Most tools in this space are either dedicated sensors mounted at the door or software tied to a fixed, trained model. This sits in a third spot. Here's the honest trade-off.</p>
     </div>
     <div class="flist">
       <div class="frow">
-        <h3>Watches for movement, not on a stopwatch</h3>
-        <p>Nothing is analyzed while a doorway sits empty. Local motion detection runs constantly on just the entrance regions — costing nothing — and only when something actually moves does a short burst of frames get analyzed as a sequence. That means the analysis starts the moment an event begins rather than whenever the next scheduled check happens to land, and a fast entry gets read across several frames instead of one frozen instant.</p>
-      </div>
-      <div class="frow">
-        <h3>Rules in English, not retraining</h3>
-        <p>"Ignore the accessible gate," "these zones should be empty right now," "a queue isn't a violation" — each of those is a sentence in a prompt here, not a retraining job. A fixed classifier can do the same job once it's been trained for it; changing what counts as a violation on this system is an edit, not a model update.</p>
+        <h3>Watches for movement, not on a timer</h3>
+        <p>Motion detection runs constantly on the doorway alone, on the computer at your gym. Only when something moves are a few photos of that moment analyzed together, so a fast entry is read across several photos instead of one frozen instant.</p>
       </div>
       <div class="frow">
         <h3>A reason, not just a score</h3>
-        <p>Every result comes with a plain-language note — what was actually seen, not just a confidence number. That's what makes it possible to tell a false flag from a real one at a glance in the alert log, instead of pulling video for every single alert.</p>
+        <p>Every flag comes with a plain-language note of what was seen, like "a second person follows close behind without stopping at the reader." That's what lets you tell a false flag from a real one at a glance.</p>
       </div>
       <div class="frow">
-        <h3>You own the code, not a subscription to a black box</h3>
-        <p>This is source you can read, self-host, and modify — not a closed platform you're locked into. That cuts both ways: it also means you're responsible for hosting it and keeping it running, which a managed SaaS product would otherwise handle for you.</p>
+        <h3>A hosted service, run by a small team</h3>
+        <p>We host the website, the analysis and the alerts, and handle updates. You don't run any software yourself. It's a small operation, so support is by email and phone during business hours.</p>
       </div>
     </div>
-    <p style="color:var(--muted);font-size:13.5px;margin-top:8px;">This is a genuine trade-off, not a universal upgrade — a mature, trained-model product from a team that's been doing this for gyms specifically has real advantages too: proven accuracy at scale, and features like automated billing for guest fees that this doesn't have (yet). Worth comparing directly against whatever else you're evaluating before deciding.</p>
+    <p style="color:var(--muted);font-size:13.5px;margin-top:8px;">A mature, trained-model product built for gyms has real advantages too: proven accuracy at scale, and features like automated guest-fee billing that this doesn't have. Worth comparing before you decide.</p>
   </div>
 </section>
 
 <section id="going-live">
   <div class="wrap">
     <div class="sec-head">
-      <div class="tag">GOING LIVE</div>
-      <h2>Putting this on your actual door</h2>
-      <p>The demo above proves the concept. Moving it to a real entrance is a short, physical checklist — most of it is about the camera, not the software.</p>
+      <div class="tag">THE FIRST TWO WEEKS</div>
+      <h2>Getting it right on your door</h2>
+      <p>Most of what makes it accurate is about the camera, not the software.</p>
     </div>
     <div class="steps steps-4">
       <div class="step">
         <div class="step-n">01</div>
-        <h3>Mount at chest height</h3>
-        <p>Aim it straight at the doorway, not down from the ceiling — a steep angle makes it hard to tell one person from two standing close together.</p>
+        <h3>Check the angle</h3>
+        <p>A camera mounted high, looking down at the gate or turnstile, works best: from above, two people close together are still two separate heads. A low camera looking along the line of people can hide the second person behind the first.</p>
       </div>
       <div class="step">
         <div class="step-n">02</div>
         <h3>Check the light</h3>
-        <p>Test at your darkest hour (early morning open, late close) and your brightest (a sunlit entrance at noon). Backlighting from glass doors is the most common failure mode.</p>
+        <p>Glass doors with headlights or sun behind them are the most common cause of mistakes. Look at a few night-time photos in the first week.</p>
       </div>
       <div class="step">
         <div class="step-n">03</div>
-        <h3>Run it in the background first</h3>
-        <p>Let it flag entries for a week without telling staff to act on it. Compare the flags against what actually happened before you trust it operationally.</p>
+        <h3>Run it quietly first</h3>
+        <p>For the first week, compare the flags against what really happened before anyone acts on them. Mark each one "Tailgate" or "It was fine".</p>
       </div>
       <div class="step">
         <div class="step-n">04</div>
-        <h3>Tell your front desk what a flag means</h3>
-        <p>A flag means "check the log," not "confront a member." Two minutes of training avoids most awkward moments.</p>
+        <h3>Tell your front desk</h3>
+        <p>A flag means "check the photo," not "confront a member." Two minutes of training avoids most awkward moments.</p>
       </div>
     </div>
   </div>
 </section>
 
-
 <section id="roadmap">
   <div class="wrap">
     <div class="sec-head">
       <div class="tag">WHAT'S NEXT</div>
-      <h2>Where this is headed</h2>
-      <p>Being straight about what exists today versus what's planned — everything above this line is built and working; everything below isn't yet.</p>
+      <h2>What exists, and what doesn't yet</h2>
+      <p>Everything above this line is built and working. Everything below isn't yet.</p>
     </div>
     <div class="flist">
       <div class="frow">
-        <h3>A phone app</h3>
-        <p>The obvious next step, and the one most gym owners will want: alerts as push notifications instead of email, and a feed you can scroll through in the morning to see what happened overnight. The pieces are already in place for it — the server keeps a real alert log and already sends SMS — so an app would mostly be a nicer window onto data that exists. Not built yet.</p>
+        <h3>Push notifications</h3>
+        <p>Today, alerts come by email or text, and your activity page is the morning feed: it opens on any phone and can be added to the home screen. A native app with push notifications isn't built.</p>
       </div>
       <div class="frow">
-        <h3>History beyond 24 hours</h3>
-        <p>The alert log now holds a rolling 24 hours and survives restarts, which covers "what happened last night." What it isn't yet is an archive — there's no way to pull up last month, filter by date, or export to a spreadsheet. That's the next thing to build, and it's what turns a nightly check into evidence you can act on over time.</p>
+        <h3>History beyond 48 hours</h3>
+        <p>The activity page covers "what happened last night," and flagged entries are kept 35 days for the monthly report. There's no searchable archive, date filter or spreadsheet export yet.</p>
       </div>
       <div class="frow">
-        <h3>Recovering the money, not just reporting it</h3>
-        <p>Right now SecurityAI tells you when and how often unscanned entries happen. It can't tell you who, by design — that would mean facial recognition, which carries real legal exposure under biometric privacy laws in several states. The realistic version is tighter integration with your check-in system so a flagged entry lands next to the member record your staff already has, and they make the call.</p>
+        <h3>Matching to your check-in system</h3>
+        <p>SecurityAI can tell you when and how often more people came through than expected. It can't tell you who, by design: that would mean facial recognition. The realistic next step is putting a flagged entry next to your check-in records so your staff make the call.</p>
       </div>
       <div class="frow">
-        <h3>Tuning from real footage</h3>
-        <p>The motion thresholds are reasoned starting points, tested against simulated movement rather than a real gym doorway at 2am. Every real deployment makes them better. If you're an early customer, expect some tuning in the first weeks — and expect to be asked what it got wrong.</p>
+        <h3>Tuning from real doors</h3>
+        <p>The motion settings are reasoned starting points. If you're an early customer, expect some tuning in the first weeks, and expect to be asked what it got wrong.</p>
       </div>
     </div>
   </div>
@@ -1054,32 +1042,36 @@
   <div class="wrap">
     <div class="sec-head">
       <div class="tag">COMMON QUESTIONS</div>
-      <h2>Before you set it up</h2>
+      <h2>Before you sign up</h2>
     </div>
     <div class="faqlist">
       <details class="faq">
         <summary>Is this facial recognition?</summary>
-        <p>No. SecurityAI counts people and reads behavior at your door — it doesn't identify who anyone is, and it can't tell you whether a specific person is a member, an employee, or a stranger. If two people look similar, it has no way to know if they're the same person or not.</p>
+        <p>No. SecurityAI counts people and describes what they did at your door. It doesn't identify anyone, and it can't tell you whether a specific person is a member, an employee or a stranger.</p>
+      </details>
+      <details class="faq">
+        <summary>What gets installed at my gym?</summary>
+        <p>A laptop or a Raspberry Pi (a small computer about the size of a deck of cards), plugged into power and into the same network as your camera recorder. It needs an internet connection. Nothing is mounted and nothing touches your door or check-in system.</p>
       </details>
       <details class="faq">
         <summary>What if it gets it wrong?</summary>
-        <p>It will, sometimes — bad lighting, an unusual angle, or a crowded doorway can all produce a false flag or miss a real one. Treat every flag as "worth a look," not a verdict. That's why the going-live checklist above recommends a background-only trial period before anyone acts on an alert.</p>
+        <p>It will, sometimes: bad lighting, an odd angle or a crowded doorway can cause a false flag or a miss. Treat every flag as "worth a look," not a verdict. That's why every flag comes with the photos.</p>
       </details>
       <details class="faq">
         <summary>Does it replace my front desk or key fobs?</summary>
-        <p>No — it sits alongside whatever check-in system you already use and watches for entries that don't match it. If your internet or camera goes down, your existing access control keeps working; you'd just stop getting flags until it's back.</p>
+        <p>No. It sits alongside your check-in system. If your internet or the camera computer goes down, your access control keeps working; you'd just stop getting flags until it's back.</p>
       </details>
       <details class="faq">
-        <summary>How long does setup actually take?</summary>
-        <p>For the single-frame demo on this page: a couple of minutes, using a webcam or a screen share of your existing camera dashboard. Wiring it into a real entrance with a dedicated camera and a review process is closer to the going-live checklist above — plan on a week of background testing before relying on it.</p>
+        <summary>How long does setup take?</summary>
+        <p>We set it up with you on site, in the room where your camera recorder is. Then plan on a week of quietly comparing flags against what really happened before you rely on it.</p>
+      </details>
+      <details class="faq">
+        <summary>What happens to the photos?</summary>
+        <p>No video is stored. Photos of each crossing are kept for 48 hours so you can check them on your activity page, then deleted. Entries flagged as tailgating are kept for 35 days for your monthly report. Your camera recorder keeps doing its own recording separately, as it does now.</p>
       </details>
       <details class="faq">
         <summary>Can I add a second gym later?</summary>
-        <p>Yes — moving from the single-gym plan to the multi-gym contract rate is a plan change, not a new setup from scratch. Each location still gets its own cameras and its own alert log.</p>
-      </details>
-      <details class="faq">
-        <summary>What happens to the footage?</summary>
-        <p>Individual frames are analyzed and then discarded — what's retained is the alert log itself (timestamps, counts, outcomes), not stored video. You're still responsible for whatever your camera's own recording system does separately, and for any local signage or consent laws that apply to it.</p>
+        <p>Yes. Each location gets its own camera computer, its own activity page and its own alert list.</p>
       </details>
     </div>
   </div>
@@ -1089,18 +1081,18 @@
   <div class="wrap">
     <div class="sec-head">
       <div class="tag">CUSTOMER SUPPORT</div>
-      <h2>Something not working, or not sure where to start?</h2>
-      <p>Send a message below and it goes straight to our inbox, or reach us directly. We reply within one business day.</p>
+      <h2>Questions, or not sure it'll work at your gym?</h2>
+      <p>Tell us about your door and your camera recorder and we'll tell you honestly. We reply within one business day.</p>
     </div>
     <div class="demo" style="grid-template-columns:1fr 1fr;">
       <div class="demo-feed">
-        <label>Your name</label>
+        <label for="supportName">Your name</label>
         <input type="text" id="supportName" placeholder="Jordan Lee">
-        <label>Email — where we'll reply</label>
+        <label for="supportEmail">Email — where we'll reply</label>
         <input type="text" id="supportEmail" placeholder="jordan@yourgym.com">
-        <label>What's this about</label>
-        <input type="text" id="supportTopic" placeholder="Setup, billing, a bug, a question about pricing...">
-        <label>Message</label>
+        <label for="supportTopic">What's this about</label>
+        <input type="text" id="supportTopic" placeholder="Setup, billing, a question about pricing...">
+        <label for="supportMessage">Message</label>
         <textarea id="supportMessage" rows="5" placeholder="Tell us what's going on" style="width:100%;background:#0F1214;border:1px solid var(--line);border-radius:4px;color:var(--text);font-size:14px;padding:10px 12px;font-family:'IBM Plex Sans';margin-bottom:16px;resize:vertical;"></textarea>
         <button class="btn-primary" id="supportSubmitBtn" onclick="submitSupportRequest()">Send message</button>
         <div class="fineprint" id="supportStatus" style="margin-top:10px;"></div>
@@ -1113,7 +1105,6 @@
           <div class="log-item"><span class="t">HOURS</span><span style="color:var(--text);">Mon–Fri, 9am–5pm</span></div>
           <div class="log-item"><span class="t">FOR URGENT ISSUES</span><span style="color:var(--text);">Call, don't email</span></div>
         </div>
-        <p class="fineprint" style="margin-top:16px;">Setup questions? The <a href="#going-live" style="color:var(--text);text-decoration:underline;">Going Live checklist</a> and <a href="#faq" style="color:var(--text);text-decoration:underline;">FAQ</a> above answer most of them faster than waiting on a reply.</p>
       </div>
     </div>
   </div>
@@ -1121,18 +1112,19 @@
 
 <section id="contact" style="border-bottom:none;">
   <div class="wrap closing">
-    <h2>Stop losing members to the side door.</h2>
-    <p>Set up takes under an hour with a camera you already have. Book a walkthrough and we'll wire up your first entrance live.</p>
+    <h2>Know what happened at your door last night.</h2>
+    <p>See what a morning with SecurityAI looks like, then tell us about your gym.</p>
     <div class="hero-ctas">
-      <button class="btn-primary" onclick="document.getElementById('demo').scrollIntoView()">Try the live demo</button>
+      <a class="btn-primary" href="sample-report.html">See a sample morning report</a>
+      <a class="btn-ghost" href="#support">Talk to us</a>
     </div>
   </div>
 </section>
 
 <footer>
   <div class="wrap" style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px;width:100%;">
-    <span>SecurityAI — a concept product design.</span>
-    <span>The scripted demo above is illustrative; the working demo makes real camera/screen and Claude calls.</span>
+    <span>SecurityAI — entrance monitoring for 24-hour gyms.</span>
+    <span><a href="terms.html">Terms</a> · <a href="terms.html#privacy">Privacy</a></span>
   </div>
 </footer>
 
@@ -1186,7 +1178,7 @@ async function toggleCamera(){
     return;
   }
   if(!window.isSecureContext){
-    document.getElementById('statusText').textContent = 'Camera needs this page loaded over https:// or http://localhost — see the note below.';
+    document.getElementById('statusText').textContent = 'Camera access needs the https:// version of this page.';
     return;
   }
   if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
@@ -1208,7 +1200,7 @@ async function toggleScreenShare(){
     return;
   }
   if(!window.isSecureContext){
-    document.getElementById('statusText').textContent = 'Screen share needs this page loaded over https:// or http://localhost — see the note below.';
+    document.getElementById('statusText').textContent = 'Screen sharing needs the https:// version of this page.';
     return;
   }
   if(!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia){
@@ -1245,7 +1237,7 @@ window.addEventListener('DOMContentLoaded', () => {
   }
 
   if(!window.isSecureContext){
-    addWarning('This page isn\'t loaded securely, so your browser disables camera and screen access entirely — this affects every browser, on both phones and computers. Opening the file directly (file://) or loading it over plain http:// (other than localhost) both trigger this. Serve it over https://, or over http://localhost during local testing, then reload. See README.md for a quick way to test this on your phone during development.');
+    addWarning('Your browser only allows camera and screen access on a secure (https://) page. Open this site at its https:// address and try again.');
   } else if(isMobile && !(navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia)){
     addWarning('Camera capture should work fine on this phone. Screen sharing won\'t — most mobile browsers (including Safari and Chrome on iOS/Android) don\'t implement that API at all, regardless of this page. Use "Enable camera" here instead.');
   }
@@ -1253,6 +1245,15 @@ window.addEventListener('DOMContentLoaded', () => {
   addZoneRow(); // seed the multi-camera-scan zone list with one blank row
 });
 
+// Every demo try is a paid analysis on the owner's account: send a picture
+// no bigger than needed (a full-size screen share costs several times more).
+function fitDemoCanvas(canvas, video, maxPx){
+  const w = video.videoWidth || 640, h = video.videoHeight || 480;
+  const k = Math.min(1, maxPx / Math.max(w, h));
+  canvas.width = Math.max(1, Math.round(w * k));
+  canvas.height = Math.max(1, Math.round(h * k));
+  canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+}
 async function analyzeFrame(){
   if(analyzing) return;
   const video = document.getElementById('video');
@@ -1271,9 +1272,7 @@ async function analyzeFrame(){
   statusDot.className = 'status-dot';
   statusText.textContent = 'Sending frame to Claude for analysis...';
 
-  canvas.width = video.videoWidth;
-  canvas.height = video.videoHeight;
-  canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+  fitDemoCanvas(canvas, video, 768);
   const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
   const base64 = dataUrl.split(',')[1];
 
@@ -1305,7 +1304,7 @@ async function analyzeFrame(){
     } else if(result.accessible_gate_used){
       statusDot.className = 'status-dot warn';
       statusText.textContent = `Accessible gate used: ${result.note}`;
-      addLog(ts, cam, `Accessible gate entry — verify check-in${queueNote}`, 'review');
+      addLog(ts, cam, `Accessible gate entry — match to your check-in log${queueNote}`, 'review');
     } else {
       statusDot.className = 'status-dot ok';
       statusText.textContent = `Cleared: ${result.note}`;
@@ -1378,9 +1377,7 @@ async function scanCameraWall(){
   statusText.textContent = 'Scanning visible cameras...';
   resultsEl.innerHTML = '<div class="log-empty">Analyzing...</div>';
 
-  canvas.width = video.videoWidth;
-  canvas.height = video.videoHeight;
-  canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+  fitDemoCanvas(canvas, video, 1024);
   const base64 = canvas.toDataURL('image/jpeg', 0.85).split(',')[1];
 
   try{
@@ -1397,7 +1394,7 @@ async function scanCameraWall(){
     renderWallResults(result.cameras || []);
   } catch(err){
     statusText.textContent = 'Scan failed: ' + err.message;
-    resultsEl.innerHTML = `<div class="log-empty">Scan failed: ${err.message}</div>`;
+    resultsEl.innerHTML = `<div class="log-empty">Scan failed: ${escapeHtml(err.message)}</div>`;
   } finally {
     scanning = false;
     if(stream) scanBtn.disabled = false;
@@ -1455,11 +1452,11 @@ async function submitSupportRequest(){
     status.style.color = 'var(--green)';
     status.textContent = data.delivered
       ? 'Sent — we\'ll reply within one business day.'
-      : 'Received, but email delivery isn\'t configured on this server yet (see README) — your message was logged server-side instead.';
+      : 'Received. If you don\'t hear back within a business day, please email or call us directly.';
     document.getElementById('supportMessage').value = '';
   } catch(err){
     status.style.color = 'var(--red)';
-    status.textContent = 'Could not send: ' + err.message + '. This page needs to be served by server.js — see README.';
+    status.textContent = 'Could not send (' + err.message + '). Please email or call us directly using the details alongside.';
   } finally {
     btn.disabled = false;
     btn.textContent = 'Send message';
@@ -1468,7 +1465,7 @@ async function submitSupportRequest(){
 
 // Shows the same distinction the real system makes (queued_count vs.
 // people_count in analyzeFrame's prompt): people standing near the door
-// waiting their turn aren't the same as an unscanned entry, and
+// waiting their turn aren't the same as an extra person crossing, and
 // shouldn't by themselves cause a flag.
 function simulateQueue(){
   if(simRunning) return;
@@ -1492,7 +1489,7 @@ function simulateQueue(){
   });
 
   setTimeout(() => {
-    statusText.textContent = 'One steps up to scan...';
+    statusText.textContent = 'One steps up to the door...';
     const mover = waiters[2]; // the one closest to the door goes first
     mover.style.transition = '';
     mover.style.left = '46%';
@@ -1502,7 +1499,7 @@ function simulateQueue(){
     const now = new Date();
     const ts = now.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit', second:'2-digit'});
     statusDot.className = 'status-dot ok';
-    statusText.textContent = 'Scanned and cleared — 2 still waiting, not flagged.';
+    statusText.textContent = 'One went through — 2 still waiting, not flagged.';
     waiters[2].style.background = 'rgba(63,207,142,0.7)';
     addLog(ts, 'DOOR-01', 'Queue observed — 1 entered, 2 waiting, no flag', 'ok', 'logListSim');
     simRunning = false;
@@ -1529,7 +1526,7 @@ function simulate(kind){
 
   frame.querySelectorAll('.walker').forEach(w => w.remove());
   statusDot.className = 'status-dot';
-  statusText.textContent = 'Person approaching door...';
+  statusText.textContent = 'Someone approaching the door...';
 
   const w1 = document.createElement('div');
   w1.className = 'walker';
@@ -1551,15 +1548,15 @@ function simulate(kind){
     const ts = now.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit', second:'2-digit'});
     if(kind === 'ok'){
       statusDot.className = 'status-dot ok';
-      statusText.textContent = 'Check-in matched — entry cleared.';
+      statusText.textContent = 'One person, one expected — cleared.';
       w1.style.background = 'rgba(63,207,142,0.7)';
-      addLog(ts, 'DOOR-01', 'Matched', 'ok', 'logListSim');
+      addLog(ts, 'DOOR-01', '1 crossed, 1 expected', 'ok', 'logListSim');
     } else {
       statusDot.className = 'status-dot bad';
-      statusText.textContent = 'Two entries, one check-in — front desk alerted.';
+      statusText.textContent = 'Two people crossed, one expected — alert sent.';
       w1.style.background = 'rgba(255,90,90,0.7)';
       w2.style.background = 'rgba(255,90,90,0.7)';
-      addLog(ts, 'DOOR-01', 'Tailgate flagged', 'bad', 'logListSim');
+      addLog(ts, 'DOOR-01', '2 crossed, 1 expected — flagged', 'bad', 'logListSim');
     }
     simRunning = false;
   }, 1250);

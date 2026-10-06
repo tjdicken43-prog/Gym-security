@@ -3,67 +3,132 @@
 <head>
 <meta charset="UTF-8">
 <link rel="icon" type="image/svg+xml" href="logo.svg">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
 <title>Operations — SecurityAI</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
 <style>
   :root{--bg:#14171A;--panel:#1C2124;--panel-2:#22282C;--line:#31383D;
-        --text:#EDEFF1;--muted:#8B939B;--green:#3FCF8E;--red:#FF5A5A;--amber:#FFB020;}
+        --text:#EDEFF1;--muted:#8B939B;--green:#3FCF8E;--red:#FF5A5A;--amber:#FFB020;--blue:#7FB2FF;}
   *{box-sizing:border-box;}
-  body{margin:0;background:var(--bg);color:var(--text);font-family:'IBM Plex Sans',sans-serif;line-height:1.55;}
-  h1,h2{font-family:'Oswald',sans-serif;font-weight:600;margin:0;}
+  html{-webkit-text-size-adjust:100%;}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:'IBM Plex Sans',sans-serif;line-height:1.55;overflow-wrap:anywhere;}
+  h1,h2,h3{font-family:'Oswald',sans-serif;font-weight:600;margin:0;}
   .mono{font-family:'IBM Plex Mono',monospace;}
   a{color:inherit;}
-  .wrap{max-width:860px;margin:0 auto;padding:0 18px;}
+  .wrap{max-width:860px;margin:0 auto;padding:0 16px;padding-left:max(16px,env(safe-area-inset-left));padding-right:max(16px,env(safe-area-inset-right));}
 
   nav{border-bottom:1px solid var(--line);}
-  nav .wrap{display:flex;align-items:center;justify-content:space-between;height:56px;}
+  nav .wrap{display:flex;align-items:center;justify-content:space-between;min-height:56px;gap:10px;}
   .brand{display:flex;align-items:center;gap:9px;font-family:'Oswald';font-size:18px;font-weight:600;text-decoration:none;color:var(--text);}
   .brand .tag{font-family:'IBM Plex Mono';font-size:10px;color:var(--amber);border:1px solid rgba(255,176,32,.4);
               border-radius:100px;padding:1px 8px;letter-spacing:.6px;}
-  .navlink{color:var(--muted);font-size:13.5px;text-decoration:none;}
+  .navlink{color:var(--muted);font-size:13.5px;text-decoration:none;padding:10px 0;}
   .navlink:hover{color:var(--text);}
 
-  main{padding:24px 0 80px;}
-  .card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:18px;margin-bottom:14px;}
-  .card h2{font-size:16px;margin-bottom:4px;}
-  .card .sub{color:var(--muted);font-size:12.5px;margin-bottom:14px;}
+  main{padding:18px 0 80px;}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:16px;margin-bottom:14px;}
+  .card h2{font-size:17px;margin-bottom:4px;}
+  .card .sub{color:var(--muted);font-size:13px;margin-bottom:12px;}
 
-  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px;}
-  @media(max-width:700px){.stats{grid-template-columns:repeat(2,1fr);}}
-  .stat{background:var(--panel-2);border:1px solid var(--line);border-radius:7px;padding:12px 13px;}
-  .stat .n{font-family:'Oswald';font-size:22px;}
-  .stat .l{color:var(--muted);font-size:11px;letter-spacing:.3px;}
-  .stat.warn .n{color:var(--amber);}
-  .stat.good .n{color:var(--green);}
-
-  .row{display:flex;justify-content:space-between;gap:12px;padding:9px 0;border-bottom:1px solid var(--line);font-size:13.5px;}
+  .row{display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-bottom:1px solid var(--line);font-size:13.5px;}
   .row:last-child{border-bottom:none;}
-  .row .k{color:var(--muted);}
-  .row .v{font-family:'IBM Plex Mono';font-size:12.5px;text-align:right;word-break:break-all;}
+  .row .k{color:var(--muted);flex-shrink:0;max-width:48%;}
+  .row .v{font-family:'IBM Plex Mono';font-size:12.5px;text-align:right;min-width:0;}
   .v.ok{color:var(--green);} .v.bad{color:var(--red);} .v.warn{color:var(--amber);}
 
-  .btn{background:transparent;color:var(--text);font-weight:500;font-size:13px;padding:9px 14px;
-       border-radius:5px;border:1px solid var(--line);cursor:pointer;}
+  .btn{background:transparent;color:var(--text);font-weight:500;font-size:14px;padding:10px 14px;min-height:44px;
+       border-radius:6px;border:1px solid var(--line);cursor:pointer;font-family:inherit;}
   .btn:hover{border-color:#4a545b;}
+  .btn[disabled]{opacity:.55;}
+  a.btn{text-decoration:none;display:inline-flex;align-items:center;}
   .btn.primary{background:var(--green);color:#0C1512;border-color:var(--green);font-weight:600;}
-  input[type=password],input[type=text]{width:100%;background:#0F1214;border:1px solid var(--line);
-    border-radius:5px;color:var(--text);font-size:15px;padding:11px 12px;margin-bottom:10px;}
-  input:focus{outline:none;border-color:var(--green);}
-  .note{background:var(--panel-2);border-left:2px solid var(--amber);border-radius:0 5px 5px 0;
-        padding:11px 13px;font-size:12.5px;color:var(--muted);margin-top:12px;}
+  .btn.danger{color:#FF9C9C;border-color:rgba(255,90,90,.45);}
+  input[type=password],input[type=text],input[type=email],input[type=number],input[type=time],select,textarea{width:100%;background:#0F1214;border:1px solid var(--line);
+    border-radius:6px;color:var(--text);font-size:16px;padding:11px 12px;margin-bottom:10px;font-family:inherit;}
+  input[type=time]{color-scheme:dark;}
+  input:focus,select:focus,textarea:focus{outline:none;border-color:var(--green);}
+  .note{background:var(--panel-2);border-left:3px solid var(--amber);border-radius:0 6px 6px 0;
+        padding:10px 12px;font-size:13px;color:var(--muted);margin:10px 0 0;}
   .note strong{color:var(--text);}
-  .empty{color:var(--muted);font-size:13.5px;padding:8px 0;}
-  #gate{max-width:420px;margin:60px auto;}
+  .note.red{border-left-color:var(--red);} .note.green{border-left-color:var(--green);} .note.blue{border-left-color:var(--blue);}
+  .empty{color:var(--muted);font-size:13.5px;padding:6px 0;}
+  #gate{max-width:420px;margin:40px auto;}
+
+  label.f{display:block;font-size:12.5px;color:var(--muted);margin-bottom:4px;}
+  .btn:focus-visible,a:focus-visible{outline:2px solid var(--green);outline-offset:2px;}
+  .btns{display:flex;gap:8px;flex-wrap:wrap;}
+  .ok-t{color:var(--green);} .bad-t{color:var(--red);} .warn-t{color:var(--amber);} .muted{color:var(--muted);}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:0 12px;}
+  @media(max-width:560px){.grid2{grid-template-columns:1fr;}}
+
+  /* headline */
+  .verdict{font-size:15px;margin:0;}
+  .verdict.bad{color:var(--red);} .verdict.ok{color:var(--green);} .verdict.warn{color:var(--amber);}
+
+  /* one card per gym */
+  .gym{background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--muted);border-radius:8px;padding:14px 14px 12px;margin-bottom:14px;}
+  .gym.s-ok{border-left-color:var(--green);} .gym.s-bad{border-left-color:var(--red);} .gym.s-warn{border-left-color:var(--amber);}
+  .gym .top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap;}
+  .gym h3{font-size:18px;line-height:1.25;}
+  .pill{font-size:12px;font-weight:600;border-radius:100px;padding:3px 10px;white-space:nowrap;background:var(--panel-2);color:var(--muted);border:1px solid var(--line);}
+  .pill.ok{color:var(--green);border-color:rgba(63,207,142,.4);} .pill.bad{color:var(--red);border-color:rgba(255,90,90,.45);} .pill.warn{color:var(--amber);border-color:rgba(255,176,32,.45);}
+  .code{font-family:'IBM Plex Mono';font-size:12.5px;color:var(--muted);}
+  .lines{margin:8px 0 4px;font-size:14px;}
+  .lines div{padding:3px 0;}
+  .lines .l{color:var(--muted);display:inline-block;min-width:92px;}
+  .zone{padding-left:10px;}
+  .copyrow{display:flex;gap:8px;align-items:stretch;margin-top:6px;}
+  .copyrow input{margin:0;font-family:'IBM Plex Mono',monospace;font-size:12.5px;min-width:0;}
+  .copyrow .btn{flex-shrink:0;}
+  details.box{border-top:1px solid var(--line);margin-top:10px;}
+  details.box > summary{cursor:pointer;list-style:none;min-height:44px;display:flex;align-items:center;gap:8px;font-size:14px;font-weight:600;}
+  details.box > summary::-webkit-details-marker{display:none;}
+  details.box > summary::before{content:"▸";color:var(--green);font-size:12px;}
+  details.box[open] > summary::before{content:"▾";}
+  .inner{padding:4px 0 8px;}
+  .out{font-size:13.5px;margin-top:8px;}
+  .src{font-size:12px;color:var(--muted);margin:-6px 0 10px;}
+  .check{display:flex;gap:8px;align-items:center;font-size:14px;margin:0 0 10px;}
+  .check input{width:18px;height:18px;accent-color:var(--green);}
+
+  .msgbox{min-height:190px;font-size:14px;line-height:1.5;resize:vertical;}
+  .paircode{font-family:'IBM Plex Mono',monospace;font-size:40px;letter-spacing:6px;text-align:center;padding:12px 0 2px;}
+  .pairmeta{text-align:center;color:var(--muted);font-size:13px;}
+  .steps{margin:12px 0 0;padding-left:20px;font-size:14px;}
+  .steps li{margin:8px 0;}
+  kbd{font-family:'IBM Plex Mono',monospace;font-size:12.5px;background:#0F1214;border:1px solid var(--line);border-radius:4px;padding:1px 6px;}
+
+  .need{font-size:10.5px;font-family:'IBM Plex Mono';letter-spacing:.5px;text-transform:uppercase;border:1px solid var(--line);border-radius:100px;padding:1px 7px;color:var(--muted);white-space:nowrap;}
+  .need.required{color:var(--text);border-color:#4a545b;}
+  .need.remove{color:var(--amber);border-color:rgba(255,176,32,.5);}
+  .envrow{display:grid;grid-template-columns:22px 1fr;gap:4px 10px;padding:10px 0;border-bottom:1px solid var(--line);}
+  .envrow:last-child{border-bottom:none;}
+  .envrow .mark{font-size:15px;line-height:1.4;}
+  .envrow .key{font-family:'IBM Plex Mono';font-size:12.5px;}
+  .envrow .why{grid-column:2;font-size:13px;color:var(--muted);}
+  .envrow .fix{grid-column:2;font-size:13px;color:var(--amber);}
+  details.more > summary{cursor:pointer;color:var(--muted);font-size:13.5px;min-height:40px;display:flex;align-items:center;}
+
+  /* accuracy test (node rtsp-run.js --test) */
+  .acc{border-top:1px solid var(--line);margin-top:10px;padding-top:10px;font-size:14px;}
+  .acc h4{font-family:'Oswald',sans-serif;font-size:15px;font-weight:600;margin:0;}
+  .acc .when{font-size:12.5px;color:var(--muted);margin:2px 0 8px;}
+  .scgrid{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:3px 12px;}
+  .scgrid .n{font-family:'IBM Plex Mono',monospace;font-size:13px;text-align:right;white-space:nowrap;}
+  .cmp{margin-top:10px;padding:10px 12px;background:var(--panel-2);border-radius:6px;}
+  .cmp .big{font-family:'IBM Plex Mono',monospace;font-size:13px;}
+  .acc .wk{font-size:13px;padding:3px 0;border-bottom:1px solid var(--line);}
+  .acc .wk:last-child{border-bottom:none;}
 </style>
 </head>
 <body>
 
 <nav><div class="wrap">
-  <a class="brand" href="activity.html">
+  <a class="brand" href="admin.html">
     <svg width="21" height="21" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" style="flex-shrink:0;">
       <path d="M4 18V6a2 2 0 0 1 2-2h12" stroke="currentColor" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/>
       <path d="M44 18V6a2 2 0 0 0-2-2H30" stroke="currentColor" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/>
@@ -73,55 +138,122 @@
       <circle cx="24" cy="24" r="5.5" fill="#3FCF8E"/>
     </svg>SecurityAI <span class="tag">OPS</span>
   </a>
-  <a class="navlink" href="activity.html">Customer view →</a>
+  <a class="navlink" href="monitor.html">Browser monitor →</a>
 </div></nav>
 
 <main><div class="wrap">
 
-  <!-- Token gate. Not real authentication — see the note. -->
+  <!-- Token gate. A shared secret, not user accounts. -->
   <div id="gate" class="card">
     <h2>Operations</h2>
-    <div class="sub">Costs, diagnostics and tools. Not for customers.</div>
-    <input type="password" id="tok" placeholder="Admin token" autocomplete="off">
+    <div class="sub">Gyms, camera computers, costs. Not for customers.</div>
+    <label class="f" for="tok">Admin token</label>
+    <input type="password" id="tok" placeholder="Paste ADMIN_TOKEN" autocomplete="off" onkeydown="if(event.key==='Enter')unlock()">
+    <label class="check"><input type="checkbox" id="remember" checked> Remember on this phone (only tick on your own device)</label>
     <button class="btn primary" style="width:100%;" onclick="unlock()">Open</button>
-    <p class="empty" id="gateMsg"></p>
-    <div class="note"><strong>This is the value of ADMIN_TOKEN</strong> from your hosting environment. If you haven't set one, leave this blank and press Open — but do set one before anyone else has your URL.</div>
+    <p class="empty" id="gateMsg" role="alert"></p>
+    <div class="note"><strong>This is the value of ADMIN_TOKEN</strong> from Render &gt; your service &gt; Environment (tap the eye icon, then copy). No ADMIN_TOKEN yet? Add one there first — press <em>Generate</em> for the value.</div>
   </div>
 
   <div id="panel" style="display:none;">
 
-    <div class="card">
-      <h2>Running cost</h2>
-      <div class="sub">Estimated from the analyses actually performed. Close enough to spot a problem tonight rather than at the end of the month — check the Anthropic console for the real figure.</div>
-      <div class="stats">
-        <div class="stat"><div class="n" id="cDay">—</div><div class="l">LAST 24 HOURS</div></div>
-        <div class="stat"><div class="n" id="cMonth">—</div><div class="l">AT THIS RATE / MONTH</div></div>
-        <div class="stat warn"><div class="n" id="cWorst">—</div><div class="l">WORST CASE / MONTH</div></div>
-        <div class="stat"><div class="n" id="cModel">—</div><div class="l">MODEL</div></div>
+    <div class="card" id="nowCard">
+      <h2>Right now</h2>
+      <p class="verdict" id="verdict" aria-live="polite">Checking…</p>
+      <div id="warnings"></div>
+      <div class="sub" id="siteLine" style="margin:10px 0 0;"></div>
+      <details class="more" id="uptimeBox">
+        <summary>Get a text or email at 2 AM if anything breaks</summary>
+        <div class="note blue" style="margin-top:6px;">
+          Free, 3 minutes, on your phone: sign up at <strong>uptimerobot.com</strong> &gt; <em>New monitor</em> &gt; type <strong>HTTP(s)</strong> &gt; paste a gym's <strong>uptime link</strong> (on each gym below) &gt; interval 5 minutes &gt; tick your email / the app. One monitor per gym, so the alert names the gym.
+          It checks from outside Render, so it also warns you if the website itself is down.
+          <div style="margin-top:8px;">Whole site (names no gym):</div>
+          <div class="copyrow"><input type="text" id="aliveUrl" readonly aria-label="Whole-site uptime link"><button class="btn" type="button" data-copy="#aliveUrl">Copy</button></div>
+        </div>
+      </details>
+    </div>
+
+    <div id="noAdmin" class="note red" style="display:none;margin:0 0 14px;"></div>
+
+    <div id="gymBlocks"></div>
+
+    <div class="card" id="addCard">
+      <details class="box" id="newGymBox" style="border-top:0;margin-top:0;">
+        <summary>Add a gym</summary>
+        <div class="inner">
+          <label class="f" for="gName">Gym name</label>
+          <input type="text" id="gName" placeholder="J Street Gym" autocomplete="off" maxlength="80">
+          <label class="f" for="gEmail">Manager's email (for "Forgot code" and the monthly report)</label>
+          <input type="email" id="gEmail" placeholder="manager@jstreetgym.com" autocomplete="off">
+          <label class="f" for="gTz">Time zone</label>
+          <select id="gTz"></select>
+          <div id="adoptOffer"></div>
+          <button class="btn primary" type="button" onclick="createGym()">Create gym</button>
+          <div class="out" id="gymMsg" role="status"></div>
+        </div>
+      </details>
+      <div id="handoff" style="display:none;margin-top:12px;">
+        <div class="note green" style="margin:0 0 4px;"><strong id="handoffTitle">Message for the gym</strong> — edit it if you like, then send.</div>
+        <textarea id="handoffText" class="msgbox" aria-label="Message for the gym"></textarea>
+        <div class="btns">
+          <button class="btn primary" type="button" id="shareBtn" onclick="shareHandoff()">Share…</button>
+          <a class="btn" id="smsBtn" href="#">Text it</a>
+          <a class="btn" id="mailBtn" href="#">Email it</a>
+          <button class="btn" type="button" data-copy="#handoffText">Copy</button>
+        </div>
       </div>
-      <div class="row"><span class="k">Analyses used today</span><span class="v" id="cUsed">—</span></div>
-      <div class="row"><span class="k">Margin at $199/month</span><span class="v" id="cMargin">—</span></div>
-      <div class="note" id="cNote" style="display:none;"></div>
+    </div>
+
+    <div class="card" id="pairCard">
+      <h2>Connect a camera computer</h2>
+      <div class="sub">A new laptop or Raspberry Pi, or one that says it isn't recognised. No long token to type — just 6 numbers.</div>
+      <label class="f" for="pairGym">Which gym is it for?</label>
+      <select id="pairGym"></select>
+      <button class="btn primary" type="button" onclick="getPairCode()">Get a pairing code</button>
+      <div id="pairOut" style="display:none;">
+        <div class="paircode mono" id="pairCode">— — —</div>
+        <div class="pairmeta" id="pairMeta"></div>
+      </div>
+      <ol class="steps">
+        <li>On the new computer, open <strong>Terminal</strong> and paste this line, then press Return:
+          <div class="copyrow"><input type="text" id="curlCmd" readonly aria-label="Install command"><button class="btn" type="button" data-copy="#curlCmd">Copy</button></div>
+        </li>
+        <li>When it asks for the website address, type <kbd id="siteHost">—</kbd></li>
+        <li>When it asks for the pairing code, type the 6 numbers above (press <em>Get a pairing code</em> first).</li>
+      </ol>
+      <p class="empty" style="font-size:13px;">Program already on that computer? Then instead: <kbd>cd ~/securityai</kbd> and <kbd>node pair.js</kbd>.</p>
+      <div id="pairHistory" style="margin-top:8px;"></div>
+    </div>
+
+    <div class="card" id="setupCard">
+      <h2>Render settings</h2>
+      <div class="sub">Render &gt; your service &gt; Environment. Shows only whether each one is set — never the value.</div>
+      <div id="diskLine"></div>
+      <div id="envList"><div class="empty">Loading…</div></div>
     </div>
 
     <div class="card">
-      <h2>Health</h2>
-      <div class="sub">Everything that can stop an event reaching the log.</div>
-      <div id="health"><div class="empty">Loading…</div></div>
-      <div style="display:flex;gap:9px;flex-wrap:wrap;margin-top:12px;">
-        <button class="btn" onclick="refresh()">Refresh</button>
-        <button class="btn" onclick="checkMailbox()">Check the mailbox</button>
+      <details class="box" id="techBox" style="border-top:0;margin-top:0;">
+        <summary>Technical details (one gym)</summary>
+        <div class="inner">
+          <label class="f" for="techGym">Gym</label>
+          <select id="techGym"></select>
+          <div id="runner"><div class="empty">Open to load.</div></div>
+          <div id="health" style="margin-top:12px;"></div>
+          <div class="btns" style="margin-top:12px;"><button class="btn" type="button" onclick="loadTech()">Refresh</button></div>
+        </div>
+      </details>
+    </div>
+
+    <div class="card" id="toolsCard" style="display:none;">
+      <h2>Email camera tools</h2>
+      <div class="sub">Only for gyms whose recorder emails its alarm photos. Re-analysing costs money — one analysis per email.</div>
+      <div class="btns">
+        <button class="btn" type="button" onclick="checkMailbox()">Check the mailbox</button>
+        <button class="btn" type="button" onclick="backfill(1)">Analyse newest email</button>
+        <button class="btn" type="button" onclick="backfill(null)">Re-analyse a number of emails…</button>
       </div>
       <div id="mailbox" style="margin-top:12px;"></div>
-    </div>
-
-    <div class="card">
-      <h2>Tools</h2>
-      <div class="sub">Re-analysing costs money — one analysis per email.</div>
-      <div style="display:flex;gap:9px;flex-wrap:wrap;">
-        <button class="btn" onclick="backfill(1)">Analyse newest email</button>
-        <button class="btn" onclick="backfill(null)">Re-analyse a number of emails…</button>
-      </div>
       <div id="toolMsg" style="margin-top:12px;"></div>
     </div>
 
@@ -130,135 +262,722 @@
 </div></main>
 
 <script>
-// The admin token is held in sessionStorage for this tab only and sent as
-// a header. Worth being straight about what this is: a shared secret that
-// keeps costs and mailbox details off the page customers see. It is not
-// user authentication, and it should not be the only thing standing
-// between anyone and something that actually matters.
+// The admin token is held for this tab (and on this phone if ticked) and
+// sent as a header. It is a shared secret that keeps costs, codes and
+// controls off the customer pages — not user accounts.
+// Everything that came from a camera computer, a gym or an email (host
+// names, zone labels, errors, notes) goes through esc() before it
+// becomes HTML.
 let token = '';
-
+const SITE = location.origin;
 function esc(v){
   return String(v == null ? '' : v)
     .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
     .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
+const $ = id => document.getElementById(id);
 function money(n){ return '$' + (Number(n) || 0).toFixed(2); }
-
-async function api(path, opts){
-  const o = Object.assign({ headers: {} }, opts || {});
-  if(token) o.headers['X-Admin-Token'] = token;
-  const r = await fetch(path, o);
-  if(r.status === 403) throw new Error('Token rejected.');
-  return r.json();
+function shortAgo(iso){
+  if(!iso) return 'never';
+  const s = Math.max(0, Math.round((Date.now() - new Date(iso)) / 1000));
+  return s < 60 ? s + ' s ago' : s < 3600 ? Math.floor(s/60) + ' min ago' : s < 86400 ? Math.floor(s/3600) + ' h ago' : Math.floor(s/86400) + ' d ago';
+}
+function when(iso, tz){
+  if(!iso) return '—';
+  const o = { weekday:'short', month:'short', day:'numeric', hour:'numeric', minute:'2-digit', second:'2-digit', timeZoneName:'short' };
+  try{ return new Date(iso).toLocaleString('en-US', Object.assign({ timeZone: tz || undefined }, o)); }catch(e){ return new Date(iso).toLocaleString('en-US', o); }
+}
+function hhmm(v){
+  const m = /^(\d{1,2}):(\d{2})$/.exec(v || ''); if(!m) return v || '';
+  const h = +m[1]; return `${h % 12 || 12}:${m[2]} ${h < 12 ? 'AM' : 'PM'}`;
 }
 
+// JSON call with the token. Throws on 403 (bad token); otherwise returns
+// { status, ok, body } so callers can show the server's own words.
+async function call(path, opts){
+  const o = Object.assign({}, opts || {});
+  o.headers = Object.assign({}, o.headers || {});
+  if(token) o.headers['X-Admin-Token'] = token;
+  if(o.json !== undefined){ o.method = o.method || 'POST'; o.headers['Content-Type'] = 'application/json'; o.body = JSON.stringify(o.json); delete o.json; }
+  const r = await fetch(path, o);
+  if(r.status === 403){
+    const e = new Error('Token rejected.'); e.status = 403;
+    try{ const b = await r.json(); e.noAdminToken = b.adminTokenSet === false; }catch(x){}
+    throw e;
+  }
+  let body = {}; try{ body = await r.json(); }catch(e){}
+  return { status: r.status, ok: r.ok, body };
+}
+
+let refreshTimer = null;
 async function unlock(){
-  token = document.getElementById('tok').value.trim();
-  const msg = document.getElementById('gateMsg');
+  token = $('tok').value.trim();
+  const msg = $('gateMsg');
   msg.textContent = 'Checking…';
   try{
-    await api('/monitor/debug');
-    try{ sessionStorage.setItem('securityai:admin', token); }catch(e){}
-    document.getElementById('gate').style.display = 'none';
-    document.getElementById('panel').style.display = 'block';
-    refresh();
-    setInterval(refresh, 15000);
+    const r = await call('/monitor/debug');
+    if(!r.ok) throw new Error(r.body.error || 'The website did not answer (' + r.status + ').');
+    try{
+      sessionStorage.setItem('securityai:admin', token);
+      if($('remember').checked) localStorage.setItem('securityai:admin', token);
+      else localStorage.removeItem('securityai:admin');
+    }catch(e){}
+    $('gate').style.display = 'none';
+    $('panel').style.display = 'block';
+    fillTzSelect($('gTz'), '');
+    $('curlCmd').value = `curl -O ${SITE}/update.js && node update.js`;
+    $('siteHost').textContent = SITE;
+    await refresh();
+    loadSetup();
+    loadPairings();
+    if(!refreshTimer) refreshTimer = setInterval(() => { if(!document.hidden) refresh(); }, 15000);
   } catch(err){
-    msg.textContent = err.message;
+    msg.textContent = err.status === 403
+      ? (err.noAdminToken ? 'ADMIN_TOKEN is not set on Render. Add it (Generate), Save, wait until it says Live.' : 'That is not the ADMIN_TOKEN. Copy it again from Render > Environment.')
+      : err.message;
   }
 }
 
+// ---------- data ----------
+let overview = null, accounts = {}, adoptable = [], dbg = null;
 async function refresh(){
   try{
-    const [st, dbg] = await Promise.all([api('/monitor/status'), api('/monitor/debug')]);
-    renderCost(st);
-    renderHealth(st, dbg);
+    const [ov, gl, d] = await Promise.all([call('/admin/overview'), call('/admin/gyms'), call('/monitor/debug')]);
+    if(ov.status === 404){ adminMissing(); return; }
+    overview = ov.body; dbg = d.body || {};
+    accounts = {};
+    (gl.body.gyms || []).forEach(g => { accounts[g.key || g.code] = g; });
+    adoptable = gl.body.adoptable || [];
+    renderNow();
+    renderGyms();
+    renderAdopt();
+    fillGymSelects();
+    // J17: the email tools only make sense when email ingest is set up.
+    const tr = (dbg.ingestDetail && dbg.ingestDetail.transports) || [];
+    $('toolsCard').style.display = tr.some(t => /email|imap|mail/i.test(String(t))) ? 'block' : 'none';
   } catch(err){
-    document.getElementById('health').innerHTML = `<div class="empty">${esc(err.message)}</div>`;
+    $('verdict').className = 'verdict bad';
+    $('verdict').textContent = err.status === 403 ? 'The admin token stopped working (was ADMIN_TOKEN changed on Render?). Reload and enter it again.' : 'Could not reach the website: ' + err.message;
+  }
+}
+function adminMissing(){
+  const n = $('noAdmin');
+  n.style.display = 'block';
+  n.innerHTML = '<strong>ADMIN_TOKEN is not set on Render.</strong> Gyms and camera pairing need it. Render &gt; your service &gt; Environment &gt; Add: key <span class="mono">ADMIN_TOKEN</span>, press Generate, Save. Then open this page again and paste it.';
+  $('pairCard').style.display = 'none'; $('addCard').style.display = 'none';
+  $('envList').innerHTML = '<div class="empty">Needs ADMIN_TOKEN (see above).</div>';
+}
+const emailWorks = () => !(overview && (overview.warnings || []).some(w => w.id === 'email'));
+
+// ---------- a gym's state in plain words ----------
+// Returns { cls: ok|warn|bad|'', label, lines[] (HTML) }.
+function zoneWarnings(z){ return [].concat(z.warnings || []).filter(Boolean); }
+function gymState(g){
+  const r = g.runner;
+  const zones = r ? r.zones || [] : [];
+  const warned = zones.some(z => z.picture === 'ok' && (zoneWarnings(z).length || z.lastError));
+  const sched = g.monitoring && g.monitoring.schedule ? `${hhmm(g.monitoring.schedule.start)}–${hhmm(g.monitoring.schedule.end)}` : null;
+  switch(g.state){
+    case 'watching': return warned ? { cls:'warn', label:'Check the camera' } : { cls:'ok', label:'Watching' };
+    case 'off-hours': return warned ? { cls:'warn', label:'Check the camera' } : { cls:'ok', label: sched ? `Off hours (watches ${sched})` : 'Off hours' };
+    case 'starting': return { cls:'', label:'Starting…' };
+    case 'no-picture': return { cls:'bad', label: r && r.picture === 'no-camera' ? 'No camera set up' : 'No picture' };
+    case 'problem': return { cls:'bad', label:'Problem' };
+    case 'offline': return { cls:'bad', label:'Computer offline' };
+    case 'not-paired': return { cls:'bad', label:'Not paired' };
+    case 'paused': return { cls:'warn', label:'Paused by you' };
+    default: return { cls:'', label:'No camera computer yet' };
   }
 }
 
-function renderCost(s){
-  const c = s.costEstimate;
-  if(!c){
-    // Without the token the server redacts costs out of the response, so
-    // say that plainly rather than showing empty boxes.
-    document.getElementById('cNote').style.display = 'block';
-    document.getElementById('cNote').innerHTML = '<strong>Costs are hidden.</strong> The admin token was not accepted, so the server returned the customer-facing view. Check ADMIN_TOKEN.';
+function renderNow(){
+  const o = overview || {};
+  const gyms = o.gyms || [];
+  const bad = gyms.filter(g => gymState(g).cls === 'bad');
+  // A gym with no camera computer yet is not "good": nothing is watched.
+  const warn = gyms.filter(g => gymState(g).cls === 'warn' || !g.runner);
+  const red = (o.warnings || []).filter(w => w.level === 'red');
+  const v = $('verdict');
+  if(!gyms.length){ v.className = 'verdict warn'; v.textContent = 'No gyms yet. Add one below, then connect its camera computer.'; }
+  else if(bad.length || red.length){
+    v.className = 'verdict bad';
+    v.textContent = bad.length ? `Needs you: ${bad.map(g => `${g.name} (${gymState(g).label.toLowerCase()})`).join(', ')}.` : 'Something needs you — see below.';
+  } else if(warn.length){ v.className = 'verdict warn'; v.textContent = `Worth a look: ${warn.map(g => `${g.name} (${gymState(g).label.toLowerCase()})`).join(', ')}.`; }
+  else { v.className = 'verdict ok'; v.textContent = gyms.length === 1 ? 'All good.' : `All ${gyms.length} gyms good.`; }
+  $('warnings').innerHTML = (o.warnings || []).map(w =>
+    `<div class="note ${w.level === 'red' ? 'red' : ''}">${esc(w.message)}</div>`).join('');
+  const cap = o.siteWideDailyCap ? ` of ${o.siteWideDailyCap} allowed (MAX_TOTAL_DAILY_BURSTS)` : '';
+  const cost = gyms.reduce((n, g) => n + ((g.last24h && g.last24h.estimatedCost) || 0), 0);
+  $('siteLine').textContent = `All gyms, last 24 hours: ${o.siteWideLast24h || 0} analyses${cap} · about ${money(cost)} (~${money(cost * 30)} a month at this rate). Check console.anthropic.com for the real bill.`;
+  $('aliveUrl').value = o.siteUptimeUrl || SITE + '/monitor/runner/alive';
+}
+
+// ---------- one card per gym ----------
+// The card is built once; only its status part is redrawn on refresh, so
+// a form being typed into is never wiped.
+function gymCard(g){
+  const el = document.createElement('section');
+  el.className = 'gym';
+  el.dataset.key = g.key;
+  el.innerHTML = `<div class="gstat"></div>
+    <div class="acc"></div><div class="out" data-out="acc" role="status"></div>
+    <div class="adoptrow"></div>
+    <div class="btns" style="margin-top:10px;">
+      <button class="btn" type="button" data-act="handoff">Send to gym</button>
+      <button class="btn" type="button" data-act="pause"></button>
+    </div>
+    <details class="box" data-box="settings"><summary>Settings: watch hours, who gets alerts, limits</summary><div class="inner sform"><div class="empty">Loading…</div></div></details>
+    <details class="box" data-box="test"><summary>Send a test alert</summary><div class="inner">
+      <label class="f">Send to (leave blank for this gym's alert list plus SUPPORT_EMAIL)</label>
+      <input type="text" data-f="testTo" autocomplete="off" placeholder="you@example.com or mobile number">
+      <button class="btn primary" type="button" data-act="test">Send a test to me</button>
+      <div class="out" data-out="test" role="status"></div></div></details>
+    <details class="box" data-box="access"><summary>Sign-in code and camera computers</summary><div class="inner">
+      <div class="code" data-f="codeLine"></div>
+      <div class="btns" style="margin-top:8px;">
+        <button class="btn" type="button" data-act="newcode">Issue new sign-in code</button>
+        <button class="btn danger" type="button" data-act="unpair">Unpair camera computers</button>
+      </div>
+      <div class="out" data-out="access" role="status"></div></div></details>`;
+  return el;
+}
+function renderGyms(){
+  const box = $('gymBlocks');
+  const gyms = (overview && overview.gyms) || [];
+  const keep = new Set(gyms.map(g => g.key));
+  box.querySelectorAll('section.gym').forEach(el => { if(!keep.has(el.dataset.key)) el.remove(); });
+  gyms.forEach((g, i) => {
+    let el = [...box.querySelectorAll('section.gym')].find(x => x.dataset.key === g.key);
+    if(!el){ el = gymCard(g); box.appendChild(el); }
+    if(box.children[i] !== el) box.insertBefore(el, box.children[i]);
+    renderGymStatus(el, g);
+  });
+  if(!gyms.length){ $('newGymBox').open = true; }
+}
+function renderGymStatus(el, g){
+  const st = gymState(g);
+  el.className = 'gym ' + (st.cls ? 's-' + st.cls : '');
+  const r = g.runner;
+  const acct = accounts[g.key] || {};
+  const lines = [];
+  // Camera computer
+  const u = g.unpaired || null;   // refused after its last accepted check-in
+  if(u){
+    lines.push(`<div><span class="l">Computer</span> <span class="bad-t">on but not paired</span> · ${esc(u.host || 'unknown')} · refused ${esc(shortAgo(u.at))}</div>`);
+    lines.push(`<div class="note red">${esc(u.message || 'Computer is on but not paired — pair it again (Connect a camera computer).')}</div>`);
+  }
+  else if(!r) lines.push(`<div><span class="l">Computer</span> none has checked in since the website started${acct.fromEnv ? '' : ' — connect one below'}</div>`);
+  else lines.push(`<div><span class="l">Computer</span> <span class="${r.online ? 'ok-t' : 'bad-t'}">${r.online ? 'online' : 'OFFLINE'}</span>${r.online ? '' : ' (asleep: lid closed? unplugged? no internet?)'} · ${esc(r.host || 'unknown')} · checked in ${esc(shortAgo(r.lastSeen))}${r.usesLegacyToken ? ' · <span class="warn-t">uses RUNNER_TOKEN</span>' : ''}</div>`);
+  // The sleep the computer itself reported last time it woke up.
+  const slept = r && !r.online ? (r.zones || []).flatMap(zoneWarnings).find(w => /was asleep from/i.test(w)) : null;
+  if(slept) lines.push(`<div class="note">Last sleep it reported: ${esc(slept)}</div>`);
+  // Picture, per camera. A picture that is coming through but has a setup
+  // warning (e.g. an address that ignores the channel) is amber, never green.
+  if(r){
+    const zones = r.zones || [];
+    if(!zones.length) lines.push(`<div><span class="l">Picture</span> <span class="warn-t">no camera set up</span> — run <kbd>node setup-camera.js</kbd> on that computer</div>`);
+    zones.forEach(z => {
+      const warns = zoneWarnings(z);
+      let s;
+      if(!r.online) s = `<span class="muted">unknown (computer offline)</span>`;
+      else if(z.picture === 'starting') s = `<span class="muted">Starting…</span>`;
+      else if(z.picture === 'no-picture') s = `<span class="bad-t">NO PICTURE</span>${z.since ? ' since ' + esc(when(z.since, g.timeZone)) : ''}${z.lastError ? ' — ' + esc(z.lastError) : ''}`;
+      else if(warns.length || z.lastError) s = `<span class="warn-t">picture coming through, but:</span> ${esc(warns.concat(z.lastError && !warns.includes(z.lastError) ? [z.lastError] : []).join(' · '))}`;
+      else s = `<span class="ok-t">OK</span>${z.fps != null ? ' · ' + esc(z.fps) + ' fps' : ''}`;
+      lines.push(`<div class="zone"><span class="l">${esc(z.label)}</span> ${s}</div>`);
+    });
+  }
+  lines.push(`<div><span class="l">Last crossing</span> ${g.lastCrossing ? esc(shortAgo(g.lastCrossing)) + ' <span class="code">(' + esc(when(g.lastCrossing, g.timeZone)) + ')</span>' : 'none yet'}</div>`);
+  const t = g.today || {}, m = g.monitoring || {};
+  lines.push(`<div><span class="l">Today</span> ${esc(t.bursts || 0)} analyses · ${esc(money(t.estimatedCost))}${m.dailyBurstCap ? ` · limit ${esc(m.dailyBurstCap)} a day` : ''}</div>`);
+  if(m.capMonthly != null) lines.push(`<div><span class="l">Most it can cost</span> about ${esc(money(m.capMonthly))} a month <span class="code">(limit ${esc(m.dailyBurstCap)} a day every day, ${esc(/haiku/i.test(m.model || '') ? 'Haiku' : 'Sonnet')})</span></div>`);
+  const srcName = m.sources && m.sources.schedule;
+  const watches = m.schedule
+    ? esc(hhmm(m.schedule.start) + ' – ' + hhmm(m.schedule.end)) + (srcName ? ` <span class="code">(${esc(srcName)})</span>` : '')
+    : srcName === 'website' ? 'all day <span class="code">(website)</span>' : 'all day — set hours below';
+  lines.push(`<div><span class="l">Watches</span> ${watches}${g.timeZone ? ' · ' + esc(g.timeZone) : ''}</div>`);
+  const d = g.delivery || {};
+  if(d.lastFailure) lines.push(`<div class="note red">Last alert that didn't go out: ${esc(d.lastFailure.to)} — ${esc(d.lastFailure.reason)} (${esc(when(d.lastFailure.at, g.timeZone))})</div>`);
+  else if(d.lastOkAt) lines.push(`<div><span class="l">Alerts</span> <span class="ok-t">last one delivered ${esc(shortAgo(d.lastOkAt))}</span></div>`);
+  if(r && r.hostConflict) lines.push(`<div class="note">${esc(r.hostConflict.message)}</div>`);
+  if(m.problem) lines.push(`<div class="note red"><strong>Not monitoring:</strong> ${esc(m.problem)}</div>`);
+  const up = g.uptimeUrl || '';
+  el.querySelector('.gstat').innerHTML = `<div class="top"><div><h3>${esc(g.name)}</h3>
+      <div class="code">${acct.code ? 'code ' + esc(acct.code) : ''}${acct.email ? ' · ' + esc(acct.email) : ''}${g.fromEnv ? ' · from GYM_CODES' : ''}</div></div>
+      <span class="pill ${esc(st.cls)}">${esc(st.label)}</span></div>
+    <div class="lines">${lines.join('')}</div>
+    <div class="code" style="margin-top:6px;">Uptime link for this gym (UptimeRobot):</div>
+    <div class="copyrow"><input type="text" readonly value="${esc(up)}" aria-label="Uptime link for ${esc(g.name)}"><button class="btn" type="button" data-copyval="${esc(up)}">Copy</button></div>`;
+  // History saved under a code no gym owns (e.g. "jstreet" from before
+  // gyms had accounts): offer it to a gym that has none of its own yet.
+  const ar = el.querySelector('.adoptrow');
+  if(!ar.dataset.done){
+    const offer = (acct.key && !acct.fromEnv && !g.hasHistory) ? adoptable : [];
+    ar.innerHTML = offer.map(a => `<div class="note">${esc(a.hint || '')}<div class="btns" style="margin-top:8px;"><button class="btn primary" type="button" data-adoptnow="${esc(a.code)}" data-gym="${esc(g.key)}">${esc(a.label || "Adopt '" + a.code + "'")}</button></div></div>`).join('');
+  }
+  const pause = el.querySelector('[data-act="pause"]');
+  const paused = g.state === 'paused' || (m.stoppedByOperator && !m.running);
+  pause.textContent = paused ? 'Start watching again' : 'Stop watching';
+  pause.dataset.paused = paused ? '1' : '';
+  pause.hidden = g.state === 'not-connected' && !paused;
+  el.querySelector('[data-f="codeLine"]').textContent = acct.code
+    ? `Sign-in code: ${acct.code}${acct.codeIssuedAt ? ' (issued ' + when(acct.codeIssuedAt, g.timeZone) + ')' : ''}. Camera computers unpaired ${g.pairingGeneration || 0} time${g.pairingGeneration === 1 ? '' : 's'}.`
+    : 'This gym comes from GYM_CODES on Render: change its code there.';
+  el.querySelector('[data-act="newcode"]').hidden = !acct.code || !!acct.fromEnv;
+  renderAccuracy(el, g);
+}
+
+// ---------- accuracy test scorecard (node rtsp-run.js --test) ----------
+// Everything in it that came from the camera computer or the model (the
+// camera name, notes) goes through esc() like the rest of the page.
+const comparingNow = new Set();
+function waveWords(w){
+  return ({ ignored:'ignored ✓', 'checked-ok':'nobody counted ✓', counted:'counted as a walk ✗', flagged:'flagged ✗', 'not-checked':'not counted', 'not-tested':'not tested' })[w] || 'not done';
+}
+function scRows(sc){
+  const n = (ok, text) => `<div class="n ${ok ? 'ok-t' : 'bad-t'}">${esc(text)}</div>`;
+  return `<div class="scgrid">
+    <div>Walks noticed</div>${n(sc.noticed >= sc.walks, `${sc.noticed} of ${sc.walks}`)}
+    <div>Counted right</div>${n(sc.right >= sc.counted, `${sc.right} of ${sc.counted}`)}
+    <div>Tailgates caught <span class="muted">(2 on one rotation${sc.tailgatesTried > sc.tailgates ? `; ${esc(sc.tailgatesTried - sc.tailgates)} more not seen` : ''})</span></div>${n(sc.tailgates > 0 && sc.tailgatesCaught >= sc.tailgates, `${sc.tailgatesCaught} of ${sc.tailgates}`)}
+    <div>False alarms</div>${n(!sc.falseAlarms, String(sc.falseAlarms))}
+    <div>Arm wave</div>${n(/✓/.test(waveWords(sc.wave)), waveWords(sc.wave))}
+  </div>`;
+}
+function renderAccuracy(el, g){
+  const box = el.querySelector('.acc');
+  const a = g.accuracy || {};
+  if(a.error){ box.innerHTML = `<h4>Accuracy test</h4><div class="bad-t">${esc(a.error)}</div>`; return; }
+  let h = '<h4>Accuracy test</h4>';
+  if(a.running) h += `<div class="when warn-t">A test is running now (started ${esc(shortAgo(a.running.startedAt))}).</div>`;
+  if(a.none){
+    box.innerHTML = h + `<div class="when">Not run yet. On the camera computer: <kbd>node rtsp-run.js --test</kbd> — about 10 walks at the door, a few cents.</div>`;
     return;
   }
-  document.getElementById('cDay').textContent = money(c.last24h);
-  document.getElementById('cMonth').textContent = money(c.projectedMonthly);
-  document.getElementById('cWorst').textContent = money(c.capMonthlyWorstCase);
-  document.getElementById('cModel').textContent = String(c.model || '').includes('haiku') ? 'Haiku' : 'Sonnet';
-  document.getElementById('cUsed').textContent = `${s.burstsLast24h ?? 0} of ${s.dailyBurstCap ?? '—'}`;
-  const margin = 199 - (c.projectedMonthly || 0);
-  const el = document.getElementById('cMargin');
-  el.textContent = money(margin) + ' (' + Math.round((margin / 199) * 100) + '%)';
-  el.className = 'v ' + (margin > 150 ? 'ok' : margin > 80 ? 'warn' : 'bad');
-
-  const note = document.getElementById('cNote');
-  if(c.projectedMonthly > 40){
-    note.style.display = 'block';
-    note.innerHTML = '<strong>Running higher than expected.</strong> Usually the detection region is picking up something that moves on its own, or the schedule is wider than intended. Switching the model to Haiku cuts this to roughly a third.';
-  } else { note.style.display = 'none'; }
+  const sc = a.scorecard || {};
+  h += `<div class="when">${esc(when(a.finishedAt || a.startedAt, g.timeZone))} · ${esc(a.zoneLabel || '')} · counted with ${esc(a.modelName)} · ${esc(a.analyses)} analyses, ${esc(a.costText)}</div>`;
+  h += scRows(sc);
+  const lvl = sc.level === 'ok' ? 'green' : sc.level === 'warn' ? '' : 'red';
+  h += `<div class="note ${lvl}"><strong>${esc(sc.verdict)}</strong>${(sc.fixes || []).map(f => `<div>Do this: ${esc(f)}</div>`).join('')}</div>`;
+  const walks = (a.judged || []).filter(j => j.status !== 'redone');
+  if(walks.length) h += `<details class="more"><summary>Each walk (${walks.length})</summary>${walks.map(j => `<div class="wk">${esc(j.pos || j.n)}. ${esc(j.label || j.kind)} — ${esc(j.text)}</div>`).join('')}</details>`;
+  const busy = a.comparing || comparingNow.has(g.key);
+  if(!a.compare){
+    const est = a.compareEstimate || {};
+    if(est.crossings > 0) h += `<div class="btns" style="margin-top:8px;"><button class="btn" type="button" data-act="compare" data-run="${esc(a.runId)}"${busy ? ' disabled' : ''}>${busy ? 'Comparing… (up to a minute)' : `Compare with ${esc(a.otherModelName)} (same ${esc(est.crossings)} crossings, ${esc(est.costText)})`}</button></div>`;
+  } else {
+    const c = a.compare, cs = c.scorecard || {}, rec = a.recommendation || {};
+    const cheapName = /haiku/i.test(rec.cheaper || '') ? 'Haiku' : 'Sonnet';
+    h += `<div class="cmp"><div class="big">${esc(a.modelName)}: ${esc(sc.rightAll)}/${esc(sc.judgedAll)} right · ${esc(c.modelName)}: ${esc(cs.rightAll)}/${esc(cs.judgedAll)} right</div>
+      <div class="muted" style="font-size:13px;">Tailgates caught: ${esc(a.modelName)} ${esc(sc.tailgatesCaught)}/${esc(sc.tailgates)} · ${esc(c.modelName)} ${esc(cs.tailgatesCaught)}/${esc(cs.tailgates)}. False alarms: ${esc(sc.falseAlarms)} · ${esc(cs.falseAlarms)}.
+      ${esc(cheapName)} would save ${esc(rec.savingText || '')} a month at your limit (${esc(a.dailyCap)} a day). Now using: ${esc(a.currentModelName)}.</div>
+      <div class="note ${rec.level === 'ok' ? 'green' : rec.level === 'bad' ? 'red' : ''}" style="margin-top:8px;">${esc(rec.text || '')}</div>`;
+    const target = a.currentModel === a.model ? c.model : a.model;
+    const tName = /haiku/i.test(target) ? 'Haiku' : 'Sonnet';
+    const advised = rec.recommend === target;
+    h += `<div class="btns" style="margin-top:8px;"><button class="btn${advised ? ' primary' : ''}" type="button" data-act="model" data-model="${esc(target)}">Switch ${esc(g.name)} to ${esc(tName)}${advised ? '' : ' (not recommended)'}</button></div></div>`;
+  }
+  box.innerHTML = h;
+}
+async function compareModels(el, key, runId, btn){
+  const out = el.querySelector('[data-out="acc"]');
+  comparingNow.add(key); btn.disabled = true; btn.textContent = 'Comparing… (up to a minute)';
+  out.innerHTML = '';
+  const r = await call(`/admin/gyms/${encodeURIComponent(key)}/tests/${encodeURIComponent(runId)}/compare`, { json: {} }).catch(e => ({ body:{ error: e.message } }));
+  comparingNow.delete(key);
+  if(!r.ok) out.innerHTML = `<span class="bad-t">${esc(r.body.error || 'Could not compare.')}</span>`;
+  await refresh();
+}
+async function switchModel(el, key, model, name){
+  const out = el.querySelector('[data-out="acc"]');
+  const mName = /haiku/i.test(model) ? 'Haiku' : 'Sonnet';
+  if(!confirm(`Count ${name}'s crossings with ${mName} from now on?\n\nIt applies straight away (Settings on this card shows it, and you can change it back there).`)) return;
+  const r = await call(`/admin/gyms/${encodeURIComponent(key)}/settings`, { json: { model } }).catch(e => ({ body:{ error: e.message } }));
+  out.innerHTML = r.ok ? `<span class="ok-t">Done: ${esc(name)} is counted with ${esc(mName)} now.</span>` : `<span class="bad-t">${esc(r.body.error || 'Could not change it.')}</span>`;
+  await refresh();
 }
 
-function renderHealth(s, d){
+// ---------- gym buttons ----------
+$('gymBlocks').addEventListener('click', async ev => {
+  const b = ev.target.closest('button'); if(!b) return;
+  const el = b.closest('section.gym'); if(!el) return;
+  const key = el.dataset.key, g = ((overview && overview.gyms) || []).find(x => x.key === key) || {};
+  const name = g.name || key;
+  const act = b.dataset.act;
+  if(act === 'handoff') return showHandoff(key);
+  if(act === 'pause'){
+    const stop = !b.dataset.paused;
+    if(stop && !confirm(`Stop watching ${name}? Crossings are ignored (and cost nothing) until you press Start again. The gym's page will say "paused".`)) return;
+    b.disabled = true;
+    const r = await call(`/admin/gyms/${encodeURIComponent(key)}/monitoring`, { json: { action: stop ? 'stop' : 'start' } }).catch(e => ({ body:{ error: e.message } }));
+    b.disabled = false;
+    alert(r.body.message || r.body.error || 'Done.');
+    return refresh();
+  }
+  if(act === 'test'){
+    const out = el.querySelector('[data-out="test"]');
+    const to = el.querySelector('[data-f="testTo"]').value.trim();
+    out.innerHTML = '<span class="empty">Sending…</span>'; b.disabled = true;
+    const r = await call('/admin/test-alert', { json: Object.assign({ gymCode: key }, to ? { to } : {}) }).catch(e => ({ body:{ error: e.message } }));
+    b.disabled = false;
+    if(!r.ok){ out.innerHTML = `<span class="bad-t">${esc(r.body.error || 'Could not send.')}</span>`; return; }
+    out.innerHTML = (r.body.results || []).map(x => `<div class="${x.delivered ? 'ok-t' : 'bad-t'}">${x.delivered ? '✓ Sent' : '✗ Not sent'} to ${esc(x.to)} (${esc(x.channel)})${x.reason ? ' — ' + esc(x.reason) : ''}</div>`).join('');
+    return refresh();
+  }
+  if(act === 'newcode'){
+    if(!confirm(`Issue a new sign-in code for ${name}?\n\nThe old code stops working at once, and every phone signed in with it is signed out. History is kept. You then send the gym the new code.`)) return;
+    const out = el.querySelector('[data-out="access"]');
+    b.disabled = true;
+    const r = await call(`/admin/gyms/${encodeURIComponent(key)}/new-code`, { json: {} }).catch(e => ({ body:{ error: e.message } }));
+    b.disabled = false;
+    if(!r.ok){ out.innerHTML = `<span class="bad-t">${esc(r.body.error || 'Could not do that.')}</span>`; return; }
+    out.innerHTML = `<span class="ok-t">${esc(r.body.message)}</span>`;
+    await refresh();
+    return showHandoff(key);
+  }
+  if(act === 'unpair'){
+    if(!confirm(`Unpair every camera computer for ${name}?\n\nThey stop sending at once. To reconnect one, make a new pairing code below and run node pair.js on it.`)) return;
+    const out = el.querySelector('[data-out="access"]');
+    b.disabled = true;
+    const r = await call(`/admin/gyms/${encodeURIComponent(key)}/unpair`, { json: {} }).catch(e => ({ body:{ error: e.message } }));
+    b.disabled = false;
+    out.innerHTML = r.ok ? `<span class="${/RUNNER_TOKEN/.test(r.body.message || '') ? 'warn-t' : 'ok-t'}">${esc(r.body.message)}</span>` : `<span class="bad-t">${esc(r.body.error || 'Could not do that.')}</span>`;
+    return refresh();
+  }
+  if(act === 'save') return saveSettings(el, key, b);
+  if(act === 'compare') return compareModels(el, key, b.dataset.run, b);
+  if(act === 'model') return switchModel(el, key, b.dataset.model, name);
+});
+// Settings load when their section is opened.
+$('gymBlocks').addEventListener('toggle', ev => {
+  const d = ev.target;
+  if(d.dataset && d.dataset.box === 'settings' && d.open) loadSettings(d.closest('section.gym'));
+}, true);
+
+// ---------- per-gym settings (J3) ----------
+const US_ZONES = ['America/New_York','America/Chicago','America/Denver','America/Phoenix','America/Los_Angeles','America/Anchorage','Pacific/Honolulu'];
+const ZONE_WORDS = { 'America/New_York':'Eastern', 'America/Chicago':'Central', 'America/Denver':'Mountain', 'America/Phoenix':'Arizona', 'America/Los_Angeles':'Pacific', 'America/Anchorage':'Alaska', 'Pacific/Honolulu':'Hawaii' };
+function fillTzSelect(sel, cur){
+  const list = US_ZONES.slice(); if(cur && !list.includes(cur)) list.push(cur);
+  sel.innerHTML = `<option value="">Default (Central unless GYM_TIMEZONE says otherwise)</option>` + list.map(z => `<option value="${esc(z)}">${esc(ZONE_WORDS[z] ? ZONE_WORDS[z] + ' — ' + z : z)}</option>`).join('');
+  sel.value = cur || '';
+}
+function modelWords(m){ return /haiku/i.test(m) ? 'Haiku — about 3x cheaper' : /sonnet/i.test(m) ? 'Sonnet — more accurate' : m; }
+async function loadSettings(el){
+  const key = el.dataset.key, box = el.querySelector('.sform');
+  const r = await call(`/admin/gyms/${encodeURIComponent(key)}/settings`).catch(e => ({ body:{ error: e.message } }));
+  if(!r.ok){ box.innerHTML = `<div class="bad-t">${esc(r.body.error || 'Could not load settings.')}</div>`; return; }
+  drawSettings(el, r.body);
+}
+function drawSettings(el, v){
+  const s = v.settings || {}, lim = v.limits || {}, cam = v.cameraComputerConfig || {}, eff = v.effective || {};
+  const mode = s.scheduleStart && s.scheduleEnd ? (s.scheduleStart === s.scheduleEnd ? 'always' : 'set') : 'camera';
+  const camHours = cam.scheduleStart && cam.scheduleEnd ? `${hhmm(cam.scheduleStart)}–${hhmm(cam.scheduleEnd)}` : 'always on';
+  const srcs = eff.sources || {};
+  const box = el.querySelector('.sform');
+  box.innerHTML = `
+    <label class="f">Watch hours</label>
+    <select data-f="mode">
+      <option value="set">Only these hours</option>
+      <option value="always">All day and night</option>
+      <option value="camera">Use the camera computer's setting (${esc(camHours)})</option>
+    </select>
+    <div class="grid2" data-f="hours">
+      <div><label class="f">From</label><input type="time" data-f="start" value="${esc(s.scheduleStart && mode === 'set' ? s.scheduleStart : '21:00')}"></div>
+      <div><label class="f">Until</label><input type="time" data-f="end" value="${esc(s.scheduleEnd && mode === 'set' ? s.scheduleEnd : '05:00')}"></div>
+    </div>
+    <div class="src">In force now: ${eff.scheduleStart && eff.scheduleEnd && eff.scheduleStart !== eff.scheduleEnd ? esc(hhmm(eff.scheduleStart) + '–' + hhmm(eff.scheduleEnd)) : 'all day'}${srcs.schedule ? ' (from ' + esc(srcs.schedule) + ')' : ''}. Times are in the gym's time zone.</div>
+    <label class="f">Time zone</label>
+    <select data-f="tz"></select>
+    <div class="src">From: ${esc(v.timeZoneSource || '—')}</div>
+    <label class="f">Alert emails (up to ${esc(lim.maxEmails || 5)}, separated by commas)</label>
+    <input type="text" data-f="emails" autocomplete="off" inputmode="email" value="${esc((s.alertEmails || []).join(', '))}" placeholder="you@example.com, manager@gym.com">
+    <label class="f">Alert mobile numbers for texts (up to ${esc(lim.maxPhones || 3)})</label>
+    <input type="text" data-f="phones" autocomplete="off" inputmode="tel" value="${esc((s.alertPhones || []).join(', '))}" placeholder="479-555-0123">
+    <div class="src">These get every tailgate alert, plus "camera computer offline", "back online" and "no picture". The gym's own list (on its page) and SUPPORT_EMAIL get those too.</div>
+    <div class="grid2">
+      <div><label class="f">Model</label><select data-f="model"><option value="">Camera computer's choice (${esc(modelWords(cam.model || 'default'))})</option>${(lim.models || []).map(m => `<option value="${esc(m)}">${esc(modelWords(m))}</option>`).join('')}</select></div>
+      <div><label class="f">Daily limit (analyses a day, 1–${esc(lim.maxDailyBurstCap || 400)})</label><input type="number" data-f="cap" min="1" max="${esc(lim.maxDailyBurstCap || 400)}" inputmode="numeric" value="${esc(s.dailyBurstCap || '')}" placeholder="${esc(eff.dailyBurstCap || cam.dailyBurstCap || 60)} now"></div>
+    </div>
+    <label class="f">Camera clock note (shown under the gym's photos, ${esc(lim.noteMax || 120)} characters max)</label>
+    <input type="text" data-f="clock" maxlength="${esc(lim.noteMax || 120)}" autocomplete="off" value="${esc(s.cameraClockNote || '')}" placeholder="Camera clock runs about 1 hour fast">
+    <button class="btn primary" type="button" data-act="save">Save settings</button>
+    <div class="out" data-out="settings" role="status"></div>`;
+  box.querySelector('[data-f="mode"]').value = mode;
+  fillTzSelect(box.querySelector('[data-f="tz"]'), s.timeZone || '');
+  box.querySelector('[data-f="model"]').value = s.model || '';
+  const hours = box.querySelector('[data-f="hours"]');
+  const sync = () => { hours.style.display = box.querySelector('[data-f="mode"]').value === 'set' ? '' : 'none'; };
+  box.querySelector('[data-f="mode"]').onchange = sync; sync();
+}
+async function saveSettings(el, key, btn){
+  const box = el.querySelector('.sform'), f = n => box.querySelector(`[data-f="${n}"]`);
+  const out = box.querySelector('[data-out="settings"]');
+  const mode = f('mode').value;
+  const body = {
+    timeZone: f('tz').value || null,
+    alertEmails: f('emails').value.trim(),
+    alertPhones: f('phones').value.trim(),
+    model: f('model').value || null,
+    dailyBurstCap: f('cap').value.trim() ? Number(f('cap').value) : null,
+    cameraClockNote: f('clock').value.trim(),
+  };
+  if(mode === 'set') Object.assign(body, { scheduleStart: f('start').value, scheduleEnd: f('end').value });
+  else if(mode === 'always') body.watchHours = 'always';
+  else Object.assign(body, { scheduleStart: null, scheduleEnd: null });
+  btn.disabled = true; out.innerHTML = '<span class="empty">Saving…</span>';
+  const r = await call(`/admin/gyms/${encodeURIComponent(key)}/settings`, { json: body }).catch(e => ({ body:{ error: e.message } }));
+  btn.disabled = false;
+  if(!r.ok){ out.innerHTML = `<span class="bad-t">${esc(r.body.error || 'Could not save.')}</span>`; return; }
+  drawSettings(el, r.body);
+  box.querySelector('[data-out="settings"]').innerHTML = '<span class="ok-t">Saved. It applies straight away.</span>';
+  refresh();
+}
+
+// ---------- adopt a code a camera computer already sends (J2) ----------
+function renderAdopt(){
+  const box = $('adoptOffer');
+  if(!adoptable.length){ box.innerHTML = ''; return; }
+  box.innerHTML = adoptable.map(a => `<label class="check"><input type="checkbox" data-adopt="${esc(a.code)}"> <strong>${esc(a.label || "Adopt '" + a.code + "'")}</strong> — ${esc(a.hint || '')} Tick it if it belongs to this new gym.</label>`).join('');
+}
+async function createGym(){
+  const name = $('gName').value.trim(), email = $('gEmail').value.trim();
+  const out = $('gymMsg');
+  if(!name || !email){ out.innerHTML = '<span class="bad-t">Type the gym name and the manager\'s email.</span>'; return; }
+  const ticked = [...document.querySelectorAll('[data-adopt]')].filter(x => x.checked).map(x => x.dataset.adopt);
+  if(ticked.length > 1){ out.innerHTML = '<span class="bad-t">Tick only one code to adopt.</span>'; return; }
+  out.innerHTML = '<span class="empty">Creating…</span>';
+  try{
+    const body = { gymName: name, email, timeZone: $('gTz').value || undefined };
+    if(ticked[0]) body.adoptCode = ticked[0];
+    const r = await call('/admin/gyms', { json: body });
+    if(!r.ok){ out.innerHTML = `<span class="bad-t">${esc(r.body.error || 'Could not create it.')}</span>`; return; }
+    const g = r.body.gym;
+    let html = `<div class="ok-t">Created ${esc(g.gymName)}. Sign-in code: <span class="mono">${esc(g.code)}</span></div>`;
+    (r.body.adoptable || []).forEach(a => {
+      html += `<div class="note">${esc(a.hint || r.body.adoptHint || '')}<div class="btns" style="margin-top:8px;"><button class="btn primary" type="button" data-adoptnow="${esc(a.code)}" data-gym="${esc(g.key)}">${esc(a.label || "Adopt '" + a.code + "'")}</button></div></div>`;
+    });
+    out.innerHTML = html;
+    $('gName').value = ''; $('gEmail').value = '';
+    await refresh();
+    $('pairGym').value = g.key;
+    showHandoff(g.key);
+  }catch(e){ out.innerHTML = `<span class="bad-t">${esc(e.message)}</span>`; }
+}
+document.addEventListener('click', async ev => {
+  const b = ev.target.closest('button[data-adoptnow]'); if(!b) return;
+  b.disabled = true;
+  const row = b.closest('.adoptrow'); if(row) row.dataset.done = '1';
+  const r = await call(`/admin/gyms/${encodeURIComponent(b.dataset.gym)}/adopt`, { json: { legacyCode: b.dataset.adoptnow } }).catch(e => ({ body:{ error: e.message } }));
+  b.closest('.note').innerHTML = r.ok ? `<span class="ok-t">${esc(r.body.message || 'Adopted.')}</span>` : `<span class="bad-t">${esc(r.body.error || 'Could not adopt it.')}</span>`;
+  refresh();
+});
+
+// ---------- hand-off message (J14) ----------
+function handoffText(key){
+  const a = accounts[key] || {}, g = ((overview && overview.gyms) || []).find(x => x.key === key) || {};
+  const name = a.gymName || g.name || key;
+  const link = `${SITE}/activity.html#code=${encodeURIComponent(a.code || key)}`;
+  const live = !!(g.runner && g.runner.online && g.runner.picture === 'ok' && ['watching','off-hours'].includes(g.state));
+  return (live
+      ? `Hi! ${name}'s SecurityAI door monitor is running.\n\n`
+      : `Hi! Here is ${name}'s SecurityAI activity page. The camera isn't connected yet — the page fills in once it is, and we'll let you know.\n\n`)
+    + `Tap this link on your phone to see entries and anything flagged:\n${link}\n\n`
+    + `Then save it: iPhone - Share > Add to Home Screen. Android - menu > Add to Home screen. The first time you open it from the home screen, enter the code once more.\n\n`
+    + `Your access code is: ${a.code || key}\n`
+    + (a.email && emailWorks() ? `Lost it? Tap "Forgot your code?" on that page and it is emailed to ${a.email}.\n` : `Lost it? Just reply to this message and we'll send it again.\n`)
+    + `\nQuestions? Just reply to this message.`;
+}
+let handoffKey = null;
+function showHandoff(key){
+  handoffKey = key;
+  const a = accounts[key] || {};
+  $('handoff').style.display = 'block';
+  $('handoffTitle').textContent = `Message for ${a.gymName || key}`;
+  const ta = $('handoffText');
+  ta.value = handoffText(key);
+  updateHandoffLinks();
+  ta.oninput = updateHandoffLinks;
+  if(!navigator.share) $('shareBtn').style.display = 'none';
+  $('handoff').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+function updateHandoffLinks(){
+  const body = $('handoffText').value, a = accounts[handoffKey] || {};
+  const subject = `Your SecurityAI activity page${a.gymName ? ' - ' + a.gymName : ''}`;
+  $('smsBtn').href = 'sms:?&body=' + encodeURIComponent(body);
+  $('mailBtn').href = `mailto:${encodeURIComponent(a.email || '')}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+}
+async function shareHandoff(){
+  try{ await navigator.share({ text: $('handoffText').value }); }catch(e){ /* cancelled */ }
+}
+
+// ---------- copy buttons ----------
+async function copyText(text, btn){
+  let ok = false;
+  try{ await navigator.clipboard.writeText(text); ok = true; }catch(e){
+    const t = document.createElement('textarea'); t.value = text; document.body.appendChild(t); t.select();
+    try{ ok = document.execCommand('copy'); }catch(e2){} t.remove();
+  }
+  if(btn){ const o = btn.textContent; btn.textContent = ok ? 'Copied ✓' : 'Select and copy by hand'; setTimeout(() => btn.textContent = o, 2000); }
+}
+document.addEventListener('click', ev => {
+  const b = ev.target.closest('button[data-copy],button[data-copyval]'); if(!b) return;
+  const text = b.dataset.copyval !== undefined ? b.dataset.copyval : (document.querySelector(b.dataset.copy) || {}).value;
+  copyText(text || '', b);
+});
+
+// ---------- gym pickers ----------
+function fillGymSelects(){
+  const list = ((overview && overview.gyms) || []).map(g => ({ key: g.key, name: g.name }));
+  for(const id of ['pairGym', 'techGym']){
+    const sel = $(id), cur = sel.value;
+    sel.innerHTML = list.length ? list.map(g => `<option value="${esc(g.key)}">${esc(g.name)}</option>`).join('')
+      : '<option value="">(no gyms yet — add one first)</option>';
+    if(cur && list.some(g => g.key === cur)) sel.value = cur;
+  }
+}
+
+// ---------- pairing ----------
+let pairPoll = null;
+async function getPairCode(){
+  const gymCode = $('pairGym').value;
+  const out = $('pairOut'), meta = $('pairMeta');
+  out.style.display = 'block';
+  meta.textContent = 'Making a code…';
+  let r;
+  try{ r = await call('/admin/pair', { json: { gymCode } }); }
+  catch(e){ meta.innerHTML = `<span class="bad-t">${esc(e.message)}</span>`; return; }
+  if(!r.ok || !r.body.ok){ $('pairCode').textContent = '— — —'; meta.innerHTML = `<span class="bad-t">${esc(r.body.error || 'Could not make a code.')}</span>`; return; }
+  const p = r.body;
+  $('pairCode').textContent = p.display;
+  const until = new Date(p.expiresAt);
+  if(pairPoll) clearInterval(pairPoll);
+  const tick = async () => {
+    const left = Math.max(0, Math.round((until - Date.now()) / 1000));
+    let s = null;
+    try{ s = (await call('/admin/pair/' + encodeURIComponent(p.id))).body; }catch(e){}
+    if(s && s.state === 'used'){
+      meta.innerHTML = `<span class="ok-t">✓ Paired with ${esc(s.usedBy)}</span> — it shows on its gym above within a minute of starting.`;
+      $('pairCode').textContent = '✓';
+      clearInterval(pairPoll); loadPairings(); refresh(); return;
+    }
+    if(!s || s.state === 'expired' || s.state === 'revoked' || left === 0){
+      meta.innerHTML = `<span class="warn-t">${s && s.state === 'revoked' ? 'Cancelled (a newer code was made, or too many wrong tries).' : 'Expired.'}</span> Press the button for a new one.`;
+      $('pairCode').textContent = '— — —';
+      clearInterval(pairPoll); return;
+    }
+    meta.innerHTML = `For ${esc(p.gymName || p.gymCode)} · works once · ${Math.floor(left/60)}:${String(left%60).padStart(2,'0')} left`
+      + (s.wrongTries ? ` · <span class="warn-t">${esc(s.wrongTries)} wrong ${s.wrongTries === 1 ? 'try' : 'tries'}</span>` : '');
+  };
+  tick(); pairPoll = setInterval(tick, 3000);
+}
+async function loadPairings(){
+  let r;
+  try{ r = (await call('/admin/pairings')).body; }catch(e){ return; }
+  if(!r || !r.ok) return;
+  const rows = (r.pairings || []).slice(0, 5).map(p => `<div class="row"><span class="k">${esc(p.host)} → ${esc(p.gymName || p.gymCode)}</span><span class="v">${esc(shortAgo(p.at))}</span></div>`).join('');
+  $('pairHistory').innerHTML = rows ? `<div class="sub" style="margin:0;">Recently paired</div>${rows}` : '';
+}
+
+// ---------- Render settings (J12, J13) ----------
+async function loadSetup(){
+  let r;
+  try{ r = await call('/admin/setup'); }catch(e){ return; }
+  if(r.status === 404 || !r.body.ok) return;
+  const b = r.body, dk = b.disk || {};
+  $('diskLine').innerHTML = `<div class="note ${dk.survivesDeploys ? 'green' : ''}" style="margin:0 0 8px;"><strong>Storage:</strong> ${esc(dk.dataDir || '—')} — `
+    + (dk.survivesDeploys ? 'a separate disk, so gym accounts, history and photos survive a deploy.'
+      : !dk.dataDirSet ? 'DATA_DIR is not set, so every deploy wipes gym accounts, history and photos.'
+      : !dk.exists ? 'that folder does not exist.' : !dk.writable ? 'can\'t be written to.'
+      : 'on the same disk as the program, so it is wiped on every deploy.') + '</div>';
+  const order = { required: 0, remove: 1, recommended: 2, optional: 3, 'not needed': 4 };
+  const items = (b.items || []).slice().sort((a, c) => (order[a.need] ?? 5) - (order[c.need] ?? 5));
+  const missing = items.filter(i => i.need === 'required' && !i.ok).length;
+  $('envList').innerHTML =
+    `<p class="verdict ${missing ? 'bad' : 'ok'}" style="font-size:14px;">${missing ? `${missing} must-have setting${missing === 1 ? ' is' : 's are'} missing.` : 'All must-have settings are there.'}</p>`
+    + items.map(i => {
+      const remove = i.need === 'remove';
+      const mark = remove ? '<span class="warn-t">!</span>' : i.ok ? '<span class="ok-t">✓</span>' : i.need === 'required' ? '<span class="bad-t">✗</span>' : i.need === 'recommended' ? '<span class="warn-t">!</span>' : '<span class="empty" style="padding:0;">–</span>';
+      const tag = remove ? 'delete this' : i.need === 'required' ? 'must have' : i.need;
+      return `<div class="envrow"><span class="mark">${mark}</span><span><span class="key">${esc(i.key)}</span> <span class="need ${remove ? 'remove' : i.need === 'required' ? 'required' : ''}">${esc(tag)}</span></span>`
+        + `<span class="why">${esc(i.why)}</span>${(!i.ok || remove) && i.fix ? `<span class="fix">${esc(i.fix)}</span>` : ''}</div>`;
+    }).join('');
+}
+
+// ---------- technical details for one gym ----------
+$('techBox').addEventListener('toggle', () => { if($('techBox').open) loadTech(); });
+$('techGym').addEventListener('change', loadTech);
+async function loadTech(){
+  const key = $('techGym').value;
+  try{
+    const d = (await call('/monitor/debug' + (key ? '?gym=' + encodeURIComponent(key) : ''))).body;
+    renderRunner(d, key); renderHealth(d);
+  }catch(e){ $('health').innerHTML = `<div class="empty">${esc(e.message)}</div>`; }
+}
+function renderHealth(d){
   const sum = d.summary || {};
   const rows = [
-    ['Monitoring running', sum.monitoringRunning, sum.monitoringRunning ? 'yes' : 'NO'],
-    ['Ingest running', sum.ingestRunning, sum.ingestRunning ? 'yes' : 'NO'],
-    ['Within monitored hours', sum.withinSchedule !== false, sum.withinSchedule === false ? 'no — idle' : 'yes'],
-    ['Storage survives deploys', d.dataDirIsPersistent, d.dataDirIsPersistent ? 'yes' : 'NO — logs will be lost'],
+    ['Monitoring running', sum.monitoringRunning, sum.monitoringRunning ? 'yes' : 'no'],
+    ['Within watch hours', sum.withinSchedule !== false, sum.withinSchedule === false ? 'no — idle' : 'yes'],
     ['Anthropic key set', d.apiKeySet, d.apiKeySet ? 'yes' : 'NO'],
-    ['Alert email configured', d.emailSendingConfigured, d.emailSendingConfigured ? 'yes' : 'no'],
-    ['Ops page protected', d.adminTokenSet, d.adminTokenSet ? 'yes' : 'NO — anyone with the URL can open this'],
-    ['Dashboard heartbeat', !s.heartbeatLost, s.heartbeatLost ? 'LOST' : 'ok'],
+    ['Email can be sent', d.emailSendingConfigured, d.emailSendingConfigured ? 'yes' : (d.emailProblem || 'NO')],
     ['Events in log', true, String(sum.entriesInLog ?? 0)],
     ['Failed analyses', !sum.entriesWithErrors, String(sum.entriesWithErrors ?? 0)],
     ['Skipped, outside hours', true, String(sum.skippedOutsideHours ?? 0)],
-    ['Skipped, over cap', !sum.skippedOverCap, String(sum.skippedOverCap ?? 0)],
-    ['Schedule', true, esc(d.schedule || '—')],
-    ['Gym code', true, esc(d.gymCode || 'default')],
-    ['Data directory', true, esc(d.dataDir || '—')],
+    ['Skipped, over this gym\'s limit', !sum.skippedOverCap, String(sum.skippedOverCap ?? 0)],
+    ['Skipped, over the site-wide limit', !sum.skippedSiteWideCap, String(sum.skippedSiteWideCap ?? 0)],
+    ['Skipped to make the limit last the night', true, String(sum.skippedPacing ?? 0)],
+    ['Data folder', true, d.dataDir || '—'],
   ];
-  let html = rows.map(([k, good, v]) =>
-    `<div class="row"><span class="k">${esc(k)}</span><span class="v ${good ? 'ok' : 'bad'}">${esc(v)}</span></div>`).join('');
-  (d.frameFolders || []).forEach(f =>
-    html += `<div class="row"><span class="k">Photos stored (${esc(f.folder)})</span><span class="v">${esc(f.photos)}</span></div>`);
-  document.getElementById('health').innerHTML = html;
-
-  if(d.likelyProblem && !/Nothing obviously wrong/i.test(d.likelyProblem)){
-    document.getElementById('health').insertAdjacentHTML('afterbegin',
-      `<div class="note"><strong>Likely problem:</strong> ${esc(d.likelyProblem)}</div>`);
-  }
+  let html = rows.map(([k, good, v]) => `<div class="row"><span class="k">${esc(k)}</span><span class="v ${good ? 'ok' : 'bad'}">${esc(v)}</span></div>`).join('');
+  (d.frameFolders || []).forEach(f => html += `<div class="row"><span class="k">Photos stored (${esc(f.folder)})</span><span class="v">${esc(f.photos)}</span></div>`);
+  if(d.likelyProblem && !/Nothing obviously wrong/i.test(d.likelyProblem)) html = `<div class="note"><strong>Likely problem:</strong> ${esc(d.likelyProblem)}</div>` + html;
+  $('health').innerHTML = html;
+}
+function renderRunner(d, key){
+  const el = $('runner');
+  const list = (d.runners || []).filter(r => !key || r.gymCode === key);
+  if(!list.length){ el.innerHTML = '<div class="empty">No camera computer has checked in for this gym since the website started.</div>'; return; }
+  const row = (k, v, cls) => `<div class="row"><span class="k">${esc(k)}</span><span class="v ${cls || ''}">${esc(v)}</span></div>`;
+  el.innerHTML = list.map(r => {
+    const c = r.configApplied || {}, raw = r.configReceived || {};
+    let html = row('Status', r.online ? 'online' : 'OFFLINE', r.online ? 'ok' : 'bad')
+      + row('Last check-in', r.lastSeen ? `${shortAgo(r.lastSeen)} (${when(r.lastSeen)})` : 'never')
+      + row('Host', r.host || '—') + row('Version', r.version || '—') + row('Gym', `${r.gymName || ''} (${r.gymCode || '—'})`)
+      + row('Check-ins since website start', r.heartbeats)
+      + row('Hours on the camera computer', (raw.scheduleStart && raw.scheduleEnd) ? `${raw.scheduleStart}–${raw.scheduleEnd}` : 'always')
+      + row('Daily limit asked / applied', `${raw.dailyBurstCap ?? '—'} / ${c.dailyBurstCap ?? '—'}`)
+      + row('Model', c.model || 'default')
+      + row('Crossings received', r.bursts)
+      + row('Last crossing', r.lastBurstAt ? `${shortAgo(r.lastBurstAt)} — ${r.lastBurstResult || ''}` : 'none yet')
+      + row('Duplicates ignored / rate-limited', `${r.duplicatesIgnored ?? 0} / ${r.rateLimited ?? 0}`, r.rateLimited ? 'warn' : '');
+    (r.zonesDetail || []).forEach(z => {
+      html += row(z.label, `${z.streamOk ? 'picture OK' : (!z.framesSeen && !z.lastError ? 'starting…' : 'NO PICTURE')} · ${z.fps ?? '—'} fps · ${z.framesSeen ?? '—'} frames${z.lastError ? ' · ' + z.lastError : ''}${(z.warnings || []).length ? ' · ' + z.warnings.join(' · ') : ''}`,
+        z.streamOk ? ((z.warnings || []).length || z.lastError ? 'warn' : 'ok') : (!z.framesSeen && !z.lastError ? '' : 'bad'));
+    });
+    return html;
+  }).join('<div style="height:14px;"></div>');
 }
 
+// ---------- email ingest tools (only when set up) ----------
 async function checkMailbox(){
-  const el = document.getElementById('mailbox');
+  const el = $('mailbox');
   el.innerHTML = '<div class="empty">Checking…</div>';
   try{
-    const r = await api('/monitor/mailbox-test');
+    const r = (await call('/monitor/mailbox-test')).body;
     if(!r.configured){ el.innerHTML = `<div class="note">${esc(r.reason)}</div>`; return; }
     if(r.error || !r.loggedIn){
-      el.innerHTML = `<div class="note" style="border-left-color:var(--red);"><strong>Could not read the mailbox.</strong> ${esc(r.error || 'Login failed')}<br><br>Nearly always the app password in ingest-zones.json — it must be the 16-character app password, not the account password.</div>`;
+      el.innerHTML = `<div class="note red"><strong>Could not read the mailbox.</strong> ${esc(r.error || 'Login failed')}<br><br>Nearly always the app password in ingest-zones.json — it must be the 16-character app password, not the account password.</div>`;
       return;
     }
-    const rows = (r.recentSubjects || []).map(m =>
-      `<div class="row"><span class="k">${esc(m.subject)}</span><span class="v">${esc(m.attachments)} photo${m.attachments === 1 ? '' : 's'}</span></div>`).join('');
+    const rows = (r.recentSubjects || []).map(m => `<div class="row"><span class="k">${esc(m.subject)}</span><span class="v">${esc(m.attachments)} photo${m.attachments === 1 ? '' : 's'}</span></div>`).join('');
     el.innerHTML = `<div class="row"><span class="k">Signed in as</span><span class="v ok">${esc(r.user)}</span></div>`
       + `<div class="row"><span class="k">Messages in mailbox</span><span class="v">${esc(r.totalMessages || 0)}</span></div>`
-      + `<div class="row"><span class="k">Analysed up to message</span><span class="v">#${esc(r.lastProcessedUid ?? 0)}</span></div>`
-      + `<div class="row"><span class="k">Waiting to be analysed</span><span class="v ${r.awaitingAnalysis ? 'warn' : 'ok'}">${esc(r.awaitingAnalysis ?? 0)}</span></div>`
-      + rows;
-  } catch(err){
-    el.innerHTML = `<div class="note" style="border-left-color:var(--red);">${esc(err.message)}</div>`;
-  }
+      + `<div class="row"><span class="k">Waiting to be analysed</span><span class="v ${r.awaitingAnalysis ? 'warn' : 'ok'}">${esc(r.awaitingAnalysis ?? 0)}</span></div>` + rows;
+  } catch(err){ el.innerHTML = `<div class="note red">${esc(err.message)}</div>`; }
 }
-
 async function backfill(count){
-  const el = document.getElementById('toolMsg');
+  const el = $('toolMsg');
   let n = count;
   if(n === null){
     const answer = window.prompt('How many of the most recent alarm emails should be re-analysed?\n\nEach one costs an analysis.', '10');
@@ -267,22 +986,19 @@ async function backfill(count){
   }
   el.innerHTML = `<div class="empty">Re-analysing ${n} email(s)…</div>`;
   try{
-    const r = await api('/monitor/process-latest?count=' + n, { method: 'POST' });
-    if(r.error){ el.innerHTML = `<div class="note" style="border-left-color:var(--red);">${esc(r.error)}</div>`; return; }
+    const r = (await call('/monitor/process-latest?count=' + n, { method: 'POST' })).body;
+    if(r.error){ el.innerHTML = `<div class="note red">${esc(r.error)}</div>`; return; }
     const done = r.processed || [];
-    const withPhotos = done.filter(x => x.frames).length;
-    el.innerHTML = `<div class="note"><strong>Done.</strong> ${done.length} read, ${withPhotos} had photos and were analysed. They appear on the <a href="activity.html">customer view</a>.</div>`;
+    el.innerHTML = `<div class="note"><strong>Done.</strong> ${done.length} read, ${done.filter(x => x.frames).length} had photos and were analysed.</div>`;
     refresh();
-  } catch(err){
-    el.innerHTML = `<div class="note" style="border-left-color:var(--red);">${esc(err.message)}</div>`;
-  }
+  } catch(err){ el.innerHTML = `<div class="note red">${esc(err.message)}</div>`; }
 }
 
-// Remembered for this tab only, so a shared computer doesn't stay unlocked.
+// Remembered for this tab (and, if ticked, on this phone).
 (function restore(){
   let saved = null;
-  try{ saved = sessionStorage.getItem('securityai:admin'); }catch(e){}
-  if(saved !== null){ document.getElementById('tok').value = saved; unlock(); }
+  try{ saved = sessionStorage.getItem('securityai:admin'); if(!saved) saved = localStorage.getItem('securityai:admin'); }catch(e){}
+  if(saved){ $('tok').value = saved; unlock(); }
 })();
 </script>
 </body>

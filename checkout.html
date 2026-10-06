@@ -102,7 +102,7 @@
         <line x1="10" y1="24" x2="38" y2="24" stroke="#3FCF8E" stroke-width="2.4" stroke-opacity="0.4" stroke-linecap="round"/>
         <circle cx="24" cy="24" r="5.5" fill="#3FCF8E"/>
       </svg>SecurityAI</a>
-    <a class="back" href="securityai.html">← Back to pricing</a>
+    <a class="back" href="securityai.html#pricing">← Back to pricing</a>
   </div>
 </nav>
 
@@ -117,7 +117,7 @@
 
       <div class="disclosure">
         <div class="mark">HOW THIS WORKS</div>
-        <p><strong style="color:var(--text);">Card details are never entered on this page.</strong> "Start subscription" calls a real backend (<span class="mono">server.js</span>) that opens an actual Stripe Checkout session — Stripe's own hosted page collects the card. That's what keeps this PCI-compliant: card numbers never touch this site's server or front end. This page needs to be served by that backend to work — see the included README.</p>
+        <p><strong style="color:var(--text);">You don't enter your card on this page.</strong> "Continue to payment" takes you to Stripe's secure checkout page, where you enter your card. After that we'll contact you to set up the camera computer at your gym.</p>
       </div>
 
       <div class="layout">
@@ -125,11 +125,11 @@
           <div class="card">
             <h3>CONTACT</h3>
             <div class="row2">
-              <div><label>Full name</label><input type="text" placeholder="Jordan Lee"></div>
-              <div><label>Email</label><input type="email" placeholder="jordan@yourgym.com"></div>
+              <div><label for="name">Full name</label><input type="text" id="name" autocomplete="name" placeholder="Jordan Lee"></div>
+              <div><label for="email">Email</label><input type="email" id="email" autocomplete="email" placeholder="jordan@yourgym.com"></div>
             </div>
-            <label>Gym / business name</label>
-            <input type="text" placeholder="Iron & Oak Fitness">
+            <label for="gym">Gym / business name</label>
+            <input type="text" id="gym" autocomplete="organization" placeholder="Iron &amp; Oak Fitness">
           </div>
 
           <div class="card">
@@ -141,15 +141,15 @@
             <h3>REQUIRED CONSENT</h3>
             <div class="consent">
               <input type="checkbox" id="c1" class="required-consent">
-              <p>I agree to SecurityAI's <a href="#">Terms of Service</a> and <a href="#">Privacy Policy</a>.</p>
+              <p>I agree to SecurityAI's <a href="terms.html#terms" target="_blank" rel="noopener">Terms of Service</a> and <a href="terms.html#privacy" target="_blank" rel="noopener">Privacy Policy</a>.</p>
             </div>
             <div class="consent">
               <input type="checkbox" id="c2" class="required-consent">
-              <p>I authorize SecurityAI to charge the card above <strong>$<span class="pr">99</span> per month</strong>, on a recurring basis, until I cancel.</p>
+              <p>I authorize SecurityAI to charge the card I enter on the next page <strong>$<span class="tot">99</span> per month</strong><span class="qtyWords"></span>, on a recurring basis, until I cancel.</p>
             </div>
             <div class="consent">
               <input type="checkbox" id="c3" class="required-consent">
-              <p>I understand entrance footage will be analyzed to match entries against check-ins, that SecurityAI retains alert logs rather than raw video, and that I'm responsible for any camera signage or consent required under my local surveillance laws.</p>
+              <p>I understand that photos from my entrance camera will be analyzed to count how many people come through, that photos are kept for 48 hours (entries flagged as tailgating for 35 days) and no video is stored, and that I'm responsible for any camera signage or consent required under my local surveillance laws.</p>
             </div>
             <div class="consent optional">
               <input type="checkbox" id="c4">
@@ -161,22 +161,18 @@
         <div class="card" style="position:sticky;top:24px;">
           <h3>ORDER SUMMARY</h3>
           <div class="summary-line"><span class="plan-name-line">One entrance</span><span>$<span class="pr">99</span>/month</span></div>
-          <div class="summary-line"><span>Gyms on this plan</span><span>1</span></div>
+          <div class="summary-line" id="qtyLine"><span>Gyms on this plan</span><span id="qtyFixed">1</span>
+            <span id="qtyEdit" style="display:none;align-items:center;gap:8px;">
+              <label for="qty" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);">Number of gyms</label>
+              <input type="number" id="qty" min="2" max="50" step="1" value="2" inputmode="numeric" style="width:76px;margin:0;padding:7px 9px;background:#0F1214;border:1px solid var(--line);border-radius:4px;color:var(--text);font-size:15px;">
+            </span></div>
           <div class="summary-line"><span>Billing cycle</span><span>Monthly</span></div>
-          <div class="summary-total"><span>Due today</span><span>$<span class="pr">99</span></span></div>
-          <button class="btn-primary" id="submitBtn" disabled onclick="submitCheckout()">Start subscription</button>
+          <div class="summary-total"><span>Due today</span><span>$<span class="tot">99</span></span></div>
+          <div class="fineprint" id="qtyNote" style="display:none;text-align:left;margin-top:6px;">Multi-gym plan: 2 to 50 gyms, $<span class="pr">169</span> each per month.</div>
+          <button class="btn-primary" id="submitBtn" disabled onclick="submitCheckout()">Continue to payment</button>
           <div class="fineprint" id="checkoutStatus" style="display:none;color:var(--red);"></div>
-          <div class="fineprint">You'll enter your card on Stripe's secure checkout page next. You can cancel anytime from your account settings.</div>
+          <div class="fineprint">You'll enter your card on Stripe's secure checkout page next. To cancel any time, email or call us.</div>
         </div>
-      </div>
-    </div>
-
-    <div class="success" id="success">
-      <div class="check">✓</div>
-      <h2>You're set up</h2>
-      <p>This is a demo confirmation — no real subscription was created and no card was charged. In a live version, a receipt would go to the email you entered and setup instructions would follow.</p>
-      <div class="hero-ctas" style="margin-top:26px;">
-        <a href="securityai.html" class="back" style="border:1px solid var(--line);padding:11px 20px;border-radius:4px;text-decoration:none;">Back to site</a>
       </div>
     </div>
 
@@ -184,17 +180,41 @@
 </main>
 
 <script>
-  // Populate plan + price from query string
+  // The plan comes from the link; the price shown here is for display only.
+  // The server works out the real price from the plan name.
   const params = new URLSearchParams(window.location.search);
-  const PLAN_NAMES = {
-    'single-door': 'One entrance',
-    'gym': 'Whole gym — unlimited entrances',
-    'multi': 'Multi-gym contract (per gym)',
+  const PLANS = {
+    'single-door': { name: 'One entrance', price: 99 },
+    'gym':         { name: 'Whole gym — every entrance', price: 199 },
+    'multi':       { name: 'Multi-gym contract (per gym)', price: 169 },
   };
-  const plan = PLAN_NAMES[params.get('plan')] || 'One entrance';
-  const price = params.get('price') || '99';
-  document.querySelectorAll('.pr').forEach(el => el.textContent = price);
-  document.querySelector('.plan-name-line').textContent = plan;
+  const planKey = PLANS[params.get('plan')] ? params.get('plan') : 'single-door';
+  const plan = PLANS[planKey];
+  document.querySelectorAll('.pr').forEach(el => el.textContent = plan.price);
+  document.querySelector('.plan-name-line').textContent = plan.name;
+
+  // Multi-gym is charged per gym (2 to 50, same limits as the server), so
+  // the page asks how many and shows the real total it will send.
+  const isMulti = planKey === 'multi';
+  const qtyIn = document.getElementById('qty');
+  function quantity(){
+    if(!isMulti) return 1;
+    const n = parseInt(qtyIn.value, 10);
+    return Math.max(2, Math.min(50, Number.isFinite(n) ? n : 2));
+  }
+  function showTotal(){
+    const q = quantity();
+    document.querySelectorAll('.tot').forEach(el => el.textContent = (plan.price * q).toLocaleString('en-US'));
+    document.querySelectorAll('.qtyWords').forEach(el => el.textContent = isMulti ? ` (${q} gyms × $${plan.price})` : '');
+  }
+  if(isMulti){
+    document.getElementById('qtyFixed').style.display = 'none';
+    document.getElementById('qtyEdit').style.display = 'inline-flex';
+    document.getElementById('qtyNote').style.display = 'block';
+    qtyIn.addEventListener('input', showTotal);
+    qtyIn.addEventListener('change', () => { qtyIn.value = quantity(); showTotal(); });
+  }
+  showTotal();
 
   // Enable submit only once all required consent is checked
   const requiredBoxes = document.querySelectorAll('.required-consent');
@@ -208,31 +228,44 @@
   async function submitCheckout(){
     const btn = document.getElementById('submitBtn');
     const statusEl = document.getElementById('checkoutStatus');
+    const name = document.getElementById('name').value.trim();
+    const email = document.getElementById('email').value.trim();
+    const gym = document.getElementById('gym').value.trim();
+    statusEl.style.display = 'none';
+    if(!name || !email || !gym || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){
+      statusEl.textContent = 'Please fill in your name, a valid email and your gym’s name.';
+      statusEl.style.display = 'block';
+      return;
+    }
     btn.disabled = true;
-    btn.textContent = 'Contacting payment server...';
+    btn.textContent = 'Opening secure payment page…';
 
     try{
       const res = await fetch('/create-checkout-session', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          planName: plan,
-          unitAmountCents: parseInt(price, 10) * 100,
-          gyms: 1
-        })
+        body: JSON.stringify(Object.assign({ plan: planKey, name, email, gym }, isMulti ? { gyms: quantity() } : {}))
       });
 
-      if(!res.ok) throw new Error('Server responded with ' + res.status);
-      const data = await res.json();
-      if(!data.url) throw new Error('No checkout URL returned');
+      let data = {};
+      try{ data = await res.json(); }catch(e){}
+      if(data.paymentsOff){
+        btn.disabled = false;
+        btn.textContent = 'Continue to payment';
+        statusEl.textContent = data.error;
+        statusEl.style.display = 'block';
+        return;
+      }
+      if(!res.ok) throw new Error(data.error || ('error ' + res.status));
+      if(!data.url) throw new Error('no payment page was returned');
 
       // Real Stripe-hosted checkout — this is where card details are
       // actually entered, never on this page.
       window.location.href = data.url;
     } catch(err){
       btn.disabled = false;
-      btn.textContent = 'Start subscription';
-      statusEl.textContent = 'Could not reach the payment server (' + err.message + '). This page needs to be served by server.js, not opened as a local file — see the README.';
+      btn.textContent = 'Continue to payment';
+      statusEl.textContent = 'Sorry, the payment page could not be opened (' + err.message + '). Nothing was charged. Please try again, or email tjdicken43@gmail.com and we’ll sort it out.';
       statusEl.style.display = 'block';
     }
   }

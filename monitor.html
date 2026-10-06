@@ -5,6 +5,7 @@
 <link rel="icon" type="image/svg+xml" href="logo.svg">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Live Monitor — SecurityAI</title>
+<meta name="robots" content="noindex, nofollow">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
@@ -49,7 +50,7 @@
   .step-body{padding:0 18px 18px;}
 
   label{display:block;font-size:12.5px;color:var(--muted);margin-bottom:5px;}
-  input[type=text],input[type=email],input[type=tel],input[type=time],select{
+  input[type=text],input[type=password],input[type=email],input[type=tel],input[type=time],select{
     width:100%;background:#0F1214;border:1px solid var(--line);border-radius:5px;color:var(--text);
     font-size:15px;padding:11px 12px;font-family:'IBM Plex Sans';margin-bottom:12px;}
   input[type=time]{color-scheme:dark;}
@@ -98,6 +99,8 @@
   .consent{display:flex;gap:10px;align-items:flex-start;margin-bottom:12px;}
   .consent input{margin-top:3px;width:16px;height:16px;flex-shrink:0;accent-color:var(--green);cursor:pointer;}
   .consent p{margin:0;font-size:12.5px;color:var(--muted);}
+  .step.need{border-color:var(--red);}
+  nav .links{display:flex;gap:14px;}
 </style>
 </head>
 <body>
@@ -113,8 +116,7 @@
       <circle cx="24" cy="24" r="5.5" fill="#3FCF8E"/>
     </svg>SecurityAI
   </a>
-  <a class="back" href="activity.html">Activity →</a>
-    <a class="back" href="admin.html" style="margin-left:14px;">Ops</a>
+  <span class="links"><a class="back" href="activity.html">Activity →</a><a class="back" href="admin.html">Ops</a></span>
 </div></nav>
 
 <main><div class="wrap">
@@ -122,6 +124,27 @@
   <div class="disclosure" id="ingestBanner" style="display:none;">
     <div class="mark">SERVER MODE</div>
     <p id="ingestText"></p>
+  </div>
+
+  <!-- Operator token: Start/Stop/heartbeat/test/push all need it. -->
+  <div class="step" id="tokenBox">
+    <div class="step-head">
+      <div class="step-title">Admin token</div>
+      <div class="step-hint" id="tokState">not entered</div>
+    </div>
+    <div class="step-body" id="tokBody">
+      <p class="fineprint" style="margin:0 0 10px;">This page starts and stops monitoring, so the website asks for the <strong>ADMIN_TOKEN</strong> — the same one the Ops page uses (Render &gt; your service &gt; Environment, tap the eye icon, copy).</p>
+      <label for="adminTok">Admin token</label>
+      <input type="password" id="adminTok" autocomplete="off" placeholder="Paste ADMIN_TOKEN">
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+        <button type="button" class="btn-ghost-sm" onclick="saveToken()">Save token</button>
+        <label style="margin:0;display:flex;align-items:center;gap:6px;cursor:pointer;">
+          <input type="checkbox" id="tokRemember" style="width:15px;height:15px;accent-color:var(--green);">Remember on this computer (only your own)
+        </label>
+        <button type="button" class="btn-ghost-sm" id="tokForget" onclick="forgetToken()" style="display:none;">Forget it</button>
+      </div>
+      <p class="fineprint" id="tokMsg" style="margin-top:9px;"></p>
+    </div>
   </div>
 
   <div class="statusbar">
@@ -281,7 +304,91 @@
   </div>
 </div></div>
 
+<script src="detect.js"></script>
 <script>
+// Detection maths (shared with the server's RTSP pipeline) comes from detect.js.
+const D = window.SecurityAIDetect;
+const DIFF_GRID = D.DIFF_GRID;
+
+// ---- Operator token ------------------------------------------------------
+// Start / Stop / heartbeat / test alert / push-burst are operator-only on
+// the website: every call carries X-Admin-Token. Kept for this tab, and on
+// this computer only if ticked (same key as the Ops page).
+let adminToken = '';
+try{ adminToken = sessionStorage.getItem('securityai:admin') || localStorage.getItem('securityai:admin') || ''; }catch(e){}
+function tokenHeaders(extra){
+  const h = Object.assign({}, extra || {});
+  if(adminToken) h['X-Admin-Token'] = adminToken;
+  return h;
+}
+// fetch() with the token. A 403 means the token is missing or wrong:
+// say so plainly and point at the box.
+async function opFetch(url, opts){
+  if(!adminToken && !tokenAccepted){
+    needToken('Enter the admin token first.');
+    const err = new Error('Enter the admin token at the top of this page first.'); err.status = 403; throw err;
+  }
+  const o = Object.assign({}, opts || {});
+  o.headers = tokenHeaders(o.headers);
+  const res = await fetch(url, o);
+  if(res.status === 403){
+    needToken(adminToken ? 'That admin token was not accepted. Copy ADMIN_TOKEN again from Render > Environment.' : 'Enter the admin token first.');
+    const err = new Error(adminToken ? 'Admin token not accepted — enter it again at the top of this page.' : 'Enter the admin token at the top of this page first.');
+    err.status = 403; throw err;
+  }
+  return res;
+}
+function needToken(msg){
+  const box = document.getElementById('tokenBox');
+  box.classList.add('need');
+  document.getElementById('tokBody').style.display = '';
+  document.getElementById('tokState').textContent = 'needed';
+  const m = document.getElementById('tokMsg'); m.style.color = 'var(--red)'; m.textContent = msg;
+}
+function tokenOk(){
+  document.getElementById('tokenBox').classList.remove('need');
+  document.getElementById('tokState').textContent = 'accepted ✓';
+  document.getElementById('tokForget').style.display = adminToken ? '' : 'none';
+  const m = document.getElementById('tokMsg'); m.style.color = 'var(--green)';
+  m.textContent = adminToken ? 'Token accepted.' : 'No token needed: this page is open on the camera computer itself.';
+}
+let tokenAccepted = false;
+async function checkToken(){
+  try{
+    // No token yet: ask /monitor/status, which says whether one is needed
+    // without failing (it answers locally with no ADMIN_TOKEN set).
+    if(!adminToken){
+      const s = await (await fetch('/monitor/status')).json();
+      if(s.codeRequired && !s.signedIn){ tokenAccepted = false; needToken('Enter the admin token.'); return false; }
+      tokenAccepted = true; tokenOk(); return true;
+    }
+    const r = await fetch('/monitor/debug', { headers: tokenHeaders() });
+    tokenAccepted = r.ok;
+    if(r.status === 403 || r.status === 404){ needToken(adminToken ? 'That admin token was not accepted. Copy ADMIN_TOKEN again from Render > Environment.' : 'Enter the admin token.'); return false; }
+    tokenOk(); return true;
+  }catch(e){ return false; }
+}
+async function saveToken(){
+  adminToken = document.getElementById('adminTok').value.trim();
+  if(!adminToken){ needToken('Enter the admin token.'); return; }
+  const ok = await checkToken();
+  try{
+    sessionStorage.setItem('securityai:admin', ok ? adminToken : '');
+    if(ok && document.getElementById('tokRemember').checked) localStorage.setItem('securityai:admin', adminToken);
+  }catch(e){}
+  if(ok){ refreshStatus(); refreshLog(); runPreflight(); }
+}
+function forgetToken(){
+  adminToken = '';
+  try{ sessionStorage.removeItem('securityai:admin'); localStorage.removeItem('securityai:admin'); }catch(e){}
+  document.getElementById('adminTok').value = '';
+  document.getElementById('tokForget').style.display = 'none';
+  checkToken();
+}
+document.getElementById('adminTok').value = adminToken;
+document.getElementById('adminTok').addEventListener('keydown', e => { if(e.key === 'Enter') saveToken(); });
+// Which gym this page acts on (blank = the website's current gym).
+function gymField(){ const el = document.getElementById('gymCode'); return el ? el.value.trim() : ''; }
 
 const consentBox = document.getElementById('monitorConsent');
 const startBtn = document.getElementById('startBtn');
@@ -337,7 +444,7 @@ document.addEventListener('visibilitychange', () => {
 // out at 9am.
 function startHeartbeat(){
   if(heartbeatTimer) return;
-  const beat = () => fetch('/monitor/heartbeat', { method:'POST' }).catch(()=>{});
+  const beat = () => opFetch('/monitor/heartbeat', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(gymField() ? { gymCode: gymField() } : {}) }).catch(()=>{});
   beat();
   heartbeatTimer = setInterval(beat, 30000);
 }
@@ -607,7 +714,7 @@ async function triggerZoneBurst(z, ev){
   z.eventFrames = []; z.eventEvidence = [];
   if(frames.length < 2) return;
   try{
-    await fetch('/monitor/push-burst', {
+    await opFetch('/monitor/push-burst', {
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({ frames, evidence, zone:{ label:z.label, expectedCount:z.expectedCount, accessibleGate:z.accessibleGate, durationSec } }),
     });
@@ -686,7 +793,7 @@ async function startMonitoring(){
     alertPhone: document.getElementById('alertPhone').value.trim(),
   };
   try{
-    const res = await fetch('/monitor/start', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+    const res = await opFetch('/monitor/start', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
     const data = await res.json();
     if(!res.ok) throw new Error(data.error || 'Failed to start');
     setFieldsDisabled(true);
@@ -705,7 +812,15 @@ function showStartError(msg){
 }
 
 async function stopMonitoring(){
-  await fetch('/monitor/stop', { method:'POST' });
+  startError.style.display = 'none';
+  try{
+    const res = await opFetch('/monitor/stop', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(gymField() ? { gymCode: gymField() } : {}) });
+    if(!res.ok){ const d = await res.json().catch(() => ({})); throw new Error(d.error || 'Could not stop it.'); }
+  }catch(err){
+    // Not stopped on the website: say so, and leave this page's loop
+    // alone so what you see matches what the website is doing.
+    return showStartError('Not stopped: ' + err.message);
+  }
   stopMotionLoop();
   stopHeartbeat();
   releaseWakeLock();
@@ -730,7 +845,15 @@ function fmtTime(iso){ return new Date(iso).toLocaleTimeString([], {hour:'2-digi
 
 async function refreshStatus(){
   try{
-    const s = await (await fetch('/monitor/status')).json();
+    const q = gymField() ? '?code=' + encodeURIComponent(gymField()) : '';
+    const s = await (await fetch('/monitor/status' + q, { headers: tokenHeaders() })).json();
+    if(s.gymCode) window.__serverGymCode = s.gymCode;   // the gym's key: where its photos live
+    if(s.codeRequired && !s.signedIn){
+      document.getElementById('statusDot').className = 'status-dot';
+      document.getElementById('statusMain').textContent = 'Enter the admin token to see and control monitoring';
+      document.getElementById('statusSub').textContent = '';
+      return;
+    }
     const dot = document.getElementById('statusDot');
     const main = document.getElementById('statusMain');
     const sub = document.getElementById('statusSub');
@@ -751,14 +874,22 @@ async function refreshStatus(){
       const sb = document.querySelector('.startbar'); if(sb) sb.style.display = 'none';
     }
 
-    if(s.running){
+    if(s.running && s.startedBy === 'runner' && !motionLoopInterval){
+      // A camera computer (laptop / Pi) is watching this gym and posting to
+      // the website. Nothing here is running, so don't lock the form.
+      dot.className = 'status-dot running';
+      main.textContent = `${s.gymName || 'This gym'} is watched by its camera computer`;
+      sub.textContent = `${s.burstsLast24h ?? 0}/${s.dailyBurstCap ?? '—'} analyses (24h). To watch from this browser instead, press Stop watching for it on the Ops page first.`;
+      setFieldsDisabled(false);
+      startBtn.disabled = !consentBox.checked;
+      startBtn.style.display = 'inline-block'; stopBtn.style.display = 'none';
+    } else if(s.running){
       const inWindow = s.withinSchedule !== false;
       dot.className = inWindow ? 'status-dot running' : 'status-dot idle';
       main.textContent = inWindow
         ? `Watching ${zoneDefs.length} zone${zoneDefs.length===1?'':'s'} for motion`
         : 'Idle — outside scheduled hours';
       pacingFactor = s.pacingFactor || 1;
-      if(s.gymCode) window.__serverGymCode = s.gymCode;
       const bits = [`${s.burstsLast24h ?? s.captureCount}/${s.dailyBurstCap} analyses used (24h)`];
       if(pacingFactor > 1.05) bits.push(`pacing ${pacingFactor.toFixed(1)}x slower to stay in budget`);
       if(s.projectedTotal && s.projectedTotal > s.dailyBurstCap) bits.push(`on pace for ~${s.projectedTotal} tonight`);
@@ -791,7 +922,7 @@ async function processLatest(){
   const el = document.getElementById('mailboxResult');
   el.innerHTML = '<div class="log-empty">Analysing the newest email…</div>';
   try{
-    const r = await (await fetch('/monitor/process-latest?count=1', { method:'POST' })).json();
+    const r = await (await opFetch('/monitor/process-latest?count=1', { method:'POST' })).json();
     if(r.error){ el.innerHTML = `<div class="tip" style="border-left-color:var(--red);">${esc(r.error)}</div>`; return; }
     const p = (r.processed || [])[0];
     el.innerHTML = p
@@ -807,7 +938,7 @@ async function testMailbox(){
   const el = document.getElementById('mailboxResult');
   el.innerHTML = '<div class="log-empty">Checking…</div>';
   try{
-    const r = await (await fetch('/monitor/mailbox-test')).json();
+    const r = await (await opFetch('/monitor/mailbox-test')).json();
     if(!r.configured){
       el.innerHTML = `<div class="tip"><strong>Not set up for email.</strong> ${esc(r.reason)}</div>`;
       return;
@@ -829,8 +960,13 @@ async function testMailbox(){
 }
 
 async function refreshLog(){
+  if(!tokenAccepted) return;
   try{
-    const log = await (await fetch('/monitor/log')).json();
+    const q = gymField() ? '?code=' + encodeURIComponent(gymField()) : '';
+    const res = await fetch('/monitor/log' + q, { headers: tokenHeaders() });
+    if(!res.ok) return;
+    const log = await res.json();
+    if(!Array.isArray(log)) return;
     const el = document.getElementById('logList');
     if(!log.length){ el.innerHTML = '<div class="log-empty">Nothing in the retention window yet.</div>'; return; }
     el.innerHTML = log.map(e => {
@@ -842,7 +978,7 @@ async function refreshLog(){
       const shots = (e.frames && e.frames.length) ? e.frames : (e.frame ? [e.frame] : []);
       const thumb = shots.length
         ? '<span style="display:flex;gap:4px;flex-shrink:0;">' + shots.map((f,i) =>
-            `<a href="/monitor/frame/${encodeURIComponent(gc)}/${encodeURIComponent(f)}" target="_blank" rel="noopener" title="Frame ${i+1} of ${shots.length} — tap for full size"><img src="/monitor/frame/${encodeURIComponent(gc)}/${encodeURIComponent(f)}" class="evidence" alt="Frame ${i+1}"></a>`
+            `<a href="#" data-frame="/monitor/frame/${encodeURIComponent(gc)}/${encodeURIComponent(f)}" title="Frame ${i+1} of ${shots.length} — tap for full size"><img data-src="/monitor/frame/${encodeURIComponent(gc)}/${encodeURIComponent(f)}" class="evidence" alt="Frame ${i+1}"></a>`
           ).join('') + '</span>'
         : '';
       if(e.error) return `<div class="log-item">${thumb}<span class="t">${fmtTime(e.timestamp)} — ${zone}capture failed</span><span class="badge bad">${esc(e.error)}</span></div>`;
@@ -863,8 +999,34 @@ async function refreshLog(){
         </span>
         <span class="badge ${kind}">${label}</span></div>`;
     }).join('');
+    loadThumbs(el);
   } catch(err){ /* status poller reports connectivity */ }
 }
+
+// Photos are operator-only, and an <img> can't send the token header, so
+// they are fetched with it and shown from memory (cached by address).
+const thumbCache = new Map();
+async function frameUrl(src){
+  if(thumbCache.has(src)) return thumbCache.get(src);
+  const p = fetch(src, { headers: tokenHeaders() }).then(r => r.ok ? r.blob() : null).then(b => b ? URL.createObjectURL(b) : null).catch(() => null);
+  thumbCache.set(src, p);
+  const u = await p;
+  if(!u) thumbCache.delete(src);
+  return u;
+}
+function loadThumbs(root){
+  root.querySelectorAll('img[data-src]').forEach(async img => {
+    const u = await frameUrl(img.dataset.src);
+    if(u) img.src = u; else img.alt = 'Photo no longer available';
+  });
+}
+document.addEventListener('click', async e => {
+  const a = e.target.closest && e.target.closest('a[data-frame]');
+  if(!a) return;
+  e.preventDefault();
+  const u = await frameUrl(a.dataset.frame);
+  if(u) window.open(u, '_blank', 'noopener');
+});
 
 // If the tab died while monitoring was on, offer to pick up where it
 // left off. The screen share itself can't be restored automatically —
@@ -939,8 +1101,11 @@ async function forgotCode(){
 // unconfigured SMTP is caught now rather than discovered at 2am.
 async function runPreflight(){
   const el = document.getElementById('preflightList');
+  if(!tokenAccepted){ el.innerHTML = '<div class="log-empty">Enter the admin token (top of this page) to see this.</div>'; return; }
   try{
-    const p = await (await fetch('/monitor/preflight')).json();
+    const res = await fetch('/monitor/preflight', { headers: tokenHeaders() });
+    if(res.status === 403){ el.innerHTML = '<div class="log-empty">Enter the admin token (top of this page) to see this.</div>'; return; }
+    const p = await res.json();
     el.innerHTML = p.checks.map(c => {
       const state = c.ok ? 'ok' : (c.critical ? 'bad' : 'warn');
       const word  = c.ok ? 'Ready' : (c.critical ? 'Required' : 'Optional');
@@ -968,7 +1133,7 @@ async function sendTestAlert(){
   out.style.color = 'var(--muted)';
   out.textContent = 'Sending…';
   try{
-    const res = await fetch('/monitor/test-alert', {
+    const res = await opFetch('/monitor/test-alert', {
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({ email, phone }),
     });
@@ -977,7 +1142,7 @@ async function sendTestAlert(){
     const bits = [];
     if(d.result && d.result.email) bits.push('email: ' + d.result.email);
     if(d.result && d.result.sms) bits.push('sms: ' + d.result.sms);
-    const good = bits.every(b => b.includes('sent'));
+    const good = bits.length > 0 && bits.every(b => /: sent$/.test(b));
     out.style.color = good ? 'var(--green)' : 'var(--red)';
     out.textContent = (good ? 'Sent — check your inbox/phone now. ' : 'Problem: ') + bits.join(', ');
   } catch(err){
@@ -986,8 +1151,7 @@ async function sendTestAlert(){
   }
 }
 
-runPreflight();
-refreshStatus(); refreshLog();
+checkToken().then(() => { runPreflight(); refreshStatus(); refreshLog(); });
 setInterval(refreshStatus, 4000);
 setInterval(refreshLog, 4000);
 
