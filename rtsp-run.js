@@ -395,7 +395,7 @@ function setupRemote(cfg, handles, warningsOf, testLink) {
       const item = {
         gymCode: cfg.gymCode || null,
         zone: { label: z.label, expectedCount: z.expectedCount, accessibleGate: z.accessibleGate, durationSec: Number(ev.durationSec) },
-        frames: framesB64.slice(0, 4),
+        frames: framesB64.slice(0, 6),
         capturedAt,
       };
       // The MIDDLE photo again at up to 1024 px, for people to look at

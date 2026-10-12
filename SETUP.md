@@ -144,8 +144,8 @@ gym's photos and alerts separate from other gyms'.
   end of the 1st.
 - **What it can cost (Anthropic bill)**: each gym's *daily limit* (60
   checks a day unless you change it on the admin page) is a hard stop, so a
-  gym can cost at most about **$6.80 a month on Sonnet** or **$2.30 on
-  Haiku**, however busy the door is. The admin page shows this as *Most it
+  gym can cost at most about **$9.20 a month on Sonnet** or **$3.10 on
+  Haiku** (long crossings send up to 6 photos instead of 3), however busy the door is. The admin page shows this as *Most it
   can cost* on each gym. If a night is busy early on, checks are spread out
   so the limit lasts until the end of the watch hours. The home page's
   webcam demo is separate: at most 50 tries a day (`DEMO_DAILY_CAP`, about

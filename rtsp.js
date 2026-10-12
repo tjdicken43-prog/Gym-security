@@ -419,7 +419,7 @@ function startRtspZone(cfg, handlers) {
       if (!wasActive && zoneState.eventActive && handlers.onEventStart) handlers.onEventStart();
       if (step.verdict && handlers.onVerdict) handlers.onVerdict(step.verdict);
       if (step.send) {
-        const picks = detect.selectEventFrames(zoneState._eventJpegs || [], detect.EVENT_FRAMES_SENT);
+        const picks = detect.selectEventFrames(zoneState._eventJpegs || [], detect.framesForDuration ? detect.framesForDuration(step.send.durationSec) : detect.EVENT_FRAMES_SENT);
         zoneState._eventJpegs = [];
         if (picks.length >= 1) {
           stats.events++;

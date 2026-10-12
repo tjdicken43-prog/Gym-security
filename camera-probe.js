@@ -48,6 +48,47 @@ const FORMATS = [
 const BARE_ROOT = { id: 'root', name: 'bare address (no channel)', channelAware: false, main: () => '', sub: null };
 FORMATS.forEach(f => { f.channelAware = true; });
 
+// Formats learned on THIS site by find-stream.js (asked the recorder itself
+// over ONVIF, or found by trying more address styles). Saved in
+// ~/.securityai/extra-formats.json and tried FIRST, so setup-camera.js and
+// find-camera.js pick them up with no other change.
+//   { formats: [ { id, name, port?, main?: "path with {n}", sub?: "...",
+//                  paths?: { "1": "path", ... }, subPaths?: { ... } } ] }
+// Placeholders: {n} channel, {n0} channel-1, {nn} 2-digit, {nn0} 2-digit channel-1.
+function fillTemplate(t, n) {
+  return String(t)
+    .replace(/\{nn0\}/g, String(n - 1).padStart(2, '0'))
+    .replace(/\{nn\}/g, String(n).padStart(2, '0'))
+    .replace(/\{n0\}/g, String(n - 1))
+    .replace(/\{n\}/g, String(n));
+}
+function formatFromSaved(x) {
+  if (!x || typeof x !== 'object' || !x.id) return null;
+  const pick = (tpl, map) => {
+    if (map && typeof map === 'object') return n => (map[String(n)] != null ? String(map[String(n)]).replace(/^\/+/, '') : null);
+    if (tpl) return n => fillTemplate(tpl, n).replace(/^\/+/, '');
+    return null;
+  };
+  const main = pick(x.main, x.paths);
+  if (!main) return null;
+  const port = parseInt(x.port, 10);
+  return {
+    id: 'site-' + String(x.id).replace(/[^a-z0-9_-]/gi, '').slice(0, 30),
+    name: String(x.name || 'found on this recorder').slice(0, 60),
+    main, sub: pick(x.sub, x.subPaths),
+    port: port > 0 && port < 65536 ? port : undefined,
+    channelAware: true,
+  };
+}
+function loadSavedFormats() {
+  try {
+    const home = process.env.SECURITYAI_HOME || path.join(os.homedir(), '.securityai');
+    const j = JSON.parse(fs.readFileSync(path.join(home, 'extra-formats.json'), 'utf8'));
+    return (Array.isArray(j.formats) ? j.formats : []).map(formatFromSaved).filter(Boolean);
+  } catch (e) { return []; }
+}
+loadSavedFormats().reverse().forEach(f => FORMATS.unshift(f));
+
 // ---------------------------------------------------------------------------
 // Credentials in the URL.
 //
@@ -72,9 +113,11 @@ function buildUrl(creds, format, channel, opts) {
   const o = opts || {};
   const fn = o.sub ? format.sub : format.main;
   if (!fn) return null;
+  const p = fn(channel);
+  if (p == null) return null;                       // saved list has no such channel
   const auth = creds.user || creds.pass
     ? `${encodeCred(creds.user || '')}${creds.pass ? ':' + encodeCred(creds.pass) : ''}@` : '';
-  return `rtsp://${auth}${hostPort(creds.host, creds.port)}/${fn(channel)}`;
+  return `rtsp://${auth}${hostPort(creds.host, format.port || creds.port)}/${p}`;
 }
 
 function maskUrl(u) {
@@ -254,6 +297,7 @@ function inputArgs(url) {
 // a snapshot behind for the user to look at.
 async function grabFrame(url, outJpg, opts) {
   const o = opts || {};
+  if (!url) return { status: 'notfound', rtspCode: 404, detail: 'no address for this channel' };
   try { fs.unlinkSync(outJpg); } catch (e) { /* not there */ }
   const args = ['-hide_banner', '-nostdin', '-y']
     .concat(inputArgs(url))
@@ -559,6 +603,7 @@ function openFile(file) {
 
 module.exports = {
   get FFMPEG() { return FFMPEG; }, setFfmpeg, FORMATS, BARE_ROOT, SAME_PICTURE_BELOW, COL_LETTERS,
+  fillTemplate, formatFromSaved, loadSavedFormats,
   encodeCred, buildUrl, maskUrl, maskText, normaliseInput, parseHostInput,
   runFfmpeg, ffmpegCheck, tcpCheck, localIPv4, sameSubnet24,
   classify, describe, grabFrame, mediaSize, decodeSpeed,

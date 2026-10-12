@@ -444,7 +444,7 @@ function authGuidance(entry, second) {
     say('It ALWAYS shows camera 1, whatever channel you want. Friday night the runner watched');
     say('camera 1 (the pro shop) instead of the door because of exactly this.');
     say('Only use it if camera 1 really IS your entrance.');
-    if (!(await askYesNo('Use it anyway?', false))) fail('Stopped. Send a photo of this screen for help.');
+    if (!(await askYesNo('Use it anyway?', false))) fail(['Stopped. Nothing was saved.', 'Do this: type  node find-stream.js  - it asks the recorder for the real address of each camera.', 'Then run  node setup-camera.js  again.']);
     format = fallback.format; agnostic = true;
   }
   if (format.channelAware === false) agnostic = true;

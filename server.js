@@ -806,7 +806,7 @@ function unpairedFor(key) {
 
 // Route-level JSON parser, run only after the token is accepted, so an
 // anonymous caller cannot make the server buffer 4 MB.
-const runnerJsonParser = express.json({ limit: '4mb' });
+const runnerJsonParser = express.json({ limit: '6mb' });
 function runnerJson(req, res, next) {
   runnerJsonParser(req, res, err => {
     if (err) {
@@ -1062,8 +1062,8 @@ app.post('/monitor/runner/burst', runnerAuth, runnerJson, async (req, res) => {
   const code = runnerGym(req, res);
   if (!code) return;
 
-  if (!Array.isArray(b.frames) || b.frames.length < 1 || b.frames.length > 4) {
-    return res.status(400).json({ ok: false, error: 'frames must be a list of 1 to 4 base64 JPEGs.' });
+  if (!Array.isArray(b.frames) || b.frames.length < 1 || b.frames.length > 6) {
+    return res.status(400).json({ ok: false, error: 'frames must be a list of 1 to 6 base64 JPEGs.' });
   }
   const frames = [];
   for (let i = 0; i < b.frames.length; i++) {

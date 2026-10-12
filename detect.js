@@ -48,7 +48,16 @@ const EVENT_PAUSE_QUIET_TICKS = 12;   // ~3s of stillness short of the far side 
 const PAUSE_EDGE_CELLS = 2.5;         // within this many grid cells of the far edge = "got to the far side"
 const EVENT_MAX_TICKS = 48;       // ~12s ceiling so a loiterer can't buffer forever
 const EVENT_MAX_BUFFER = 60;      // hard cap on retained crops
-const EVENT_FRAMES_SENT = 3;      // how many of the buffered crops go to Claude
+const EVENT_FRAMES_SENT = 3;      // fewest crops sent to Claude per crossing
+const EVENT_FRAMES_MAX = 6;       // most crops per crossing (long, slow crossings)
+// About one photo per second of the crossing, between 3 and 6. A quick pass
+// stays at 3; a slow one (approach, scan, someone close behind) gets more
+// photos so a second person can't fall between them. Cost scales with it.
+function framesForDuration(sec){
+  const s = parseFloat(sec);
+  if (!isFinite(s)) return EVENT_FRAMES_SENT;
+  return Math.max(EVENT_FRAMES_SENT, Math.min(EVENT_FRAMES_MAX, Math.ceil(s)));
+}
 // --- Threshold crossing check ---------------------------------------
 // A box drawn around a doorway inevitably includes background: floor
 // behind the door, people milling on one side, a corridor. Motion alone
@@ -236,7 +245,10 @@ function didCrossThreshold(path){
 
 function selectEventFrames(buf, n){
   if(buf.length <= n) return buf.slice();
-  const picks = [0.30, 0.65, 0.95].slice(0, n);
+  // 3 photos: the original late-weighted picks. More: evenly spread from
+  // 15% to 95% of the crossing.
+  const picks = n <= 3 ? [0.30, 0.65, 0.95].slice(0, n)
+    : Array.from({ length: n }, (_, i) => 0.15 + (0.80 * i) / (n - 1));
   const out = picks.map(f => buf[Math.min(buf.length - 1, Math.floor(f * (buf.length - 1)))]);
   // de-duplicate if the event was very short
   return out.filter((v, i) => out.indexOf(v) === i);
@@ -320,7 +332,7 @@ function resetZone(z) {
 
 return {
   classifyMotion, didCrossThreshold, selectEventFrames, stepZone, resetZone,
-  SENSITIVITY, DIFF_GRID, MOTION_CHECK_MS, EVENT_FRAMES_SENT,
+  SENSITIVITY, DIFF_GRID, MOTION_CHECK_MS, EVENT_FRAMES_SENT, EVENT_FRAMES_MAX, framesForDuration,
   MOTION_CONSECUTIVE_REQUIRED, MOTION_COOLDOWN_MS,
 };
 }));

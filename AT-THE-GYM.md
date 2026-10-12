@@ -206,6 +206,8 @@ spare)? `node install-service.js --remove` instead: settings stay.
 | `The recorder refused the video connection` / `cannot reach the recorder` / `No answer from the recorder` | Was it working before? The recorder is restarting or the cable came out: check the cable, it retries by itself. |
 | `The website is not answering properly` | Render is restarting (a deploy). Wait: crossings are kept on the laptop and sent when it's back. |
 | Wrong camera (pro shop instead of door) | `node setup-camera.js` again, pick channel **4**. |
+| `the only address that works has NO channel number` | Type **n**. Then `node find-stream.js` (asks the recorder for each camera's real address), then `node setup-camera.js` again. |
+| Setup says `Cannot reach 192.168.2.54` but the laptop's cable is in a numbered camera port on the recorder | Use the recorder's camera-side address instead: `ping -c 3 10.1.1.1`; if it answers, type `10.1.1.1` at the recorder IP question. Keep Wi-Fi on and first in Network > Set Service Order (that side has no internet). |
 | Motion number never moves | `node setup-camera.js` again, pick a tighter grid box round the turnstile. |
 | Fan roaring / `only 1.5 pictures a second` | `node setup-camera.js` again, type **S** for the small one. |
 | `The monitor is already running in another window` | Use that window, or Ctrl-C there first. Only one runs at a time, so nothing gets counted twice. |

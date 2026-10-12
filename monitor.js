@@ -565,7 +565,7 @@ function getStatus(code) {
       projectedMonthly: Number((perDay * 30).toFixed(2)),
       capMonthlyWorstCase: Number((estimateCost(
         Array.from({ length: (cfg && cfg.dailyBurstCap) || DEFAULT_DAILY_BURST_CAP },
-          () => ({ burstFrames: 3 })), model) * 30).toFixed(2)),
+          () => ({ burstFrames: 6 })), model) * 30).toFixed(2)),   // worst case: every crossing long enough for 6 photos
     },
     lastHeartbeat: s.lastHeartbeat || null,
     heartbeatLost: !!s.heartbeatLost,
