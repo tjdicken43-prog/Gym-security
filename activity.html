@@ -62,6 +62,18 @@
   .seg button[aria-pressed="true"]{background:var(--panel-2);color:var(--text);}
 
   .section-title{font-size:14px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:var(--muted);margin:22px 2px 10px;}
+  /* three tiers: flagged (red) > worth a check (amber) > passed (green) */
+  .tier{display:flex;align-items:center;gap:10px;margin:24px 2px 10px;font-size:15px;font-weight:700;letter-spacing:.3px;text-transform:uppercase;}
+  .tier .pip{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
+  .tier .cnt{margin-left:auto;font-size:13px;font-weight:700;padding:2px 10px;border-radius:12px;letter-spacing:0;}
+  .tier.red{color:#FFB3B3;} .tier.red .pip{background:var(--red);box-shadow:0 0 0 4px rgba(255,107,107,.18);} .tier.red .cnt{background:rgba(255,107,107,.16);}
+  .tier.amber{color:var(--amber);} .tier.amber .pip{background:var(--amber);box-shadow:0 0 0 4px rgba(255,181,74,.16);} .tier.amber .cnt{background:rgba(255,181,74,.16);}
+  .tier.green{color:#8CE8BD;} .tier.green .pip{background:var(--green);box-shadow:0 0 0 4px rgba(63,207,142,.14);} .tier.green .cnt{background:rgba(63,207,142,.13);}
+  .tier-empty{color:var(--muted);font-size:15px;margin:0 2px 6px;padding:12px 14px;border:1px dashed var(--line);border-radius:10px;}
+  .tier-sub{color:var(--muted);font-size:14px;margin:-4px 2px 10px;}
+  details.group.passed{border-color:rgba(63,207,142,.35);border-left:4px solid var(--green);}
+  details.group.passed > summary{color:#8CE8BD;}
+  .inc.done.confirmed{border-left-color:var(--red);opacity:.85;}
 
   /* incident card */
   .inc{background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--red);border-radius:12px;overflow:hidden;margin-bottom:16px;}
@@ -573,19 +585,34 @@ function renderList(){
   if(view === 'timeline'){
     el.innerHTML = pinHtml + group('all', `Everything, newest first (${ev.length})`, ev, true);
   } else {
-    const open = ev.filter(e => needsLook(e) && !e.review);
+    // 1. Flagged (red): the AI saw more people than allowed. Open ones
+    //    first, then any staff confirmed as a tailgate.
+    // 2. Worth a check (amber): unsure verdicts, photos that couldn't be
+    //    checked, accessible-gate entries to match to the log.
+    // 3. Passed (green): normal entries, plus flags staff marked fine.
+    const flagged = ev.filter(e => e.kind === 'flag' && !e.review);
+    const confirmed = ev.filter(e => needsLook(e) && e.review && e.review.verdict === 'tailgate');
+    const unsure = ev.filter(e => (e.kind === 'possible' || e.kind === 'unchecked') && !e.review);
     const gates = ev.filter(e => e.kind === 'gate');
-    const done = ev.filter(e => needsLook(e) && e.review);
-    const normal = ev.filter(e => !needsLook(e) && e.kind !== 'gate');
+    const passed = ev.filter(e => (!needsLook(e) && e.kind !== 'gate') || (needsLook(e) && e.review && e.review.verdict !== 'tailgate'));
+    const tier = (cls, title, n, sub) => `<h2 class="tier ${cls}"><span class="pip"></span>${esc(title)}<span class="cnt">${n}</span></h2>${sub ? `<div class="tier-sub">${esc(sub)}</div>` : ''}`;
     let h = pinHtml;
-    if(open.length || gates.length){
-      h += `<h2 class="section-title">Needs a look</h2>` + open.map(card).join('');
-      // Accessible-gate entries: nothing to judge, but they should be
-      // matched to a manual check-in (G10).
+
+    const nFlag = flagged.length + confirmed.length;
+    h += tier('red', 'Flagged', nFlag, nFlag ? 'More people came through than the swipe allows. Check the photos against your door log.' : '');
+    h += nFlag ? flagged.map(card).join('') + confirmed.map(e => card(e).replace('class="inc done', 'class="inc done confirmed')).join('')
+               : `<div class="tier-empty">No tailgates flagged ✓</div>`;
+
+    const nCheck = unsure.length + gates.length;
+    if(nCheck){
+      h += tier('amber', 'Worth a check', nCheck, 'The camera wasn’t sure, or these need matching to your check-in log.');
+      h += unsure.map(card).join('');
       if(gates.length) h += `<div class="rows" style="padding:0;">${rows(gates, true)}</div>`;
     }
-    if(done.length) h += `<h2 class="section-title">Checked</h2>` + done.map(card).join('');
-    if(normal.length) h += group('normal', `Normal entries (${normal.length})`, normal, !!openState.normal);
+
+    h += tier('green', 'Passed', passed.length, passed.length ? 'One person per swipe, as expected.' : '');
+    h += passed.length ? group('normal', `Show ${plural(passed.length, 'entry', 'entries')}`, passed, !!openState.normal, 'passed')
+                       : `<div class="tier-empty">No normal entries yet.</div>`;
     el.innerHTML = h;
   }
   // Rows inside a closed section are only drawn when it's opened, so a
@@ -606,8 +633,8 @@ function byId(id, listOnly){
   return pinned && pinned.id === id ? pinned : undefined;
 }
 
-function group(k, title, list, open){
-  return `<details class="group" data-k="${esc(k)}" data-ids='${esc(JSON.stringify(list.map(e => e.id)))}'${open ? ' open' : ''}>
+function group(k, title, list, open, extra){
+  return `<details class="group${extra ? ' ' + esc(extra) : ''}" data-k="${esc(k)}" data-ids='${esc(JSON.stringify(list.map(e => e.id)))}'${open ? ' open' : ''}>
     <summary>${esc(title)}</summary><div class="rows"></div></details>`;
 }
 function rows(list, gateRows){
@@ -619,7 +646,7 @@ function rows(list, gateRows){
     const tag = needsLook(e)
       ? (e.review ? `<span class="tag ${e.review.verdict === 'tailgate' ? 'bad' : 'ok'}">${e.review.verdict === 'tailgate' ? 'Tailgate' : 'Fine'}</span>`
                   : `<span class="tag ${e.kind === 'flag' ? 'bad' : 'warn'}">${e.kind === 'flag' ? 'Flagged' : 'Check'}</span>`)
-      : (e.kind === 'gate' ? '<span class="tag warn">Gate</span>' : '');
+      : (e.kind === 'gate' ? '<span class="tag warn">Gate</span>' : '<span class="tag ok">Passed</span>');
     const img = e.photos.length ? `<img src="${esc(photoUrl(e.photos[0]))}" alt="" loading="lazy">` : '<span class="noimg"></span>';
     const sub = gateRows ? `Accessible gate used · ${dayWords(e.at)} — match to your check-in log` : headline(e);
     h += `<button type="button" class="row${gateRows ? ' gate' : ''}" id="row-${esc(e.id)}" data-open="${esc(e.id)}" aria-label="${esc(headline(e) + ', ' + timeOf(e.at))}. Show photos">${img}

@@ -119,7 +119,7 @@ function mount(app, deps) {
       expected: Number(e.expectedCount) || 1,
       waiting: Number(e.queued_count) || 0,
       note: e.error ? null : (e.note || null),
-      photos: photos.slice(0, 5),
+      photos: photos.slice(0, 7),   // the larger copy + up to 6 analysed photos
       review: reviews[id] || null,
       // When this event and its photos will be deleted: 48 h after it,
       // unless it was flagged or marked Tailgate (then 35 days).
