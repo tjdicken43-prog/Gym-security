@@ -222,6 +222,23 @@ function classifyMotion(prevCells, cells, zoneState, sens) {
 }
 
 
+// Which way the motion went across the picture: 'up' | 'down' | 'left' |
+// 'right', or null when it's too short or wobbly to say. Start vs end along
+// the axis it mostly moved on (image coordinates: y grows downward).
+function crossingDirection(path){
+  if(!path || path.length < 3) return null;
+  const xs = path.map(p => p.cx), ys = path.map(p => p.cy);
+  const n = path.length, k = Math.max(1, Math.floor(n / 4));
+  const avg = a => a.reduce((s, v) => s + v, 0) / a.length;
+  const dx = avg(xs.slice(-k)) - avg(xs.slice(0, k));
+  const dy = avg(ys.slice(-k)) - avg(ys.slice(0, k));
+  const big = Math.max(Math.abs(dx), Math.abs(dy));
+  if(big < DIFF_GRID / 4) return null;                    // under 3 of 12 cells: not sure
+  if(Math.abs(dx) >= Math.abs(dy)) return Math.abs(dx) >= 1.5 * Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : null;
+  return Math.abs(dy) >= 1.5 * Math.abs(dx) ? (dy > 0 ? 'down' : 'up') : null;
+}
+const OPPOSITE = { up:'down', down:'up', left:'right', right:'left' };
+
 function didCrossThreshold(path){
   if(!path || path.length < 3) return { crossed:false, reason:'too-short' };
   const xs = path.map(p => p.cx), ys = path.map(p => p.cy);
@@ -312,10 +329,11 @@ function stepZone(z, cells, sens, opts) {
     const tooLong = z.eventTicks >= EVENT_MAX_TICKS;
     if (ended || tooLong) {
       const cross = didCrossThreshold(z.eventPath);
+      const direction = crossingDirection(z.eventPath);
       const ticks = z.eventTicks;
       z.eventActive = false; z.quietTicks = 0; z.eventTicks = 0; z.eventPath = [];
       out.send = (ticks >= 2 && cross.crossed)
-        ? { ticks, durationSec: (ticks * MOTION_CHECK_MS / 1000).toFixed(1), cross }
+        ? { ticks, durationSec: (ticks * MOTION_CHECK_MS / 1000).toFixed(1), cross, direction }
         : null;
       if (!out.send) out.rejected = cross.crossed ? 'too-brief' : 'no-crossing';
     }
@@ -331,7 +349,7 @@ function resetZone(z) {
 }
 
 return {
-  classifyMotion, didCrossThreshold, selectEventFrames, stepZone, resetZone,
+  classifyMotion, didCrossThreshold, crossingDirection, OPPOSITE, selectEventFrames, stepZone, resetZone,
   SENSITIVITY, DIFF_GRID, MOTION_CHECK_MS, EVENT_FRAMES_SENT, EVENT_FRAMES_MAX, framesForDuration,
   MOTION_CONSECUTIVE_REQUIRED, MOTION_COOLDOWN_MS,
 };

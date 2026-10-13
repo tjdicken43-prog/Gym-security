@@ -49,6 +49,7 @@ function headline(e){
   if(e.kind === 'flag') return n == null ? 'More people came in than expected' : (n - exp === 1 && exp === 1 ? 'Someone may have followed a member in' : `${n} people came in, ${exp} expected`);
   if(e.kind === 'possible') return n == null ? 'Maybe more than one person — not certain' : `Maybe ${n} people came in — not certain`;
   if(e.kind === 'unchecked') return 'Entry to check';
+  if(e.kind === 'check') return n != null && n > exp ? `${n} people seen — worth a look` : 'Entry worth a second look';
   if(e.kind === 'gate') return 'Accessible gate used';
   return n == null ? 'Entrance photo' : n === 1 ? '1 person came in' : `${n} people came in`;
 }

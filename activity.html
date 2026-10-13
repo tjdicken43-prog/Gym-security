@@ -77,7 +77,7 @@
 
   /* incident card */
   .inc{background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--red);border-radius:12px;overflow:hidden;margin-bottom:16px;}
-  .inc.possible,.inc.unchecked{border-left-color:var(--amber);}
+  .inc.possible,.inc.unchecked,.inc.check{border-left-color:var(--amber);}
   .inc.done{border-left-color:var(--line);}
   .inc .photo{position:relative;background:#0c0e10;display:block;width:100%;border:0;padding:0;cursor:zoom-in;}
   .inc .photo img{display:block;width:100%;aspect-ratio:4/3;object-fit:contain;background:#0c0e10;}
@@ -407,6 +407,11 @@ function headline(e){
   }
   if(e.kind === 'possible') return n == null ? 'Maybe more than one person — not certain' : `Maybe ${n} people came in — not certain`;
   if(e.kind === 'unchecked') return 'Entry we couldn’t check automatically';
+  if(e.kind === 'check'){
+    if(n != null && n > exp) return `${n} people seen — not called a tailgate, worth a look`;
+    if(e.waiting > 0) return `${n == null ? 'Someone' : n === 1 ? '1 person' : n + ' people'} came in with someone waiting close by`;
+    return `${n == null ? 'An entry' : n === 1 ? '1 person' : n + ' people'} — the camera wasn’t fully sure`;
+  }
   if(e.kind === 'gate') return 'Accessible gate used';
   if(n === 0) return 'Nobody visible';
   if(n === 1) return '1 person — normal';
@@ -417,9 +422,10 @@ function todo(e){
   const t = timeOf(e.at);
   if(e.kind === 'unchecked') return `Have a look at the photos. If more than one person came through, check your check-in log around ${t}.`;
   if(e.kind === 'possible') return `The photos aren't clear. Worth a quick look, and your check-in log around ${t}.`;
+  if(e.kind === 'check') return `Flip through the photos. If more people came through than scanned in around ${t}, mark it a tailgate.`;
   return `Check your check-in log around ${t}: if only one person scanned, it's a tailgate. Then tap a button below.`;
 }
-const needsLook = e => (e.kind === 'flag' || e.kind === 'possible' || e.kind === 'unchecked');
+const needsLook = e => (e.kind === 'flag' || e.kind === 'possible' || e.kind === 'unchecked' || e.kind === 'check');
 const photoUrl = f => `/monitor/frame/${encodeURIComponent(gymCode)}/${encodeURIComponent(f)}`;
 const clockNote = () => ((data && data.gym && data.gym.cameraClockNote) || '').trim();
 function keptWords(e){
@@ -592,7 +598,7 @@ function renderList(){
     // 3. Passed (green): normal entries, plus flags staff marked fine.
     const flagged = ev.filter(e => e.kind === 'flag' && !e.review);
     const confirmed = ev.filter(e => needsLook(e) && e.review && e.review.verdict === 'tailgate');
-    const unsure = ev.filter(e => (e.kind === 'possible' || e.kind === 'unchecked') && !e.review);
+    const unsure = ev.filter(e => (e.kind === 'possible' || e.kind === 'unchecked' || e.kind === 'check') && !e.review);
     const gates = ev.filter(e => e.kind === 'gate');
     const passed = ev.filter(e => (!needsLook(e) && e.kind !== 'gate') || (needsLook(e) && e.review && e.review.verdict !== 'tailgate'));
     const tier = (cls, title, n, sub) => `<h2 class="tier ${cls}"><span class="pip"></span>${esc(title)}<span class="cnt">${n}</span></h2>${sub ? `<div class="tier-sub">${esc(sub)}</div>` : ''}`;

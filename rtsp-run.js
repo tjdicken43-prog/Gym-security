@@ -37,6 +37,7 @@ const FLAG = {
   help: args.includes('--help') || args.includes('-h'),
   verbose: args.includes('--verbose'),
   test: args.includes('--test'),
+  entry: (() => { const i = args.indexOf('--entry'); return i >= 0 ? String(args[i + 1] || '') : null; })(),
 };
 // Background (service) mode: started by launchd / systemd via install-service.js.
 const SERVICE = process.env.SECURITYAI_SERVICE === '1';
@@ -604,7 +605,33 @@ function watchForChanges(onChange) {
   t.unref();
 }
 
+let shownEntryHint = false;
+
+// node rtsp-run.js --entry up|down|left|right|off
+// Saves which way people come IN on the picture. Crossings the other way
+// (people leaving) are then skipped. The background monitor notices the
+// changed settings and restarts by itself within about 20 seconds.
+function setEntryDirection(val) {
+  const v = String(val || '').toLowerCase().trim();
+  const ok = ['up', 'down', 'left', 'right', 'off'];
+  if (!ok.includes(v)) {
+    say('Type one of:  node rtsp-run.js --entry up   (or down, left, right, or off to check everyone)');
+    say('Not sure which? Watch with  node rtsp-run.js , walk IN once, and look for "moving up/down/left/right" on that crossing line.');
+    return 1;
+  }
+  let raw;
+  try { raw = JSON.parse(fs.readFileSync(CONFIG, 'utf8')); } catch (e) { say(`Could not read the settings (${tildify(CONFIG)}). Run  node setup-camera.js  first.`); return 1; }
+  for (const z of raw.zones || []) { if (v === 'off') delete z.entryDirection; else z.entryDirection = v; }
+  require('./runner-config').writePrivate(CONFIG, JSON.stringify(raw, null, 2) + '\n');
+  say(v === 'off'
+    ? 'Saved: everyone crossing is checked again (in and out).'
+    : `Saved: people coming in move ${v} on the picture. People moving ${detect.OPPOSITE[v]} (leaving) are skipped and cost nothing.`);
+  say('The background monitor picks this up within about 20 seconds. Watch it with:  node rtsp-run.js');
+  return 0;
+}
+
 async function main() {
+  if (FLAG.entry !== null) process.exit(setEntryDirection(FLAG.entry));
   // The accuracy test drives the monitor that is running (or starts one);
   // it never opens a camera connection itself.
   if (FLAG.test) {
@@ -772,7 +799,20 @@ async function main() {
             .catch(err => warn(`${z.label}: ${err.message}`));
           return;
         }
-        sayAt(`${z.label}  ▶ crossing detected (${ev.durationSec} s) — sending ${plural(framesB64.length, 'photo')} to be counted${evd ? ' + a larger copy of the middle one to look at' : ''}…`);
+        // People LEAVING through the same turnstile: the opposite way to
+        // the entry direction set with  node rtsp-run.js --entry <dir>.
+        // Skipped here, so they cost nothing and don't use the daily limit.
+        // Unclear direction = sent anyway (never miss a way in).
+        const dirWord = ev.direction ? ` moving ${ev.direction}` : '';
+        if (z.entryDirection && ev.direction && ev.direction === detect.OPPOSITE[z.entryDirection]) {
+          sayAt(`${z.label}  ◁ someone leaving (${ev.durationSec} s,${dirWord}) — not checked, costs nothing`);
+          return;
+        }
+        if (!z.entryDirection && ev.direction && !shownEntryHint) {
+          shownEntryHint = true;
+          sayAt(`${z.label}  Tip: people leaving are checked too. Walk IN once, note the direction on its line, then run  node rtsp-run.js --entry up  (or down/left/right).`);
+        }
+        sayAt(`${z.label}  ▶ crossing detected (${ev.durationSec} s${dirWord}) — sending ${plural(framesB64.length, 'photo')} to be counted${evd ? ' + a larger copy of the middle one to look at' : ''}…`);
         if (FLAG.verbose && extra && extra.evidenceSize) say(`    larger copy: ${extra.evidenceSize.width}x${extra.evidenceSize.height}, ${Math.round(extra.evidenceSize.bytes / 1024)} KB`);
         if (process.env.RUNNER_DUMP_DIR) dumpEvent(z, framesB64, extra);
         Promise.resolve(mode.send(z, framesB64, ev, capturedAt, evd))

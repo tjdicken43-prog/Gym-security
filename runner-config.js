@@ -218,6 +218,11 @@ function validateConfig(raw, opts) {
     if (!Number.isInteger(ec) || ec < 1) { errors.push(`${name}: "expectedCount" must be a whole number, 1 or more.`); }
     else z.expectedCount = ec;
     z.accessibleGate = !!z.accessibleGate;
+    // Which way people come IN on the picture (node rtsp-run.js --entry).
+    if (z.entryDirection != null && !['up', 'down', 'left', 'right'].includes(z.entryDirection)) {
+      warnings.push(`${name}: "entryDirection" should be up, down, left or right - ignoring it (everyone is checked).`);
+      delete z.entryDirection;
+    }
 
     // cameraUrl
     const u = z.cameraUrl;

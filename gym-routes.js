@@ -98,6 +98,14 @@ function mount(app, deps) {
     if (e.error) return 'unchecked';
     if (e.tailgate_flag) return e.confidence === 'low' ? 'possible' : 'flag';
     if (e.accessible_gate_used) return 'gate';
+    // Not flagged, but worth a human glance rather than a green "Passed":
+    // the AI wasn't fully sure, counted more people than one swipe allows
+    // without calling it a tailgate, or saw someone waiting at the gate as
+    // another went through (how most tailgates start).
+    const n = Number(e.people_count), exp = Number(e.expectedCount) || 1;
+    if (e.confidence && e.confidence !== 'high') return 'check';
+    if (Number.isFinite(n) && n > exp) return 'check';
+    if (Number(e.queued_count) > 0) return 'check';
     return 'ok';
   }
 
