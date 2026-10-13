@@ -139,7 +139,7 @@ function mount(app, deps) {
     const t = String(req.query.t || '');
     const p = [...pending.values()].find(x => sameSecret(t, x.approveToken));
     if (!p || p.expires < Date.now()) return res.status(410).send(page('Link expired', '<h1>This link has expired</h1><p>Go back to the admin page and sign in again for a new one.</p>'));
-    if (p.approved) return res.send(page('Approved', '<h1>Already approved ✓</h1><p>The admin page you were signing in on is now open.</p>'));
+    if (p.approved) return res.send(page('Approved', '<h1>Already approved ✓</h1><p>The admin page you were signing in on opens by itself.</p><a href="/admin.html" class="ok" style="display:block;text-align:center;text-decoration:none;line-height:52px;border-radius:10px;font-weight:700;margin-top:12px;">Open the admin page</a>'));
     res.send(page('Approve sign-in', `<h1>Approve admin sign-in?</h1>
       <p>From <b>${esc(deviceWords(p.ua))}</b>, ${esc(new Date(p.at).toUTCString())}.</p>
       <form method="post" action="/admin/approve"><input type="hidden" name="t" value="${esc(t)}">
@@ -159,7 +159,14 @@ function mount(app, deps) {
     const p = [...pending.values()].find(x => sameSecret(t, x.approveToken));
     if (!p || p.expires < Date.now()) return res.status(410).send(page('Link expired', '<h1>This link has expired</h1><p>Sign in again on the admin page for a new one.</p>'));
     if (!p.approved) { p.approved = true; p.session = signSession(); p.expires = Date.now() + 5 * 60e3; }
-    res.send(page('Approved', '<h1>Approved ✓</h1><p>Go back to the admin page: it opens by itself in a few seconds.</p>'));
+    // Also approve THIS browser (the session is useless without the admin
+    // token, so it's safe here), so "Open the admin page" works from this
+    // tab too, not only from the tab that was waiting.
+    res.send(page('Approved', `<h1>Approved ✓</h1>
+      <p>The admin page you were signing in on opens by itself within a few seconds.</p>
+      <p>Or open it here:</p>
+      <a href="/admin.html" style="display:block;text-align:center;text-decoration:none;line-height:52px;border-radius:10px;font-weight:700;margin-top:12px;" class="ok">Open the admin page</a>
+      <script>try{localStorage.setItem('securityai:adminSession', ${JSON.stringify(p.session)});}catch(e){}</script>`));
   });
 }
 

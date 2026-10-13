@@ -342,6 +342,7 @@ async function call(path, opts){
   if(r.status === 403){
     const e = new Error('Token rejected.'); e.status = 403;
     try{ const b = await r.json(); e.noAdminToken = b.adminTokenSet === false; e.needEmail = !!b.needEmail; }catch(x){}
+    if(e.needEmail && adminSession){ adminSession = ''; try{ localStorage.removeItem('securityai:adminSession'); }catch(x){} }   // expired or signed out: ask again
     throw e;
   }
   let body = {}; try{ body = await r.json(); }catch(e){}
@@ -349,22 +350,39 @@ async function call(path, opts){
 }
 
 // Right token, new browser: email TJ an Approve link and wait for it.
+// The wait survives the phone switching to the email app (checks again the
+// moment this page is visible) and a reload (the request is remembered for
+// this tab). Approving from the email in THIS browser also works.
 let approvalPoll = null;
+async function checkApproval(){
+  let w = null; try{ w = JSON.parse(sessionStorage.getItem('securityai:approval') || 'null'); }catch(e){}
+  // Approved from the email in this same browser: the session is already here.
+  let stored = ''; try{ stored = localStorage.getItem('securityai:adminSession') || ''; }catch(e){}
+  if(stored && stored !== adminSession){ adminSession = stored; stopWaiting(); return unlock(); }
+  if(!w) return;
+  if(Date.now() > w.until){ stopWaiting(); $('gateMsg').textContent = 'The approval link expired. Tap Open to send a new one.'; return; }
+  const s = await call('/admin/login/status?id=' + encodeURIComponent(w.id)).catch(() => null);
+  if(s && s.body && s.body.session){ stopWaiting(); saveSession(s.body.session); unlock(); }
+  else if(s && s.body && s.body.expired){ stopWaiting(); $('gateMsg').textContent = 'That approval was lost (the website restarted, or the link expired). Tap Open to send a new one.'; }
+}
+function stopWaiting(){ clearInterval(approvalPoll); approvalPoll = null; try{ sessionStorage.removeItem('securityai:approval'); }catch(e){} }
+function waitForApproval(w){
+  try{ sessionStorage.setItem('securityai:approval', JSON.stringify(w)); }catch(e){}
+  $('gateMsg').innerHTML = `<b>Check your email</b> (${esc(w.sentTo)}) and tap <b>Approve</b>. This page opens by itself a few seconds after. The link works for ${esc(w.minutes)} minutes.<br><button class="btn" type="button" style="width:100%;margin-top:10px;" onclick="checkApproval()">I approved it: open now</button>`;
+  clearInterval(approvalPoll);
+  approvalPoll = setInterval(checkApproval, 3000);
+}
+document.addEventListener('visibilitychange', () => { if(!document.hidden && $('gate').style.display !== 'none') checkApproval(); });
 async function emailApproval(){
   const msg = $('gateMsg');
+  // Already waiting on an email from this tab: keep waiting, don't send another.
+  let w = null; try{ w = JSON.parse(sessionStorage.getItem('securityai:approval') || 'null'); }catch(e){}
+  if(w && Date.now() < w.until){ waitForApproval(w); return checkApproval(); }
   msg.textContent = 'Right token. Sending you an approval email…';
   const r = await call('/admin/login/start', { method:'POST' }).catch(e => ({ ok:false, body:{ error: e.message } }));
   if(!r.ok){ msg.textContent = r.body.error || 'Could not send the approval email.'; return; }
   if(r.body.session){ saveSession(r.body.session); return unlock(); }      // email check is off
-  msg.innerHTML = `<b>Check your email</b> (${esc(r.body.sentTo)}) and tap <b>Approve</b>. This page opens by itself. The link works for ${esc(r.body.minutes)} minutes.`;
-  clearInterval(approvalPoll);
-  const id = r.body.id, until = Date.now() + r.body.minutes * 60e3;
-  approvalPoll = setInterval(async () => {
-    if(Date.now() > until){ clearInterval(approvalPoll); msg.textContent = 'The approval link expired. Tap Open to send a new one.'; return; }
-    const s = await call('/admin/login/status?id=' + encodeURIComponent(id)).catch(() => null);
-    if(s && s.body && s.body.session){ clearInterval(approvalPoll); saveSession(s.body.session); unlock(); }
-    else if(s && s.body && s.body.expired){ clearInterval(approvalPoll); msg.textContent = 'The approval link expired. Tap Open to send a new one.'; }
-  }, 3000);
+  waitForApproval({ id: r.body.id, until: Date.now() + r.body.minutes * 60e3, sentTo: r.body.sentTo, minutes: r.body.minutes });
 }
 function saveSession(s){ adminSession = s; try{ localStorage.setItem('securityai:adminSession', s); }catch(e){} }
 
@@ -394,7 +412,7 @@ async function unlock(){
     loadCheckReports();
     if(!refreshTimer) refreshTimer = setInterval(() => { if(!document.hidden) refresh(); }, 15000);
   } catch(err){
-    if(err.needEmail) return emailApproval();
+    if(err.needEmail){ try{ sessionStorage.setItem('securityai:admin', token); }catch(e){} return emailApproval(); }
     msg.textContent = err.status === 403
       ? (err.noAdminToken ? 'ADMIN_TOKEN is not set on Render. Add it (Generate), Save, wait until it says Live.' : 'That is not the ADMIN_TOKEN. Copy it again from Render > Environment.')
       : err.message;
