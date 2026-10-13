@@ -226,7 +226,8 @@ monitor which way is IN. Once, at the gym:
 1. Watch the monitor:  `node rtsp-run.js`
 2. Walk **in** through the turnstile. Its line says e.g.
    `crossing detected (2.0 s moving down)`.
-3. Ctrl-C, then type the word it showed:  `node rtsp-run.js --entry down`
+3. Ctrl-C, then type the word(s) it showed:  `node rtsp-run.js --entry down`
+   (an entry that shows two lines, e.g. "up" then "left": `node rtsp-run.js --entry left,up`)
 
 From then on people moving the other way show
 `◁ someone leaving … not checked, costs nothing`. Undo: `node rtsp-run.js --entry off`.

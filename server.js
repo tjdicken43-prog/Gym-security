@@ -1087,6 +1087,7 @@ app.post('/monitor/runner/burst', runnerAuth, runnerJson, async (req, res) => {
     expectedCount: (expected >= 1 && expected <= 20) ? expected : 1,
     accessibleGate: z.accessibleGate === true,
     durationSec: (Number.isFinite(dur) && dur > 0 && dur <= 120) ? Math.round(dur * 10) / 10 : null,
+    lingerSec: (Number.isFinite(Number(z.lingerSec)) && Number(z.lingerSec) > 0) ? Math.min(600, Math.round(Number(z.lingerSec))) : null,
     capturedAt,
     serverPacing: true,   // camera computers don't pace themselves (monitor.js)
   };

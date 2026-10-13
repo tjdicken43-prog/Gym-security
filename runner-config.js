@@ -219,7 +219,7 @@ function validateConfig(raw, opts) {
     else z.expectedCount = ec;
     z.accessibleGate = !!z.accessibleGate;
     // Which way people come IN on the picture (node rtsp-run.js --entry).
-    if (z.entryDirection != null && !['up', 'down', 'left', 'right'].includes(z.entryDirection)) {
+    if (z.entryDirection != null && ![].concat(z.entryDirection).every(d => ['up', 'down', 'left', 'right'].includes(d))) {
       warnings.push(`${name}: "entryDirection" should be up, down, left or right - ignoring it (everyone is checked).`);
       delete z.entryDirection;
     }

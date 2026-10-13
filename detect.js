@@ -47,6 +47,8 @@ const EVENT_QUIET_TICKS = 3;      // ~750ms of stillness = the event is over
 const EVENT_PAUSE_QUIET_TICKS = 12;   // ~3s of stillness short of the far side = the event is over
 const PAUSE_EDGE_CELLS = 2.5;         // within this many grid cells of the far edge = "got to the far side"
 const EVENT_MAX_TICKS = 48;       // ~12s ceiling so a loiterer can't buffer forever
+const LINGER_WINDOW_TICKS = 120;   // ~30 s: a crossing this soon after hanging around is told so
+const LINGER_MIN_TICKS = 16;       // ~4 s of motion that never crossed = hanging around the gate
 const EVENT_MAX_BUFFER = 60;      // hard cap on retained crops
 const EVENT_FRAMES_SENT = 3;      // fewest crops sent to Claude per crossing
 const EVENT_FRAMES_MAX = 6;       // most crops per crossing (long, slow crossings)
@@ -297,6 +299,7 @@ function stepZone(z, cells, sens, opts) {
 
   const result = classifyMotion(z.prevCells, cells, z, sens);
   z.prevCells = cells;
+  z.tickCount = (z.tickCount || 0) + 1;
   out.verdict = result.verdict;
   z.lastVerdict = result.verdict;
 
@@ -335,6 +338,19 @@ function stepZone(z, cells, sens, opts) {
       out.send = (ticks >= 2 && cross.crossed)
         ? { ticks, durationSec: (ticks * MOTION_CHECK_MS / 1000).toFixed(1), cross, direction }
         : null;
+      // Hanging around the turnstile: motion that ran the full ~12 s without
+      // finishing. A crossing within 30 s of that is told so (lingerSec),
+      // because waiting at the gate then slipping in together is the
+      // classic tailgate.
+      if (z.lingerStart != null && z.tickCount - z.lingerLast > LINGER_WINDOW_TICKS) z.lingerStart = null;
+      // Counts both the ~12 s limit and someone who moved around then stood
+      // still (the event ends by going quiet) without crossing.
+      const lingered = tooLong || (!out.send && ticks >= LINGER_MIN_TICKS);
+      if (lingered) { if (z.lingerStart == null) z.lingerStart = z.tickCount - ticks; z.lingerLast = z.tickCount; }
+      if (out.send && z.lingerStart != null) {
+        out.send.lingerSec = Math.round((z.tickCount - z.lingerStart) * MOTION_CHECK_MS / 1000);
+        if (!lingered) z.lingerStart = null;
+      }
       if (!out.send) out.rejected = cross.crossed ? 'too-brief' : 'no-crossing';
     }
   }

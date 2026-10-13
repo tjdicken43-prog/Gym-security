@@ -410,6 +410,7 @@ function headline(e){
   if(e.kind === 'check'){
     if(n != null && n > exp) return `${n} people seen — not called a tailgate, worth a look`;
     if(e.waiting > 0) return `${n == null ? 'Someone' : n === 1 ? '1 person' : n + ' people'} came in with someone waiting close by`;
+    if(e.lingerSec >= 12) return `${n == null ? 'Someone' : n === 1 ? '1 person' : n + ' people'} came in after someone waited at the gate ~${Math.round(e.lingerSec)} s`;
     return `${n == null ? 'An entry' : n === 1 ? '1 person' : n + ' people'} — the camera wasn’t fully sure`;
   }
   if(e.kind === 'gate') return 'Accessible gate used';

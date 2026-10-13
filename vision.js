@@ -189,7 +189,7 @@ The entrance is usually a full-height turnstile: a cage of metal bars that turns
 
 The stills are taken on a timer, so the moment someone passes may fall between two of them. Judge from where people are across the sequence: on one side early and the other side later means they went through; standing still in every frame means they have not (they may be scanning in or waiting).
 ${gate}
-Count the DISTINCT people who got through. Expected per scan: ${expected}.
+${cfg.lingerSec ? `Before these stills, someone had been at the turnstile for about ${cfg.lingerSec} seconds without going straight through. Waiting at the gate and then slipping in right behind someone is a common way to tailgate, so look carefully for a second person close behind or squeezed into the same turn. Still only flag what you can see.\n` : ''}Count the DISTINCT people who got through. Expected per scan: ${expected}.
 Tailgating means more than ${expected} going through on the same turn (sharing one gap between the bars, or squeezed in right behind) or through a door held open. People who each get their own turn, even seconds apart, are not tailgating.
 
 Respond with ONLY a JSON object, no other text:

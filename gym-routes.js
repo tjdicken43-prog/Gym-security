@@ -106,6 +106,7 @@ function mount(app, deps) {
     if (e.confidence && e.confidence !== 'high') return 'check';
     if (Number.isFinite(n) && n > exp) return 'check';
     if (Number(e.queued_count) > 0) return 'check';
+    if (Number(e.lingerSec) >= 12) return 'check';   // came in after someone hung around the gate
     return 'ok';
   }
 
@@ -126,6 +127,7 @@ function mount(app, deps) {
       people: (e.people_count === null || e.people_count === undefined || e.people_count === '' || !Number.isFinite(n)) ? null : n,
       expected: Number(e.expectedCount) || 1,
       waiting: Number(e.queued_count) || 0,
+      lingerSec: Number(e.lingerSec) || 0,
       note: e.error ? null : (e.note || null),
       photos: photos.slice(0, 7),   // the larger copy + up to 6 analysed photos
       review: reviews[id] || null,

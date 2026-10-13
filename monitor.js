@@ -1177,6 +1177,7 @@ async function pushBurstFor(code, frames, zoneCfg, evidence, force) {
     ...s.config,
     label: zoneCfg.label || s.config.label,
     durationSec: zoneCfg.durationSec || null,
+    lingerSec: zoneCfg.lingerSec || null,
     expectedCount: parseInt(zoneCfg.expectedCount, 10) || 1,
     accessibleGate: !!zoneCfg.accessibleGate,
   };
@@ -1212,6 +1213,7 @@ async function pushBurstFor(code, frames, zoneCfg, evidence, force) {
       frame, frames: savedFrames,
       capturedAt: (parsed && !isNaN(parsed)) ? parsed.toISOString() : null,
       clockSkewMinutes: zoneCfg.clockSkewMinutes || null,
+      lingerSec: zoneCfg.lingerSec || null,
     });
     release();
     return { entry };
@@ -1247,6 +1249,7 @@ function analysisConfigFor(code, zoneCfg, rc) {
     model: vision.ALLOWED_MODELS[base.model] ? base.model : vision.DEFAULT_MODEL,
     label: z.label || base.label,
     durationSec: z.durationSec || null,
+    lingerSec: z.lingerSec || null,
     expectedCount: parseInt(z.expectedCount, 10) || 1,
     accessibleGate: !!z.accessibleGate,
   };
