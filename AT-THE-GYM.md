@@ -231,3 +231,18 @@ monitor which way is IN. Once, at the gym:
 
 From then on people moving the other way show
 `◁ someone leaving … not checked, costs nothing`. Undo: `node rtsp-run.js --entry off`.
+
+## What else it watches for (nothing to set up)
+
+- **Waiting at the turnstile, then slipping in.** If someone hangs around the
+  turnstile and someone comes in within 30 s, Claude is told to look extra
+  closely. A wait of 12 s or more always lands in "Worth a check".
+  Screen line: `⚠ someone was at the turnstile for about N s before this`.
+- **Shared phone code.** A member inside hands their phone back through the
+  turnstile so a friend can scan the same code once the lockout is over. When
+  someone came back out, or stood at the turnstile, in the 90 s before an
+  entry, 1–2 photos of that moment go along with the entry (cost: about a
+  tenth of a cent). If Claude sees a phone or card passed over, it is
+  **Flagged**: "Someone may have scanned in on another member's phone".
+  The manager looks up whose code scanned at that time: that member shared it.
+  Screen line: `⚠ someone came out through the turnstile N s before this`.

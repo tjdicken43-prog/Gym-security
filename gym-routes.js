@@ -103,7 +103,12 @@ function mount(app, deps) {
     // without calling it a tailgate, or saw someone waiting at the gate as
     // another went through (how most tailgates start).
     const n = Number(e.people_count), exp = Number(e.expectedCount) || 1;
-    if (e.confidence && e.confidence !== 'high') return 'check';
+    // Doubt about the COUNT, not about the picture: newer answers say
+    // whether a second person can't be ruled out. "Medium" confidence on a
+    // clear single person (dark, blurry, wide-angle) is a normal entry.
+    if (typeof e.second_person_possible === 'boolean') {
+      if (e.second_person_possible || e.confidence === 'low') return 'check';
+    } else if (e.confidence && e.confidence !== 'high') return 'check';   // older entries
     if (Number.isFinite(n) && n > exp) return 'check';
     if (Number(e.queued_count) > 0) return 'check';
     if (Number(e.lingerSec) >= 12) return 'check';   // came in after someone hung around the gate
@@ -128,8 +133,12 @@ function mount(app, deps) {
       expected: Number(e.expectedCount) || 1,
       waiting: Number(e.queued_count) || 0,
       lingerSec: Number(e.lingerSec) || 0,
+      phoneHandoff: !!e.phone_handoff,
+      secondPossible: e.second_person_possible === true,
+      beforeSec: e.beforeCount ? (Number(e.beforeSec) || 0) : null,   // first photos taken this long before the crossing
       note: e.error ? null : (e.note || null),
-      photos: photos.slice(0, 7),   // the larger copy + up to 6 analysed photos
+      photos: photos.slice(0, 9),
+      beforeIdx: photos.slice(0, 9).map((f, i) => /-b\d+\.jpg$/.test(f) ? i : -1).filter(i => i >= 0),   // the larger copy + up to 2 earlier turnstile photos + up to 6 analysed photos
       review: reviews[id] || null,
       // When this event and its photos will be deleted: 48 h after it,
       // unless it was flagged or marked Tailgate (then 35 days).

@@ -308,7 +308,7 @@ function retainForReview(code, id, verdict) {
       id: want, timestamp: e.timestamp, capturedAt: e.capturedAt || null,
       zoneLabel: e.zoneLabel || null, people_count: e.people_count == null ? null : e.people_count,
       expectedCount: e.expectedCount || 1, note: e.note || null, confidence: e.confidence || null,
-      tailgate_flag: !!e.tailgate_flag, error: e.error ? true : undefined,
+      tailgate_flag: !!e.tailgate_flag, phone_handoff: e.phone_handoff || undefined, error: e.error ? true : undefined,
       frame: e.frame || null, frames: e.frames || null, keptBecause: 'marked-tailgate',
     };
     list.unshift(copy);
@@ -790,7 +790,9 @@ function gymAlertText(code, entry) {
   const when = fmtWhen(code, entry.capturedAt && Date.parse(entry.capturedAt) <= Date.parse(entry.timestamp) + 120000 ? entry.capturedAt : entry.timestamp);
   const where = entry.zoneLabel || 'your entrance';
   const n = Number(entry.people_count), exp = Number(entry.expectedCount) || 1;
-  const what = Number.isFinite(n) && n > exp
+  const what = entry.phone_handoff
+    ? 'a phone looks handed through the turnstile so someone else could scan in on the same code'
+    : Number.isFinite(n) && n > exp
     ? `${n} people went through when ${exp} ${exp === 1 ? 'was' : 'were'} expected`
     : 'more people went through than expected';
   return { when, where, what };
@@ -823,7 +825,7 @@ function incidentMessage(code, entry) {
   const links = incidentLinks(code, entry);
   const photo = entry.frame ? path.join(framesDirFor(code), entry.frame) : null;
   const attachments = (photo && fs.existsSync(photo)) ? [{ filename: 'entrance.jpg', path: photo, cid: 'entrance@securityai' }] : undefined;
-  const subject = `${gymName}: possible tailgate at ${where}, ${when}`;
+  const subject = `${gymName}: ${entry.phone_handoff ? 'possible shared code' : 'possible tailgate'} at ${where}, ${when}`;
   const text = `${what} at ${where} (${when}).\n\n"${entry.note || ''}"\n\n`
     + (links.share ? `See the photos: ${links.share}\n` : '')
     + (links.activity ? `Mark it on your activity page: ${links.activity}\n` : 'Mark it on your activity page once you\'ve checked the membership log.\n');
@@ -983,6 +985,10 @@ function getActiveZoneNames(zones) {
 // --- Analysis results -----------------------------------------------------
 async function handleEntryResult(s, result, cfg, extra) {
   let alertResult = null;
+  // A phone (or card) handed back through the turnstile for a second scan
+  // of the same code: someone got in on another member's code. Treated
+  // as a flag, so it is listed, kept and alerted like a tailgate.
+  if (result.phone_handoff) result.tailgate_flag = true;
   // A low-confidence flag goes in the log but does not wake anyone up.
   const worthAlerting = result.tailgate_flag && result.confidence !== 'low';
   const id = gymStore.newEventId();
@@ -998,6 +1004,8 @@ async function handleEntryResult(s, result, cfg, extra) {
     queued_count: result.queued_count,
     accessible_gate_used: result.accessible_gate_used,
     tailgate_flag: result.tailgate_flag,
+    phone_handoff: result.phone_handoff || undefined,
+    second_person_possible: typeof result.second_person_possible === 'boolean' ? result.second_person_possible : undefined,
     note: result.note,
     alertResult: null,
     ...extra,
@@ -1012,6 +1020,7 @@ async function handleEntryResult(s, result, cfg, extra) {
       expectedCount: cfg.expectedCount,
       note: result.note,
       tailgate_flag: true,
+      phone_handoff: result.phone_handoff || undefined,
       confidence: result.confidence || null,
       frame: (extra && extra.frame) || null,
       frames: (extra && extra.frames) || null,
@@ -1118,7 +1127,8 @@ async function pushBurstFor(code, frames, zoneCfg, evidence, force) {
   if (!Array.isArray(frames) || frames.length < 1) {
     throw new Error('At least one frame is required.');
   }
-  const singleFrame = frames.length === 1;
+  const before = (zoneCfg.before && Array.isArray(zoneCfg.before.frames) && zoneCfg.before.frames.length) ? zoneCfg.before : null;
+  const singleFrame = frames.length === 1 && !before;
   recordHeartbeat(s.key);
   if (!force && !isWithinSchedule(s.config)) {
     s.skippedOutOfWindow = (s.skippedOutOfWindow || 0) + 1;
@@ -1178,6 +1188,7 @@ async function pushBurstFor(code, frames, zoneCfg, evidence, force) {
     label: zoneCfg.label || s.config.label,
     durationSec: zoneCfg.durationSec || null,
     lingerSec: zoneCfg.lingerSec || null,
+    before,
     expectedCount: parseInt(zoneCfg.expectedCount, 10) || 1,
     accessibleGate: !!zoneCfg.accessibleGate,
   };
@@ -1193,11 +1204,13 @@ async function pushBurstFor(code, frames, zoneCfg, evidence, force) {
   // twice on the night the clocks go back): never overwrite older photos.
   try { if (fs.existsSync(path.join(framesDirFor(s.key), `${stamp}-1.jpg`))) stamp += '-' + gymStore.newEventId().slice(0, 4); } catch (e) { /* keep stamp */ }
   const allFrames = frames.map((f, i) => saveEvidenceFrame(s.key, f, `${stamp}-${i + 1}`));
+  // The earlier turnstile stills go first, so the photos read in time order.
+  const beforeSaved = before ? before.frames.map((f, i) => saveEvidenceFrame(s.key, f, `${stamp}-b${i + 1}`)).filter(Boolean) : [];
   const mid = Math.floor(frames.length / 2);
   let frame = null;
   if (evidence) frame = saveEvidenceFrame(s.key, evidence, `${stamp}-main`);
   if (!frame) frame = allFrames[mid] || allFrames.find(Boolean) || null;
-  const savedFrames = allFrames.filter(Boolean);
+  const savedFrames = beforeSaved.concat(allFrames.filter(Boolean));
 
   s.inFlight = (s.inFlight || 0) + 1;
   let held = true;
@@ -1214,6 +1227,9 @@ async function pushBurstFor(code, frames, zoneCfg, evidence, force) {
       capturedAt: (parsed && !isNaN(parsed)) ? parsed.toISOString() : null,
       clockSkewMinutes: zoneCfg.clockSkewMinutes || null,
       lingerSec: zoneCfg.lingerSec || null,
+      beforeSec: before ? before.sec : null,
+      beforeKind: before ? before.kind : null,
+      beforeCount: beforeSaved.length || null,
     });
     release();
     return { entry };

@@ -299,7 +299,7 @@ function printVerdict(label, res, durationSec) {
   const n = e.people_count, exp = e.expectedCount || 1;
   const counted = `${plural(n, 'person', 'people')} counted, ${exp} expected`;
   if (e.tailgate_flag) {
-    sayAt(`${label}  ⚠ FLAGGED: ${counted}${e.confidence === 'low' ? ' (low confidence — logged, no alert)' : ''}${e.note ? ` — "${e.note}"` : ''}`);
+    sayAt(`${label}  ⚠ FLAGGED: ${e.phone_handoff ? 'looks like a phone handed over to scan in on the same code' : counted}${e.confidence === 'low' ? ' (low confidence — logged, no alert)' : ''}${e.note ? ` — "${e.note}"` : ''}`);
   } else {
     sayAt(`${label}  ✓ ${counted} — OK${durationSec ? ` (${durationSec} s crossing)` : ''}`);
   }
@@ -366,6 +366,7 @@ function setupLocal(cfg) {
       const r = await monitor.pushBurst(framesB64, {
         label: z.label, expectedCount: z.expectedCount, accessibleGate: z.accessibleGate,
         durationSec: ev.durationSec, lingerSec: Number(ev.lingerSec) || null, capturedAt,
+        before: ev.before || null,
       }, evidence || undefined);
       if (r && r.skipped) return printVerdict(z.label, r);
       // monitor.pushBurst returns { entry } / { entry, error }; older
@@ -399,6 +400,7 @@ function setupRemote(cfg, handles, warningsOf, testLink) {
         frames: framesB64.slice(0, 6),
         capturedAt,
       };
+      if (ev.before && !test) item.before = ev.before;
       // The MIDDLE photo again at up to 1024 px, for people to look at
       // (the 384 px frames above are what gets counted). Not for test
       // walks: the test keeps its own copy on this computer.
@@ -606,6 +608,12 @@ function watchForChanges(onChange) {
 }
 
 let shownEntryHint = false;
+// Last time someone was at the turnstile without coming in (came back out,
+// or stood there), per door: { at, kind, frames }. Sent along with an
+// entry that follows within GATE_VISIT_WINDOW_MS, to spot a phone handed
+// over so a second person can scan in on the same code.
+const gateVisits = new Map();
+const GATE_VISIT_WINDOW_MS = 90 * 1000;
 
 // node rtsp-run.js --entry up|down|left|right|off
 // Saves which way people come IN on the picture. Crossings the other way
@@ -810,11 +818,24 @@ async function main() {
         const ins = [].concat(z.entryDirection || []);
         if (ins.length && ev.direction && !ins.includes(ev.direction) && ins.some(d => detect.OPPOSITE[d] === ev.direction)) {
           sayAt(`${z.label}  ◁ someone leaving (${ev.durationSec} s,${dirWord}) — not checked, costs nothing`);
+          // Remembered (free): if someone comes IN soon after, this moment
+          // is sent too, to check for a phone handed back to scan again.
+          gateVisits.set(z.label, { at: Date.now(), kind: 'left', frames: [framesB64[Math.floor(framesB64.length / 2)], framesB64[framesB64.length - 1]].filter((f, i, a) => f && a.indexOf(f) === i) });
           return;
         }
         if (!z.entryDirection && ev.direction && !shownEntryHint) {
           shownEntryHint = true;
           sayAt(`${z.label}  Tip: people leaving are checked too. Walk IN once, note the direction on its line, then run  node rtsp-run.js --entry up  (or down/left/right).`);
+        }
+        // Someone came back out, or stood at the turnstile, shortly before
+        // this crossing: send that moment too (1-2 small photos), so a phone
+        // handed over for a second scan of the same code can be seen.
+        const visit = gateVisits.get(z.label);
+        gateVisits.delete(z.label);
+        const crossStart = Date.now() - Number(ev.durationSec || 0) * 1000;
+        if (visit && visit.frames && visit.frames.length && crossStart - visit.at <= GATE_VISIT_WINDOW_MS) {
+          ev = Object.assign({}, ev, { before: { frames: visit.frames.slice(0, 2), sec: Math.max(0, Math.round((crossStart - visit.at) / 1000)), kind: visit.kind } });
+          sayAt(`${z.label}  ⚠ someone ${visit.kind === 'left' ? 'came out through' : 'was at'} the turnstile ${ev.before.sec} s before this — sending that moment too, to check for a phone handed over`);
         }
         if (ev.lingerSec) sayAt(`${z.label}  ⚠ someone was at the turnstile for about ${ev.lingerSec} s before this — looking closely`);
         sayAt(`${z.label}  ▶ crossing detected (${ev.durationSec} s${dirWord}) — sending ${plural(framesB64.length, 'photo')} to be counted${evd ? ' + a larger copy of the middle one to look at' : ''}…`);
@@ -823,8 +844,9 @@ async function main() {
         Promise.resolve(mode.send(z, framesB64, ev, capturedAt, evd))
           .catch(err => warn(`${z.label}: ${err.message}`));
       },
-      onRejected: reason => {
+      onRejected: (reason, info) => {
         const now = Date.now();
+        if (info && info.frames && info.frames.length) gateVisits.set(z.label, { at: now, kind: 'waited', frames: info.frames });
         const ts = testHere && testHere.session(z.label);
         if (ts && ts.trial) testHere.emit({ type: 'rejected', runId: ts.runId, trial: ts.trial.n, reason });
         if (now - lastRejectLine < 10000 && !FLAG.verbose) return;

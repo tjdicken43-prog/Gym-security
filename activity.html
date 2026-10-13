@@ -400,6 +400,8 @@ function scheduleWords(){ return effSchedule && effSchedule.start && effSchedule
 // ---- plain words for an entry -----------------------------------------
 function headline(e){
   const n = e.people, exp = e.expected || 1;
+  if(e.phoneHandoff && e.kind === 'flag') return 'Someone may have scanned in on another member’s phone';
+  if(e.phoneHandoff && e.kind === 'possible') return 'Maybe a phone was handed over to scan in — not certain';
   if(e.kind === 'flag'){
     if(n == null) return 'More people came in than expected';
     if(n - exp === 1) return exp === 1 ? 'Someone may have followed a member in' : `One extra person came in (${n}, expected ${exp})`;
@@ -410,6 +412,7 @@ function headline(e){
   if(e.kind === 'check'){
     if(n != null && n > exp) return `${n} people seen — not called a tailgate, worth a look`;
     if(e.waiting > 0) return `${n == null ? 'Someone' : n === 1 ? '1 person' : n + ' people'} came in with someone waiting close by`;
+    if(e.secondPossible) return `${n == null || n <= 1 ? '1 person seen' : n + ' people seen'} — a second person can’t be ruled out`;
     if(e.lingerSec >= 12) return `${n == null ? 'Someone' : n === 1 ? '1 person' : n + ' people'} came in after someone waited at the gate ~${Math.round(e.lingerSec)} s`;
     return `${n == null ? 'An entry' : n === 1 ? '1 person' : n + ' people'} — the camera wasn’t fully sure`;
   }
@@ -422,6 +425,7 @@ function headline(e){
 function todo(e){
   const t = timeOf(e.at);
   if(e.kind === 'unchecked') return `Have a look at the photos. If more than one person came through, check your check-in log around ${t}.`;
+  if(e.phoneHandoff) return `Look up whose code scanned in at ${t} in your check-in system. If it's a member who was already inside, they shared their code. ${e.beforeSec != null ? `Some photos are from ${e.beforeSec} s before, when someone was at the turnstile.` : ''}`;
   if(e.kind === 'possible') return `The photos aren't clear. Worth a quick look, and your check-in log around ${t}.`;
   if(e.kind === 'check') return `Flip through the photos. If more people came through than scanned in around ${t}, mark it a tailgate.`;
   return `Check your check-in log around ${t}: if only one person scanned, it's a tailgate. Then tap a button below.`;
@@ -606,7 +610,7 @@ function renderList(){
     let h = pinHtml;
 
     const nFlag = flagged.length + confirmed.length;
-    h += tier('red', 'Flagged', nFlag, nFlag ? 'More people came through than the swipe allows. Check the photos against your door log.' : '');
+    h += tier('red', 'Flagged', nFlag, nFlag ? 'More people came through than the swipe allows, or a phone was handed over to scan in again. Check the photos against your door log.' : '');
     h += nFlag ? flagged.map(card).join('') + confirmed.map(e => card(e).replace('class="inc done', 'class="inc done confirmed')).join('')
                : `<div class="tier-empty">No tailgates flagged ✓</div>`;
 
@@ -785,7 +789,8 @@ function showPhoto(){
   const p = vEvent.photos;
   $('vImg').src = photoUrl(p[vIndex]);
   $('vImg').alt = `Photo ${vIndex + 1} of ${p.length}`;
-  $('vCap').textContent = `${dayWords(vEvent.at)}, ${timeOf(vEvent.at)} · photo ${vIndex + 1} of ${p.length}`;
+  const early = (vEvent.beforeIdx || []).includes(vIndex) && vEvent.beforeSec != null ? ` · ${vEvent.beforeSec} s before the crossing` : '';
+  $('vCap').textContent = `${dayWords(vEvent.at)}, ${timeOf(vEvent.at)} · photo ${vIndex + 1} of ${p.length}${early}`;
   $('vPrev').disabled = vIndex === 0; $('vNext').disabled = vIndex >= p.length - 1;
 }
 function closeViewer(){ $('viewer').classList.remove('open'); $('vImg').removeAttribute('src'); if(vReturn) vReturn.focus(); }

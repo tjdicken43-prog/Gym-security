@@ -441,10 +441,17 @@ function startRtspZone(cfg, handlers) {
           if (handlers.onRejected) handlers.onRejected('no-photos');
         }
       } else if (step.rejected) {
+        // Someone at the turnstile who didn't go through: keep the middle
+        // and last photo of it, in case the next crossing follows a phone
+        // handed over (rtsp-run.js decides).
+        const ej = zoneState._eventJpegs || [];
+        const visit = (step.rejected === 'no-crossing' && ej.length)
+          ? [...new Set([ej[Math.floor(ej.length / 2)], ej[ej.length - 1]])].map(p => p.jpg.toString('base64'))
+          : null;
         zoneState._eventJpegs = [];
         stats.rejected++;
         stats.lastRejectReason = step.rejected;
-        if (handlers.onRejected) handlers.onRejected(step.rejected);
+        if (handlers.onRejected) handlers.onRejected(step.rejected, { frames: visit });
       }
     }
   });

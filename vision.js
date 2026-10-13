@@ -108,7 +108,7 @@ function parseModelJson(raw) {
   }
   const bool = v => v === true || (typeof v === 'string' && v.trim().toLowerCase() === 'true');
   const int = v => { const n = typeof v === 'string' ? Number(v.trim()) : v; return (typeof n === 'number' && Number.isFinite(n)) ? Math.max(0, Math.round(n)) : null; };
-  for (const k of ['tailgate_flag', 'accessible_gate_used', 'flag']) if (k in obj) obj[k] = bool(obj[k]);
+  for (const k of ['tailgate_flag', 'accessible_gate_used', 'flag', 'phone_handoff', 'second_person_possible']) if (k in obj) obj[k] = bool(obj[k]);
   for (const k of ['people_count', 'queued_count']) if (k in obj) obj[k] = int(obj[k]);
   if ('confidence' in obj) { const c = String(obj.confidence || '').toLowerCase(); obj.confidence = ['high', 'medium', 'low'].includes(c) ? c : null; }
   if ('note' in obj && obj.note != null) obj.note = String(obj.note).slice(0, 500);
@@ -183,7 +183,16 @@ async function analyzeEntryBurst(framesInOrder, cfg) {
   // same prompt: "two on one rotation" must flag, "two on separate
   // rotations" must not.
   const expected = cfg.expectedCount || 1;
-  const promptText = `These are ${framesInOrder.length} stills from a fixed security camera at a gym entrance, in time order${cfg.durationSec ? `, over about ${cfg.durationSec} seconds` : ''}. Such cameras usually sit high up and look down at an angle through a wide-angle lens: straight lines bend near the edges and people show mostly as heads and shoulders.
+  // Stills from someone at the turnstile just before this crossing (they
+  // came back out through it, or stood there): sent first, and labelled,
+  // so a phone handed over for a second scan can be seen.
+  const before = (cfg.before && Array.isArray(cfg.before.frames) && cfg.before.frames.length) ? cfg.before : null;
+  const nb = before ? before.frames.length : 0;
+  const images = before ? before.frames.concat(framesInOrder) : framesInOrder;
+  const beforeText = before
+    ? `The first ${nb === 1 ? 'image is' : `${nb} images are`} NOT part of the crossing: ${nb === 1 ? 'it was' : 'they were'} taken about ${before.sec} seconds before it, when someone ${before.kind === 'left' ? 'had just come back out through the turnstile' : 'was at the turnstile without going through'}. The other ${framesInOrder.length} images are the crossing. Only count people from the crossing images.\n\n`
+    : '';
+  const promptText = `${beforeText}${before ? `The crossing images` : `These are ${framesInOrder.length} stills`} from a fixed security camera at a gym entrance, in time order${cfg.durationSec ? `, over about ${cfg.durationSec} seconds` : ''}. Such cameras usually sit high up and look down at an angle through a wide-angle lens: straight lines bend near the edges and people show mostly as heads and shoulders.
 
 The entrance is usually a full-height turnstile: a cage of metal bars that turns round a post and lets one person through per turn after they scan. Turnstile bars, wire-mesh walls, doors, lights, reflections and shadows are not people. Count heads.
 
@@ -192,12 +201,16 @@ ${gate}
 ${cfg.lingerSec ? `Before these stills, someone had been at the turnstile for about ${cfg.lingerSec} seconds without going straight through. Waiting at the gate and then slipping in right behind someone is a common way to tailgate, so look carefully for a second person close behind or squeezed into the same turn. Still only flag what you can see.\n` : ''}Count the DISTINCT people who got through. Expected per scan: ${expected}.
 Tailgating means more than ${expected} going through on the same turn (sharing one gap between the bars, or squeezed in right behind) or through a door held open. People who each get their own turn, even seconds apart, are not tailgating.
 
+Members scan in with a code on their phone, and the same code works again after a short lockout. Code sharing: a member already inside comes back to the turnstile and hands their phone (or card) over or through it, so the person outside can scan in on the same code. Set phone_handoff true only if you can see something passed between a person inside and a person outside, or someone inside reaching through or over the turnstile to the person about to enter. Someone scanning their own phone at the reader is normal.
+
 Respond with ONLY a JSON object, no other text:
-{"people_count": <number who got through>, "queued_count": <number waiting, not through>, "accessible_gate_used": <true|false>, "tailgate_flag": <true|false>, "confidence": "<high|medium|low>", "note": "<one plain sentence for gym staff saying what you see>"}
+{"people_count": <number who got through>, "queued_count": <number waiting, not through>, "accessible_gate_used": <true|false>, "tailgate_flag": <true|false>, "phone_handoff": <true|false>, "second_person_possible": <true|false>, "confidence": "<high|medium|low>", "note": "<one plain sentence for gym staff saying what you see>"}
+
+second_person_possible: true ONLY if a second person could have got through on the same turn and these photos can't rule it out (someone partly hidden behind the first person, the view blocked at the key moment, or a second shape you can't make out). false when you can see one person went through and nobody was close behind them, even if the picture is dark, blurry or bent at the edges.
 
 Set confidence "low" when no frame clearly shows the crossing, people overlap, or it is too dark. A confident wrong answer is worse than an admitted doubt: set tailgate_flag true only when you can see it, and say what makes you unsure in the note.`;
 
-  return callClaudeMulti({ base64Images: framesInOrder, promptText, maxTokens: 400, model: cfg.model });
+  return callClaudeMulti({ base64Images: images, promptText, maxTokens: 400, model: cfg.model });
 }
 
 module.exports = { analyzeEntry, scanCameraWall, analyzeEntryBurst, ALLOWED_MODELS, DEFAULT_MODEL };

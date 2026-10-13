@@ -46,6 +46,7 @@ function esc(v){ return String(v == null ? '' : v).replace(/&/g,'&amp;').replace
 const token = location.pathname.split('/').filter(Boolean).pop() || new URLSearchParams(location.search).get('t') || '';
 function headline(e){
   const n = e.people, exp = e.expected || 1;
+  if(e.phoneHandoff && (e.kind === 'flag' || e.kind === 'possible')) return e.kind === 'flag' ? 'Someone may have scanned in on another member’s phone' : 'Maybe a phone was handed over to scan in';
   if(e.kind === 'flag') return n == null ? 'More people came in than expected' : (n - exp === 1 && exp === 1 ? 'Someone may have followed a member in' : `${n} people came in, ${exp} expected`);
   if(e.kind === 'possible') return n == null ? 'Maybe more than one person — not certain' : `Maybe ${n} people came in — not certain`;
   if(e.kind === 'unchecked') return 'Entry to check';

@@ -1077,6 +1077,24 @@ app.post('/monitor/runner/burst', runnerAuth, runnerJson, async (req, res) => {
     if (r.error) return res.status(400).json({ ok: false, error: r.error });
     evidence = r.b64;
   }
+  // "before": 1-2 stills from someone at the turnstile just before this
+  // crossing (came back out, or stood there). Checked for a phone handed
+  // over for a second scan of the same code.
+  let before = null;
+  if (b.before && typeof b.before === 'object' && Array.isArray(b.before.frames) && b.before.frames.length >= 1 && b.before.frames.length <= 2) {
+    const bf = [];
+    for (let i = 0; i < b.before.frames.length; i++) {
+      const r = checkJpeg(b.before.frames[i], RUNNER_MAX_FRAME_BYTES, `Earlier photo ${i + 1}`);
+      if (r.error) return res.status(400).json({ ok: false, error: r.error });
+      bf.push(r.b64);
+    }
+    const sec = Number(b.before.sec);
+    before = {
+      frames: bf,
+      sec: (Number.isFinite(sec) && sec >= 0) ? Math.min(600, Math.round(sec)) : 0,
+      kind: b.before.kind === 'left' ? 'left' : 'waited',
+    };
+  }
   const z = (b.zone && typeof b.zone === 'object') ? b.zone : {};
   const label = cleanText(z.label, 60) || 'Camera';
   const expected = parseInt(z.expectedCount, 10);
@@ -1089,6 +1107,7 @@ app.post('/monitor/runner/burst', runnerAuth, runnerJson, async (req, res) => {
     durationSec: (Number.isFinite(dur) && dur > 0 && dur <= 120) ? Math.round(dur * 10) / 10 : null,
     lingerSec: (Number.isFinite(Number(z.lingerSec)) && Number(z.lingerSec) > 0) ? Math.min(600, Math.round(Number(z.lingerSec))) : null,
     capturedAt,
+    before,
     serverPacing: true,   // camera computers don't pace themselves (monitor.js)
   };
 
