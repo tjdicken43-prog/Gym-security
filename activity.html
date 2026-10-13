@@ -186,6 +186,51 @@
   .sheet .inner{max-width:640px;margin:0 auto;}
   .sheet input{font-size:15px;}
 
+  /* first-visit guide */
+  .welcome{border-color:rgba(127,178,255,.35);}
+  .welcome h2{margin-bottom:2px;}
+  .steps{list-style:none;padding:0;margin:12px 0 14px;counter-reset:s;display:grid;gap:12px;}
+  .steps li{display:flex;gap:12px;align-items:flex-start;font-size:15px;}
+  .steps li::before{counter-increment:s;content:counter(s);flex-shrink:0;width:28px;height:28px;border-radius:50%;background:var(--panel-2);border:1px solid var(--line);
+                    display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;color:var(--blue);}
+  .steps b{display:block;font-size:16px;}
+  .steps span{color:var(--muted);}
+  .summary .go{width:100%;margin-top:14px;}
+
+  /* checking one entry: step 1 the scan-log times, step 2 the answer */
+  .scan{margin:14px 0 0;border:1px solid var(--line);border-radius:10px;overflow:hidden;}
+  .scan .st{padding:12px;}
+  .scan .st + .st{border-top:1px solid var(--line);}
+  .scan .st.one{background:var(--panel-2);}
+  .scan .lbl{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:2px;}
+  .scan .times{font-size:21px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1.3;}
+  .scan .hint{color:var(--muted);font-size:14px;margin-top:4px;}
+  .choices{display:grid;gap:8px;margin-top:8px;}
+  .btn.choice{flex-direction:column;align-items:flex-start;justify-content:center;text-align:left;gap:1px;padding:10px 14px;min-height:56px;}
+  .btn.choice small{font-weight:500;font-size:14px;opacity:.8;}
+  .btn.redline{background:transparent;border-color:rgba(255,107,107,.5);color:#FFB3B3;}
+  details.notebox{margin-top:10px;}
+  details.notebox > summary{cursor:pointer;color:var(--muted);font-size:15px;min-height:40px;display:flex;align-items:center;list-style:none;text-decoration:underline;}
+  details.notebox > summary::-webkit-details-marker{display:none;}
+  details.notebox .noteIn{margin-top:4px;}
+  .tools{display:flex;gap:8px;flex-wrap:wrap;margin:0 2px 12px;}
+  .tools .btn{min-height:44px;font-size:15px;}
+
+  /* "saved" message at the bottom of the screen */
+  .toast{position:fixed;left:50%;bottom:max(20px,env(safe-area-inset-bottom));z-index:70;max-width:calc(100% - 32px);
+         background:#EDEFF1;color:#14171A;font-weight:600;font-size:15px;padding:12px 16px;border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,.45);
+         transform:translate(-50%,16px);opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;}
+  .toast.show{opacity:1;transform:translate(-50%,0);}
+
+  /* results so far */
+  .big3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:12px 0 10px;}
+  .big3 div{background:var(--panel-2);border-radius:10px;padding:12px 6px;text-align:center;}
+  .big3 b{display:block;font-size:30px;line-height:1.15;font-variant-numeric:tabular-nums;}
+  .big3 .red b{color:var(--red);}
+  .big3 span{font-size:13px;color:var(--muted);display:block;line-height:1.3;}
+  .facts{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:14px;color:var(--muted);margin:0 0 12px;}
+  .facts b{color:var(--text);}
+
   @media (min-width:700px){
     .inc{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);}
     .inc .media{border-right:1px solid var(--line);}
@@ -241,6 +286,17 @@
       <div><div class="t" id="statusT">Loading…</div><div class="s" id="statusS"></div></div>
     </div></div>
 
+    <div class="card welcome" id="welcome" hidden>
+      <h2>How this page works</h2>
+      <p class="muted small" style="margin:0;">Takes about a minute each morning.</p>
+      <ol class="steps">
+        <li><div><b>We watch your turnstile at night</b><span>Every entry is photographed and counted. People leaving are ignored.</span></div></li>
+        <li><div><b>Anything odd goes to the top</b><span>Red = looks like a tailgate or a shared code. Yellow = worth a quick look. Green = normal.</span></div></li>
+        <li><div><b>Check the time in your scan system</b><span>Each entry shows exactly which seconds to look at. Tap what you found: that's it.</span></div></li>
+      </ol>
+      <button class="btn primary" type="button" id="welcomeOk" style="width:100%;">Got it</button>
+    </div>
+
     <div class="card summary" id="summary" aria-live="polite"></div>
 
     <div class="seg" role="group" aria-label="How to list entries">
@@ -248,19 +304,23 @@
       <button type="button" id="viewTimeline" aria-pressed="false">Timeline</button>
     </div>
 
-    <p class="retention" id="retention"></p>
     <div id="list"></div>
+    <p class="retention" id="retention"></p>
 
-    <div class="card" id="monthCard" hidden>
-      <h2>Last 30 days</h2>
-      <div class="stats">
-        <div><b id="mFlag">0</b><span>flagged</span></div>
-        <div><b id="mConf">0</b><span>you marked Tailgate</span></div>
-        <div><b id="mFine">0</b><span>you marked fine</span></div>
-        <div><b id="mOpen">0</b><span>not checked</span></div>
+    <div class="card" id="resultsCard" hidden>
+      <h2>Results so far</h2>
+      <p class="muted small" id="rSince" style="margin:0;"></p>
+      <div class="big3">
+        <div class="red"><b id="rTail">0</b><span>tailgates confirmed</span></div>
+        <div class="red"><b id="rShared">0</b><span>shared codes confirmed</span></div>
+        <div><b id="rExtra">0</b><span>people in without their own scan</span></div>
       </div>
-      <p class="muted small" id="mNote" style="margin:0 0 12px;"></p>
-      <a class="btn" href="/monitor/report/preview" style="width:100%;">Open monthly report</a>
+      <div class="facts" id="rFacts"></div>
+      <div class="actions" style="margin-top:0;">
+        <a class="btn" href="/gym/results.csv" download id="rCsv">Download spreadsheet</a>
+        <a class="btn" href="/monitor/report/preview">Monthly report</a>
+      </div>
+      <p class="muted small" style="margin:10px 0 0;">Counts only go up when someone taps <b>Tailgate</b>, <b>Shared code</b> or <b>It was fine</b> on an entry. The spreadsheet lists each one with its time — no photos.</p>
     </div>
 
     <div class="card" id="alertsCard" hidden>
@@ -280,11 +340,14 @@
 
     <footer>
       <div id="tzNote"></div>
+      <button class="btn link" type="button" id="howBtn">How this page works</button>
       <button class="btn link" type="button" id="signOutBtn" hidden>Sign out on this device</button>
       <div>Questions? <a href="securityai.html#support">Contact SecurityAI</a></div>
     </footer>
   </section>
 </div></main>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <!-- Full-screen photo viewer -->
 <div class="viewer" id="viewer" role="dialog" aria-modal="true" aria-label="Photo">
@@ -422,13 +485,23 @@ function headline(e){
   if(n == null) return 'Entry — normal';
   return `${n} people — normal (${exp} expected)`;
 }
+// What to look for in the check-in system, under the scan times.
 function todo(e){
-  const t = timeOf(e.at);
-  if(e.kind === 'unchecked') return `Have a look at the photos. If more than one person came through, check your check-in log around ${t}.`;
-  if(e.phoneHandoff) return `Look up whose code scanned in at ${t} in your check-in system. If it's a member who was already inside, they shared their code. ${e.beforeSec != null ? `Some photos are from ${e.beforeSec} s before, when someone was at the turnstile.` : ''}`;
-  if(e.kind === 'possible') return `The photos aren't clear. Worth a quick look, and your check-in log around ${t}.`;
-  if(e.kind === 'check') return `Flip through the photos. If more people came through than scanned in around ${t}, mark it a tailgate.`;
-  return `Check your check-in log around ${t}: if only one person scanned, it's a tailgate. Then tap a button below.`;
+  const n = e.people, exp = e.expected || 1;
+  if(e.phoneHandoff) return `Note whose code scanned. If that member was already inside, they handed over their code.${e.beforeSec != null ? ` Some photos are from ${e.beforeSec} s earlier, when someone was at the turnstile.` : ''}`;
+  if(e.kind === 'unchecked') return 'We couldn’t count this one. Look at the photos, then count the scans.';
+  if(e.kind === 'flag' && n != null && n > exp) return `The camera counted ${n}. Fewer than ${n} scans means someone got in free.`;
+  if(e.kind === 'possible' || e.kind === 'check') return 'Flip through the photos first. Fewer scans than people = tailgate.';
+  return 'Fewer scans than people = tailgate.';
+}
+const VERDICT_WORD = { tailgate:'Tailgate', shared:'Shared code', fine:'It was fine' };
+const isBad = v => v === 'tailgate' || v === 'shared';
+function scanTimes(e){
+  if(!e.scanFrom || !e.scanTo) return timeOf(e.at);
+  const a = fmt(e.scanFrom, { hour:'numeric', minute:'2-digit', second:'2-digit' }), b = fmt(e.scanTo, { hour:'numeric', minute:'2-digit', second:'2-digit' });
+  const ap = /\s?(AM|PM)$/;
+  // "2:14:05 – 2:14:40 AM" (one AM/PM when both share it)
+  return (a.match(ap) || [])[1] === (b.match(ap) || [])[1] ? `${a.replace(ap, '')} – ${b}` : `${a} – ${b}`;
 }
 const needsLook = e => (e.kind === 'flag' || e.kind === 'possible' || e.kind === 'unchecked' || e.kind === 'check');
 const photoUrl = f => `/monitor/frame/${encodeURIComponent(gymCode)}/${encodeURIComponent(f)}`;
@@ -491,11 +564,12 @@ function render(){
   document.title = (g.name ? g.name + ' — ' : '') + 'Entrance activity';
   $('tzNote').textContent = tzName() ? `Times are ${tzName()}.` : '';
   $('signOutBtn').hidden = !codeRequired;
-  $('retention').textContent = (data.retention && data.retention.text) || 'Photos are deleted after 48 hours. Flagged entries, and any you mark Tailgate, are kept 35 days for the monthly report.';
+  $('retention').textContent = (data.retention && data.retention.text) || 'Photos are deleted after 48 hours. Flagged entries, and any you mark Tailgate or Shared code, are kept 35 days for the monthly report.';
   renderStatus(g);
   renderSummary();
   renderList();
-  renderMonth();
+  renderResults();
+  $('welcome').hidden = !!store('sai:welcomed');
   $('alertsCard').hidden = !data.canManageAlerts;
   $('alertsLink').hidden = !data.canManageAlerts;
   const sw = scheduleWords();
@@ -562,16 +636,18 @@ function renderSummary(){
     return;
   }
   const bits = [plural(normal, 'normal entry', 'normal entries')];
-  if(checked) bits.push(`${checked} flagged, checked`);
+  if(checked) bits.push(`${checked} already checked`);
   if(gates) bits.push(`${plural(gates, 'accessible-gate entry', 'accessible-gate entries')} to match to your log`);
   const older = earlier.length
     ? `<div class="older">${esc(plural(earlier.length, 'more', 'more'))} still open from ${w && !w.always ? 'earlier' : 'before that'}</div>` : '';
   if(openNow.length){
     el.innerHTML = `<div class="big bad">${esc(label)}: ${openNow.length} ${openNow.length === 1 ? 'needs' : 'need'} a look</div>${older}
-      <div class="s">${esc(bits.join(' · '))}</div>`;
+      <div class="s">${esc(bits.join(' · '))}</div>
+      <button class="btn primary go" type="button" data-go="1">Check ${openNow.length === 1 ? 'it' : 'them'} now</button>`;
   } else if(earlier.length){
-    el.innerHTML = `<div class="big">${esc(label)}: nothing needs a look</div>${older}
-      <div class="s">${esc(bits.join(' · '))}</div>`;
+    el.innerHTML = `<div class="big">${esc(label)}: nothing new</div>${older}
+      <div class="s">${esc(bits.join(' · '))}</div>
+      <button class="btn go" type="button" data-go="1">Check the older ${earlier.length === 1 ? 'one' : 'ones'}</button>`;
   } else {
     el.innerHTML = `<div class="big good">All clear</div>
       <div class="s">${esc(label)}: ${esc(bits.join(' · '))}${checked ? '' : ' · nothing flagged'}</div>`;
@@ -602,21 +678,23 @@ function renderList(){
     //    checked, accessible-gate entries to match to the log.
     // 3. Passed (green): normal entries, plus flags staff marked fine.
     const flagged = ev.filter(e => e.kind === 'flag' && !e.review);
-    const confirmed = ev.filter(e => needsLook(e) && e.review && e.review.verdict === 'tailgate');
+    const confirmed = ev.filter(e => needsLook(e) && e.review && isBad(e.review.verdict));
     const unsure = ev.filter(e => (e.kind === 'possible' || e.kind === 'unchecked' || e.kind === 'check') && !e.review);
     const gates = ev.filter(e => e.kind === 'gate');
-    const passed = ev.filter(e => (!needsLook(e) && e.kind !== 'gate') || (needsLook(e) && e.review && e.review.verdict !== 'tailgate'));
+    const passed = ev.filter(e => (!needsLook(e) && e.kind !== 'gate') || (needsLook(e) && e.review && !isBad(e.review.verdict)));
     const tier = (cls, title, n, sub) => `<h2 class="tier ${cls}"><span class="pip"></span>${esc(title)}<span class="cnt">${n}</span></h2>${sub ? `<div class="tier-sub">${esc(sub)}</div>` : ''}`;
     let h = pinHtml;
+    const toCheck = flagged.length + unsure.length;
+    if(toCheck) h += `<div class="tools"><button class="btn" type="button" data-copy="1">Copy the times to check (${toCheck})</button></div>`;
 
     const nFlag = flagged.length + confirmed.length;
-    h += tier('red', 'Flagged', nFlag, nFlag ? 'More people came through than the swipe allows, or a phone was handed over to scan in again. Check the photos against your door log.' : '');
+    h += tier('red', 'Flagged', nFlag, nFlag ? 'Looks like someone got in without their own scan.' : '');
     h += nFlag ? flagged.map(card).join('') + confirmed.map(e => card(e).replace('class="inc done', 'class="inc done confirmed')).join('')
                : `<div class="tier-empty">No tailgates flagged ✓</div>`;
 
     const nCheck = unsure.length + gates.length;
     if(nCheck){
-      h += tier('amber', 'Worth a check', nCheck, 'The camera wasn’t sure, or these need matching to your check-in log.');
+      h += tier('amber', 'Worth a check', nCheck, 'Probably fine, but the camera couldn’t be sure. A quick look is enough.');
       h += unsure.map(card).join('');
       if(gates.length) h += `<div class="rows" style="padding:0;">${rows(gates, true)}</div>`;
     }
@@ -655,7 +733,7 @@ function rows(list, gateRows){
     const d = dayWords(e.at);
     if(!gateRows && d !== last){ h += `<div class="day">${esc(d)}</div>`; last = d; }
     const tag = needsLook(e)
-      ? (e.review ? `<span class="tag ${e.review.verdict === 'tailgate' ? 'bad' : 'ok'}">${e.review.verdict === 'tailgate' ? 'Tailgate' : 'Fine'}</span>`
+      ? (e.review ? `<span class="tag ${isBad(e.review.verdict) ? 'bad' : 'ok'}">${e.review.verdict === 'fine' ? 'Fine' : esc(VERDICT_WORD[e.review.verdict] || '')}</span>`
                   : `<span class="tag ${e.kind === 'flag' ? 'bad' : 'warn'}">${e.kind === 'flag' ? 'Flagged' : 'Check'}</span>`)
       : (e.kind === 'gate' ? '<span class="tag warn">Gate</span>' : '<span class="tag ok">Passed</span>');
     const img = e.photos.length ? `<img src="${esc(photoUrl(e.photos[0]))}" alt="" loading="lazy">` : '<span class="noimg"></span>';
@@ -677,16 +755,31 @@ function card(e){
   const thumbs = p.length > 1 ? `<div class="thumbs">${p.map((f, i) => `<button type="button" data-swap="${esc(e.id)}" data-i="${i}" aria-label="Photo ${i+1}"${i === 0 ? ' aria-current="true"' : ''}><img src="${esc(photoUrl(f))}" alt="" loading="lazy"></button>`).join('')}</div>` : '';
   const clock = note && p.length ? `<div class="clock">${esc(note)}</div>` : '';
   const verdict = e.review
-    ? `<div class="verdict"><span>You marked this: <strong>${e.review.verdict === 'tailgate' ? 'Tailgate' : 'It was fine'}</strong></span>
+    ? `<div class="verdict"><span>You marked this: <strong>${esc(VERDICT_WORD[e.review.verdict] || e.review.verdict)}</strong></span>
          <button class="btn link" type="button" data-review="${esc(e.id)}" data-v="">Change</button></div>
        ${e.review.note ? `<p class="ynote"><b>Your note:</b> ${esc(e.review.note)}</p>` : ''}`
-    : `<div class="todo">${esc(todo(e))}</div>
-       <label class="sr" for="note-${esc(e.id)}">Optional note</label>
-       <input class="noteIn" id="note-${esc(e.id)}" data-note="${esc(e.id)}" maxlength="${esc(max)}" autocomplete="off" enterkeyhint="done"
-         placeholder="Optional note, e.g. who it was" value="${esc(drafts[e.id] || '')}">
-       <div class="actions">
-         <button class="btn red" type="button" data-review="${esc(e.id)}" data-v="tailgate">Yes, tailgate</button>
-         <button class="btn green" type="button" data-review="${esc(e.id)}" data-v="fine">It was fine</button>
+    : `<div class="scan">
+         <div class="st one">
+           <div class="lbl">Step 1 · In your check-in system, look at scans between</div>
+           <div class="times">${esc(scanTimes(e))}</div>
+           <div class="hint">${esc(todo(e))}</div>
+         </div>
+         <div class="st">
+           <div class="lbl">Step 2 · What did you find?</div>
+           <div class="choices">
+             ${(() => {
+               const tg = `<button class="btn red choice" type="button" data-review="${esc(e.id)}" data-v="tailgate">Tailgate<small>Fewer scans than people came in</small></button>`;
+               const sc = `<button class="btn ${e.phoneHandoff ? 'red' : 'redline'} choice" type="button" data-review="${esc(e.id)}" data-v="shared">Shared code<small>Someone used another member’s code</small></button>`;
+               return e.phoneHandoff ? sc + tg.replace('btn red choice', 'btn redline choice') : tg + sc;
+             })()}
+             <button class="btn green choice" type="button" data-review="${esc(e.id)}" data-v="fine">It was fine<small>The scans match, or it was staff</small></button>
+           </div>
+           <details class="notebox"${drafts[e.id] ? ' open' : ''}><summary>Add a note (optional)</summary>
+             <label class="sr" for="note-${esc(e.id)}">Note</label>
+             <input class="noteIn" id="note-${esc(e.id)}" data-note="${esc(e.id)}" maxlength="${esc(max)}" autocomplete="off" enterkeyhint="done"
+               placeholder="e.g. member's name, or “cleaner”" value="${esc(drafts[e.id] || '')}">
+           </details>
+         </div>
        </div>`;
   const kept = keptWords(e);
   return `<article class="inc ${esc(cls)}" id="ev-${esc(e.id)}">
@@ -701,19 +794,22 @@ function card(e){
     </div></article>`;
 }
 
-function renderMonth(){
-  const m = data.month;
-  $('monthCard').hidden = !m && !(data.events || []).length;
-  if(!m) return;
-  // One consistent set: flagged = marked Tailgate + marked fine + not checked.
-  const confirmed = m.confirmed || 0, fine = m.fine || 0, open = m.notReviewed || 0;
-  $('mFlag').textContent = confirmed + fine + open;
-  $('mConf').textContent = confirmed; $('mFine').textContent = fine; $('mOpen').textContent = open;
-  const watched = m.nightsWatched ? `Watched ${plural(m.nightsWatched, 'night', 'nights')} and checked ${plural(m.entriesChecked || 0, 'entry', 'entries')}. ` : '';
-  $('mNote').textContent = watched + ((confirmed + fine + open)
-    ? (open ? `${open} not checked yet. What you mark here goes into the monthly report, emailed on the 1st. ` : 'All checked. The report is emailed to you on the 1st of each month. ')
-    : 'Nothing flagged. The report is emailed to you on the 1st of each month. ')
-    + '“Not certain” entries nobody marked are deleted after 48 hours and aren’t counted here.';
+function renderResults(){
+  const r = data.results;
+  $('resultsCard').hidden = !r || (!r.nightsWatched && !r.reviewed && !(data.events || []).length);
+  if(!r) return;
+  $('rSince').textContent = r.since ? `Since ${fmt(r.since + 'T12:00:00Z', { month:'long', day:'numeric', year:'numeric' })}` : '';
+  $('rTail').textContent = r.confirmedTailgates || 0;
+  $('rShared').textContent = r.confirmedShared || 0;
+  $('rExtra').textContent = r.extraPeople || 0;
+  const open = (data.events || []).filter(e => needsLook(e) && !e.review).length;
+  const f = [];
+  f.push(`<span><b>${esc(r.nightsWatched || 0)}</b> ${r.nightsWatched === 1 ? 'night' : 'nights'} watched</span>`);
+  f.push(`<span><b>${esc(r.entriesChecked || 0)}</b> entries checked</span>`);
+  f.push(`<span><b>${esc(r.cameraFlagged || 0)}</b> flagged</span>`);
+  f.push(`<span><b>${esc(r.markedFine || 0)}</b> checked and fine</span>`);
+  if(open) f.push(`<span><b>${esc(open)}</b> waiting for you</span>`);
+  $('rFacts').innerHTML = f.join('');
 }
 
 // ---- actions ------------------------------------------------------------
@@ -735,10 +831,18 @@ document.addEventListener('click', async ev => {
     if(v) delete drafts[id];
     const e = byId(id); if(e){ e.review = r.body.review; if(r.body.keptUntil) e.keptUntil = r.body.keptUntil; }
     render();
-    lastJson = ''; await load();              // re-sync, incl. the 30-day counts
-    const c = $('ev-' + id); if(c) c.scrollIntoView({ block:'center' });
+    lastJson = ''; await load();              // re-sync, incl. the results counts
+    if(!v){ const c = $('ev-' + id); if(c) c.scrollIntoView({ block:'center' }); return; }
+    // Saved: say so, and move on to the next one waiting.
+    const next = firstOpen();
+    const left = openList().length;
+    toast(`Saved as ${VERDICT_WORD[v]}. ${left ? `${left} left to check.` : 'All done ✓'}`);
+    if(next) next.scrollIntoView({ block:'start', behavior:'smooth' });
+    else $('summary').scrollIntoView({ block:'start', behavior:'smooth' });
     return;
   }
+  if(t.dataset.go){ const n = firstOpen(); if(n) n.scrollIntoView({ block:'start', behavior:'smooth' }); return; }
+  if(t.dataset.copy) return copyTimes(t);
   if(t.dataset.unpin){ pinned = null; renderList(); return; }
   if(t.dataset.share) return share(t.dataset.share, t);
   if(t.dataset.swap){
@@ -750,6 +854,37 @@ document.addEventListener('click', async ev => {
   }
   if(t.dataset.open) return openViewer(t.dataset.open, +(t.dataset.i || 0));
 });
+
+// The entries still waiting for an answer, in the order they're listed.
+function openList(){ return (data && data.events || []).filter(e => needsLook(e) && !e.review); }
+function firstOpen(){
+  if(view !== 'flagged'){ view = 'flagged'; store('sai:view', view); renderList(); }
+  return $('list').querySelector('article.inc:not(.done)');
+}
+let toastT = null;
+function toast(text){
+  const el = $('toast'); el.textContent = text; el.classList.add('show');
+  clearTimeout(toastT); toastT = setTimeout(() => el.classList.remove('show'), 3200);
+}
+// A plain list of the times to look up, to paste into a text to whoever
+// has the check-in system open.
+async function copyTimes(btn){
+  const list = openList().sort((a, b) => Date.parse(a.at) - Date.parse(b.at));
+  const gym = (data.gym && data.gym.name) || 'Entrance';
+  const lines = [`${gym}: please check the scans at these times`];
+  let day = '';
+  for(const e of list){
+    const d = dayWords(e.at); if(d !== day){ lines.push('', d); day = d; }
+    const n = e.people;
+    lines.push(`• ${scanTimes(e)} (${e.phoneHandoff ? 'phone handed over?' : n != null ? `${n} ${n === 1 ? 'person' : 'people'} seen` : 'not sure how many'})`);
+  }
+  const text = lines.join('\n');
+  try{ await navigator.clipboard.writeText(text); toast('Copied — paste it into a text or email.'); }
+  catch(e){
+    if(navigator.share){ try{ await navigator.share({ text }); return; }catch(err){ return; } }
+    window.prompt('Copy this:', text);
+  }
+}
 
 async function share(id, btn){
   btn.disabled = true;
@@ -811,6 +946,8 @@ $('viewer').addEventListener('touchend', e => {
   if(Math.abs(dx) > 50) (dx < 0 ? $('vNext') : $('vPrev')).click();
 });
 
+$('welcomeOk').onclick = () => { store('sai:welcomed', '1'); $('welcome').hidden = true; };
+$('howBtn').onclick = () => { $('welcome').hidden = false; $('welcome').scrollIntoView({ block:'start', behavior:'smooth' }); };
 $('viewFlagged').onclick = () => { view = 'flagged'; store('sai:view', view); renderList(); };
 $('viewTimeline').onclick = () => { view = 'timeline'; store('sai:view', view); renderList(); };
 $('alertsLink').onclick = () => {

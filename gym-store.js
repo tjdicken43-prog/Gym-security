@@ -162,9 +162,12 @@ function writeJson(file, value) {
 
 // --- Reviews: what the gym decided about each flag -----------------------
 // 'tailgate' = confirmed someone got in without scanning
+// 'shared'   = confirmed someone scanned in on another member's code
 // 'fine'     = staff / a member / nothing wrong
-// Kept 40 days so the monthly report (35-day store) can use them.
-const VERDICTS = { tailgate: 'Tailgate', fine: 'It was fine' };
+// Kept 40 days so the monthly report (35-day store) can use them; the
+// results tally below keeps the outcome (no photos) for good.
+const VERDICTS = { tailgate: 'Tailgate', shared: 'Shared code', fine: 'It was fine' };
+const isConfirmed = v => v === 'tailgate' || v === 'shared';
 const REVIEW_KEEP_MS = 40 * 24 * 3600e3;
 function reviewsFile(code) { return path.join(DATA_DIR, `gym-reviews-${safeCode(code)}.json`); }
 function loadReviews(code) {
@@ -476,9 +479,102 @@ function noteNight(key, day, what) {
   else if (what === 'checked') { rec.w = 1; rec.c = (rec.c || 0) + 1; }
   else if (what === 'flagged') { rec.f = (rec.f || 0) + 1; }
   saveNightsSoon(key);
+  // The never-expiring results tally (for showing what the camera found).
+  const t = loadTally(key);
+  if (what === 'watched' || what === 'checked') { if (!t.nights.includes(day)) t.nights.push(day); }
+  if (what === 'checked') t.checked += 1;
+  if (what === 'flagged') t.flagged += 1;
+  saveTallySoon(key);
 }
 function flushNights() {
   for (const [k, t] of nightsTimers) { clearTimeout(t); nightsTimers.delete(k); writeJson(nightsFile(k), loadNights(k)); }
+  for (const [k, t] of tallyTimers) { clearTimeout(t); tallyTimers.delete(k); writeJson(tallyFile(k), loadTally(k)); }
+}
+
+// --- Results tally (kept for good) -------------------------------------
+// Running totals since the camera started, and what the gym decided about
+// each checked entry — times, counts and the camera's words, never photos.
+// { since, nights:[dates], checked, flagged, outcomes: { id: {...} } }
+const TALLY_MAX_OUTCOMES = 2000;
+const tallyCache = new Map();
+const tallyTimers = new Map();
+function tallyFile(key) { return path.join(DATA_DIR, `gym-tally-${safeCode(key)}.json`); }
+function loadTally(key) {
+  const k = safeCode(key);
+  if (tallyCache.has(k)) return tallyCache.get(k);
+  let t = readJson(tallyFile(k), null);
+  if (!t || typeof t !== 'object' || Array.isArray(t)) {
+    // First time: start from the nightly counters already on disk.
+    const n = loadNights(k);
+    const days = Object.keys(n).filter(d => n[d] && n[d].w).sort();
+    t = { since: days[0] || null, nights: days, checked: days.reduce((a, d) => a + (n[d].c || 0), 0), flagged: days.reduce((a, d) => a + (n[d].f || 0), 0), outcomes: {} };
+  }
+  if (!Array.isArray(t.nights)) t.nights = [];
+  if (!t.outcomes || typeof t.outcomes !== 'object') t.outcomes = {};
+  t.checked = Number(t.checked) || 0; t.flagged = Number(t.flagged) || 0;
+  tallyCache.set(k, t);
+  return t;
+}
+function saveTallySoon(key) {
+  const k = safeCode(key);
+  if (tallyTimers.has(k)) return;
+  const tm = setTimeout(() => { tallyTimers.delete(k); writeJson(tallyFile(k), loadTally(k)); }, 1500);
+  if (tm.unref) tm.unref();
+  tallyTimers.set(k, tm);
+}
+// ev: { at, people, expected, kind, note } from the gym's view of the event.
+function tallyReview(key, id, verdict, ev) {
+  const t = loadTally(key);
+  const id_ = String(id || '');
+  if (!id_) return;
+  if (!verdict || !VERDICTS[verdict]) delete t.outcomes[id_];
+  else {
+    const e = ev || {};
+    t.outcomes[id_] = {
+      at: e.at || null, verdict,
+      people: Number.isFinite(Number(e.people)) && e.people !== null ? Number(e.people) : null,
+      expected: Number(e.expected) || 1,
+      cameraSaid: e.kind || null,
+      note: e.note ? String(e.note).slice(0, 200) : null,
+    };
+    const ids = Object.keys(t.outcomes);
+    if (ids.length > TALLY_MAX_OUTCOMES) {
+      ids.sort((a, b) => String(t.outcomes[a].at).localeCompare(String(t.outcomes[b].at)));
+      for (const old of ids.slice(0, ids.length - TALLY_MAX_OUTCOMES)) delete t.outcomes[old];
+    }
+  }
+  const d = t.outcomes[id_] && t.outcomes[id_].at ? String(t.outcomes[id_].at).slice(0, 10) : null;
+  if (d && (!t.since || d < t.since)) t.since = d;
+  saveTallySoon(key);
+}
+function tallySummary(key) {
+  const t = loadTally(key);
+  const out = Object.values(t.outcomes);
+  const tailgates = out.filter(o => o.verdict === 'tailgate');
+  const shared = out.filter(o => o.verdict === 'shared');
+  const fine = out.filter(o => o.verdict === 'fine');
+  // Extra people who got in: on a tailgate, everyone past the one swipe.
+  const extra = tailgates.reduce((a, o) => a + (o.people != null && o.people > o.expected ? o.people - o.expected : 1), 0) + shared.length;
+  const flaggedReviewed = out.filter(o => o.cameraSaid === 'flag');
+  return {
+    since: t.since || (t.nights.slice().sort()[0]) || null,
+    nightsWatched: t.nights.length,
+    entriesChecked: t.checked,
+    cameraFlagged: t.flagged,
+    reviewed: out.length,
+    confirmedTailgates: tailgates.length,
+    confirmedShared: shared.length,
+    extraPeople: extra,
+    markedFine: fine.length,
+    // Of the red flags someone checked, how many were real.
+    flagsChecked: flaggedReviewed.length,
+    flagsConfirmed: flaggedReviewed.filter(o => isConfirmed(o.verdict)).length,
+  };
+}
+function tallyRows(key) {
+  const t = loadTally(key);
+  return Object.entries(t.outcomes).map(([id, o]) => Object.assign({ id }, o))
+    .sort((a, b) => String(a.at).localeCompare(String(b.at)));
 }
 
 // --- Formatting in the gym's own time zone ------------------------------
@@ -495,7 +591,8 @@ module.exports = {
   COOKIE, parseCookies, codeFromRequest, setSessionCookie, clearSessionCookie,
   limited, count,
   eventId, newEventId,
-  VERDICTS, loadReviews, setReview, REVIEW_NOTE_MAX,
+  VERDICTS, isConfirmed, loadReviews, setReview, REVIEW_NOTE_MAX,
+  loadTally, tallyReview, tallySummary, tallyRows,
   normalizeSettings, getSettings, saveSettings, runnerGen, bumpRunnerGen,
   isPaused, setPaused, noteRunnerSeen, runnerSeen, markOfflineAlerted, knownMetaKeys,
   recordDelivery, deliveryStatus, loadNights, noteNight, flushNights,

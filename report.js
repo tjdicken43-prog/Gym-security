@@ -86,7 +86,7 @@ function watchedLine(r) {
 }
 function reviewTag(e) {
   if (!e.review) return '';
-  return e.review.verdict === 'tailgate' ? ' · <span style="color:#c0392b;font-weight:600;">Confirmed by you</span>' : '';
+  return e.review.verdict === 'tailgate' || e.review.verdict === 'shared' ? ` · <span style="color:#c0392b;font-weight:600;">${e.review.verdict === 'shared' ? 'Shared code, confirmed by you' : 'Confirmed by you'}</span>` : '';
 }
 
 // Pulls the evidence frames for the events we're showing, as mail
@@ -235,7 +235,7 @@ function renderText(report, gymName) {
     lines.push('', 'What was seen:');
     for (const e of r.events.slice(0, 12)) {
       const when = (e.capturedAt && Date.parse(e.capturedAt) <= Date.parse(e.timestamp) + 120000) ? e.capturedAt : e.timestamp;
-      const tag = e.review && e.review.verdict === 'tailgate' ? ' [confirmed by you]' : e.review ? '' : ' [not checked]';
+      const tag = e.review && (e.review.verdict === 'tailgate' || e.review.verdict === 'shared') ? ` [${e.review.verdict === 'shared' ? 'shared code, ' : ''}confirmed by you]` : e.review ? '' : ' [not checked]';
       lines.push(`  ${fmtDateTime(when)} — ${e.zoneLabel || 'Entrance'}: ${e.people_count == null ? 'not counted' : `${e.people_count} crossed, ${e.expectedCount || 1} expected`}.${e.note ? ` "${e.note}"` : ''}${tag}`);
       if (base && e.id) lines.push(`    ${base}/activity.html#ev-${encodeURIComponent(e.id)}`);
     }

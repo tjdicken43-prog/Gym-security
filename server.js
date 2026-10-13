@@ -1099,7 +1099,17 @@ app.post('/monitor/runner/burst', runnerAuth, runnerJson, async (req, res) => {
   const label = cleanText(z.label, 60) || 'Camera';
   const expected = parseInt(z.expectedCount, 10);
   const dur = Number(z.durationSec);
-  const capturedAt = isoOrNull(b.capturedAt);
+  const rawCapturedAt = isoOrNull(b.capturedAt);   // as sent: the replay key below
+  let capturedAt = rawCapturedAt;
+  // The camera computer's clock can be wrong (a borrowed laptop set to
+  // another time, or drifting). It says what time it thinks it is as it
+  // sends; if that is more than a minute off ours, shift the crossing time
+  // by the difference, so times match the gym's check-in system.
+  const rt = Date.parse(req.get('X-Runner-Time') || '');
+  if (capturedAt && !isNaN(rt)) {
+    const skew = Date.now() - rt;
+    if (Math.abs(skew) > 60e3 && Math.abs(skew) < 3 * 864e5) capturedAt = new Date(Date.parse(capturedAt) + skew).toISOString();
+  }
   const zone = {
     label,
     expectedCount: (expected >= 1 && expected <= 20) ? expected : 1,
@@ -1107,6 +1117,7 @@ app.post('/monitor/runner/burst', runnerAuth, runnerJson, async (req, res) => {
     durationSec: (Number.isFinite(dur) && dur > 0 && dur <= 120) ? Math.round(dur * 10) / 10 : null,
     lingerSec: (Number.isFinite(Number(z.lingerSec)) && Number(z.lingerSec) > 0) ? Math.min(600, Math.round(Number(z.lingerSec))) : null,
     capturedAt,
+    sentCapturedAt: rawCapturedAt !== capturedAt ? rawCapturedAt : null,
     before,
     serverPacing: true,   // camera computers don't pace themselves (monitor.js)
   };
@@ -1121,7 +1132,7 @@ app.post('/monitor/runner/burst', runnerAuth, runnerJson, async (req, res) => {
   // Replays from the runner's retry queue must not be analysed — or
   // billed — twice. Keyed on gym + zone + capture time; also checked
   // against the log on disk so it holds across a server restart.
-  const key = capturedAt ? `${code}|${label}|${capturedAt}` : null;
+  const key = rawCapturedAt ? `${code}|${label}|${rawCapturedAt}` : null;
   pruneRecentBursts();
   if (key && recentBursts.has(key)) {
     rec.duplicates = (rec.duplicates || 0) + 1;
@@ -1137,7 +1148,7 @@ app.post('/monitor/runner/burst', runnerAuth, runnerJson, async (req, res) => {
   }
 
   if (capturedAt) {
-    const logged = monitor.getLog(code).find(e => e && e.zoneLabel === label && e.capturedAt === capturedAt);
+    const logged = monitor.getLog(code).find(e => e && e.zoneLabel === label && (e.sentCapturedAt ? e.sentCapturedAt === rawCapturedAt : e.capturedAt === capturedAt));
     if (logged) {
       rec.duplicates = (rec.duplicates || 0) + 1;
       return res.json({ ok: true, entry: logged, duplicate: true });

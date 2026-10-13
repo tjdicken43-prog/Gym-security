@@ -117,6 +117,12 @@ function mount(app, deps) {
 
   // Plain-words version of an entry for the gym. No costs, no model, no
   // error text, no alert-delivery detail — just what happened.
+  function scanWindow(e) {
+    const at = Date.parse(eventTime(e));
+    if (isNaN(at)) return { scanFrom: null, scanTo: null };
+    const dur = Math.min(60, Math.max(2, Number(e.durationSec) || 8));
+    return { scanFrom: new Date(at - 15e3).toISOString(), scanTo: new Date(at + (dur + 10) * 1e3).toISOString() };
+  }
   function gymEvent(e, reviews, keptIds) {
     const id = store.eventId(e);
     const photos = [];
@@ -133,6 +139,9 @@ function mount(app, deps) {
       expected: Number(e.expectedCount) || 1,
       waiting: Number(e.queued_count) || 0,
       lingerSec: Number(e.lingerSec) || 0,
+      // When to look in the check-in system: from just before the crossing
+      // started until just after it ended (both in true time).
+      ...scanWindow(e),
       phoneHandoff: !!e.phone_handoff,
       secondPossible: e.second_person_possible === true,
       beforeSec: e.beforeCount ? (Number(e.beforeSec) || 0) : null,   // first photos taken this long before the crossing
@@ -290,7 +299,13 @@ function mount(app, deps) {
       .map(e => gymEvent(e, reviews, kept))
       .sort((a, b) => Date.parse(b.at) - Date.parse(a.at));
     const r = monitor.buildReport(v.code, 30);
+    // Reviews made before the tally existed (or on another device): add them.
+    try {
+      const t = store.loadTally(v.code);
+      for (const ev of events) if (ev.review && (!t.outcomes[ev.id] || t.outcomes[ev.id].verdict !== ev.review.verdict)) store.tallyReview(v.code, ev.id, ev.review.verdict, ev);
+    } catch (err) { /* nicety */ }
     res.json({
+      results: store.tallySummary(v.code),
       gym: gymStatus(v.code),
       gymCode: v.code,          // the caller's own code (they signed in with it); used in photo URLs
       canManageAlerts: !v.open || isOperator(req),
@@ -299,7 +314,7 @@ function mount(app, deps) {
       retention: {
         logHours: monitor.LOG_RETENTION_HOURS,
         keptDays: Math.round(monitor.SUMMARY_RETENTION_MS / 864e5),
-        text: `Photos are deleted after ${monitor.LOG_RETENTION_HOURS} hours. Flagged entries, and any you mark Tailgate, are kept ${Math.round(monitor.SUMMARY_RETENTION_MS / 864e5)} days for the monthly report.`,
+        text: `Photos are deleted after ${monitor.LOG_RETENTION_HOURS} hours. Flagged entries, and any you mark Tailgate or Shared code, are kept ${Math.round(monitor.SUMMARY_RETENTION_MS / 864e5)} days for the monthly report.`,
       },
       reviewNoteMax: store.REVIEW_NOTE_MAX,
     });
@@ -390,12 +405,49 @@ function mount(app, deps) {
     if (!e) return res.status(404).json({ error: 'That event has expired.' });
     try {
       const review = store.setReview(v.code, id, verdict || null, note);
+      // The lasting results tally (counts for showing what the camera found).
+      try { store.tallyReview(v.code, String(id), review ? review.verdict : null, gymEvent(e, {})); } catch (err) { /* tally is a nicety */ }
       // Marked Tailgate: keep it (and its photos) for 35 days, not 48 h.
       monitor.retainForReview(v.code, String(id), review ? review.verdict : null);
       res.json({ ok: true, review, keptUntil: new Date(monitor.purgeAt(v.code, e)).toISOString() });
     } catch (err) {
       res.status(400).json({ error: err.message });
     }
+  });
+
+  // ---- Results download (a spreadsheet of every checked entry) ---------
+  // Times in the gym's own zone; no photos, no names beyond the gym's notes.
+  app.get('/gym/results.csv', (req, res) => {
+    const v = needViewer(req, res);
+    if (!v) return;
+    let tz = 'America/Chicago';
+    try { tz = gyms.timeZoneFor(v.code) || tz; } catch (e) { /* default */ }
+    const f = (iso, o) => store.fmtLocal ? store.fmtLocal(iso, tz, o) : iso;
+    const q = x => { const t = x == null ? '' : String(x); return /[",\n]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t; };
+    const words = { tailgate: 'Tailgate (confirmed)', shared: 'Shared code (confirmed)', fine: 'It was fine' };
+    const said = { flag: 'Flagged', possible: 'Not certain', check: 'Worth a check', unchecked: 'Couldn\'t check', ok: 'Normal', gate: 'Accessible gate' };
+    const t = store.tallySummary(v.code);
+    const lines = [
+      ['Date', 'Time', 'Result', 'People seen', 'Scans expected', 'Camera said', 'Camera note'].join(','),
+      ...store.tallyRows(v.code).map(o => [
+        f(o.at, { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric', hour: undefined, minute: undefined }),
+        f(o.at, { weekday: undefined, month: undefined, day: undefined, hour: 'numeric', minute: '2-digit', second: '2-digit' }),
+        words[o.verdict] || o.verdict, o.people == null ? '' : o.people, o.expected, said[o.cameraSaid] || o.cameraSaid || '', o.note || '',
+      ].map(q).join(',')),
+      '',
+      ['Totals since', t.since || ''].map(q).join(','),
+      ['Nights watched', t.nightsWatched].join(','),
+      ['Entries checked by the camera', t.entriesChecked].join(','),
+      ['Flagged by the camera', t.cameraFlagged].join(','),
+      ['Confirmed tailgates', t.confirmedTailgates].join(','),
+      ['Confirmed shared codes', t.confirmedShared].join(','),
+      ['People who got in without their own scan', t.extraPeople].join(','),
+      ['Checked and fine', t.markedFine].join(','),
+    ];
+    res.set('Content-Type', 'text/csv; charset=utf-8');
+    res.set('Content-Disposition', 'attachment; filename="entrance-results.csv"');
+    res.set('Cache-Control', 'private, no-store');
+    res.send('\ufeff' + lines.join('\r\n') + '\r\n');
   });
 
   // ---- Share one incident ------------------------------------------------

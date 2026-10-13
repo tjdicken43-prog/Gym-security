@@ -49,7 +49,9 @@ function request(method, baseUrl, route, token, body, timeoutMs) {
     try { url = new URL(route, baseUrl); } catch (e) { return resolve({ status: 0, netError: 'bad serverUrl' }); }
     const data = body === undefined ? null : Buffer.from(JSON.stringify(body));
     const lib = url.protocol === 'https:' ? https : http;
-    const headers = { 'User-Agent': 'securityai-runner/2' };
+    // X-Runner-Time: this computer's clock at the moment of sending, so the
+    // website can correct crossing times if the laptop's clock is off.
+    const headers = { 'User-Agent': 'securityai-runner/2', 'X-Runner-Time': new Date().toISOString() };
     if (data) { headers['Content-Type'] = 'application/json'; headers['Content-Length'] = data.length; }
     if (token) headers.Authorization = `Bearer ${token}`;
     let req;

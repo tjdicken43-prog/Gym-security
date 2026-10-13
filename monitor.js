@@ -300,7 +300,7 @@ function retainForReview(code, id, verdict) {
   const want = String(id || '');
   const list = loadSummary(key);
   const idx = list.findIndex(e => gymStore.eventId(e) === want);
-  if (verdict === 'tailgate') {
+  if (gymStore.isConfirmed(verdict)) {
     if (idx >= 0) return { kept: true, already: true };
     const e = getLogFor(key).find(x => x && !x.systemEvent && gymStore.eventId(x) === want);
     if (!e) return { kept: false };
@@ -1223,6 +1223,8 @@ async function pushBurstFor(code, frames, zoneCfg, evidence, force) {
     s.lastError = null;
     const entry = await handleEntryResult(s, result, cfg, {
       burstFrames: frames.length, zoneLabel: zoneCfg.label || null,
+      durationSec: zoneCfg.durationSec || null,
+      sentCapturedAt: zoneCfg.sentCapturedAt || undefined,
       frame, frames: savedFrames,
       capturedAt: (parsed && !isNaN(parsed)) ? parsed.toISOString() : null,
       clockSkewMinutes: zoneCfg.clockSkewMinutes || null,
@@ -1246,6 +1248,7 @@ async function pushBurstFor(code, frames, zoneCfg, evidence, force) {
       frames: savedFrames,
       burstFrames: frames.length,
       capturedAt: (parsed && !isNaN(parsed)) ? parsed.toISOString() : null,
+      sentCapturedAt: zoneCfg.sentCapturedAt || undefined,
       clockSkewMinutes: zoneCfg.clockSkewMinutes || null,
     };
     pushLog(s, entry);
@@ -1548,7 +1551,7 @@ function buildReport(code, days, tzOffsetMinutes, opts) {
       entriesChecked += Number(n.c) || 0;
     }
   } catch (e) { /* none */ }
-  const confirmed = events.filter(e => e.review && e.review.verdict === 'tailgate').length;
+  const confirmed = events.filter(e => e.review && gymStore.isConfirmed(e.review.verdict)).length;
   return {
     gymCode: key,
     days: range ? Math.round((until - since) / 864e5) : (days || 30),
