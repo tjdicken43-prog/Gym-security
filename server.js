@@ -73,8 +73,8 @@ function isPrivateStaticPath(p) {
   try { s = decodeURIComponent(p); } catch (e) { return true; }
   s = path.posix.normalize('/' + s.replace(/\\/g, '/')).toLowerCase();   // Mac disks ignore case
   return /^\/+(rtsp-zones|ingest-zones|gyms|report-sends|runner-pairings)\.json/.test(s)
-    || /^\/+(alert-log-|summary-|mail-progress-|gym-reviews-|gym-alerts-|gym-settings-|gym-nights-)[^/]*\.json/.test(s)
-    || /^\/+(runner-queue|camera-check|frames-[^/]*|tests-[^/]*|data|node_modules)(\/|$)/.test(s);
+    || /^\/+(alert-log-|summary-|mail-progress-|gym-reviews-|gym-alerts-|gym-settings-|gym-nights-|gym-tally-|gym-devices-|gym-scans-|gym-meta-|owner-key)[^/]*\.json/.test(s)
+    || /^\/+(runner-queue|camera-check|ashbourne-reports|frames-[^/]*|tests-[^/]*|data|node_modules)(\/|$)/.test(s);
 }
 app.use((req, res, next) => {
   if ((req.method === 'GET' || req.method === 'HEAD') && isPrivateStaticPath(req.path)) return res.status(404).send('Not found');
@@ -122,10 +122,12 @@ app.get('/monitor/requires-code', (req, res) => res.json({ required: gyms.anyCod
 // Issuing codes is operator-only. Set ADMIN_TOKEN in the environment and
 // send it as the X-Admin-Token header. Without ADMIN_TOKEN set, this
 // endpoint is disabled entirely rather than left open.
+const adminAuth = require('./admin-auth');
 function requireAdmin(req, res) {
   const token = process.env.ADMIN_TOKEN;
   if (!token) { res.status(404).json({ error: 'Not enabled.' }); return false; }
-  if (!sameSecret(req.get('X-Admin-Token') || '', token)) { res.status(403).json({ error: 'Not authorized.' }); return false; }
+  const c = adminAuth.check(req);
+  if (!c.ok) { res.status(403).json(c.needEmail ? { error: 'Approve this browser from the email we send you.', needEmail: true } : { error: 'Not authorized.' }); return false; }
   return true;
 }
 // Constant-time compare of two secrets of any length (hash both first, so
@@ -613,8 +615,9 @@ function requireOperator(req, res) {
     res.status(403).json({ error: 'Not authorized. Set ADMIN_TOKEN on Render and send it as X-Admin-Token.', adminTokenSet: false });
     return false;
   }
-  if (sameSecret(req.get('X-Admin-Token') || '', token)) return true;
-  res.status(403).json({ error: 'Not authorized.' });
+  const c = adminAuth.check(req);
+  if (c.ok) return true;
+  res.status(403).json(c.needEmail ? { error: 'Approve this browser from the email we send you.', needEmail: true } : { error: 'Not authorized.' });
   return false;
 }
 
@@ -747,6 +750,33 @@ function gymRunnerToken(code, gen) {
   const mac = crypto.createHmac('sha256', key).update(what).digest().toString('base64url');
   return n > 0 ? `sa1.${code}.${n}.${mac}` : `sa1.${code}.${mac}`;
 }
+// The front-desk scan reader's token: "sr1.<gym>[.<n>].<HMAC>", its own
+// key and generation, so it can't act as a camera computer (or the other way
+// round) and each can be unpaired alone.
+function readerSecret() {
+  const admin = (process.env.ADMIN_TOKEN || '').trim();
+  return admin ? crypto.createHmac('sha256', admin).update('securityai-reader-pairing-v1').digest() : null;
+}
+function gymReaderToken(code, gen) {
+  const key = readerSecret();
+  if (!key) return null;
+  const n = Number(gen) || 0;
+  const mac = crypto.createHmac('sha256', key).update(`reader:${code}:${n}`).digest().toString('base64url');
+  return n > 0 ? `sr1.${code}.${n}.${mac}` : `sr1.${code}.${mac}`;
+}
+function readerAuth(req, res, next) {
+  const m = /^Bearer\s+(.+)$/i.exec(req.get('Authorization') || '');
+  const given = m ? m[1].trim() : '';
+  const t = /^sr1\.([a-z0-9_-]{1,40})\.(?:(\d{1,6})\.)?[A-Za-z0-9_-]{20,}$/.exec(given);
+  if (!t || !readerSecret() || !sameSecret(given, gymReaderToken(t[1], t[2] ? Number(t[2]) : 0))) {
+    return res.status(401).json({ ok: false, error: 'This reader is not paired (or ADMIN_TOKEN changed). Get a new code on the admin page and set the reader up again.' });
+  }
+  const key = gyms.anyCodesConfigured() ? (gyms.resolveKey(t[1]) || monitor.safeCode(t[1])) : monitor.safeCode(t[1]);
+  if ((t[2] ? Number(t[2]) : 0) !== store.readerGen(key)) return res.status(401).json({ ok: false, fatal: true, error: 'This reader was unpaired on the website. Get a new code on the admin page and set it up again.' });
+  req.readerGym = key;
+  next();
+}
+
 function runnerAuth(req, res, next) {
   const legacy = (process.env.RUNNER_TOKEN || '').trim();
   const canPair = !!pairingSecret();
@@ -1021,7 +1051,31 @@ app.post('/monitor/runner/heartbeat', runnerAuth, runnerJson, (req, res) => {
       // channel"): shown on the admin page so a picture that is coming
       // through from the WRONG camera is never shown as plain green.
       warnings: (Array.isArray(z.warnings) ? z.warnings : []).slice(0, 10).map(w => cleanText(w, 300)).filter(Boolean),
+      tamper: ['dark', 'covered', 'frozen', 'moved'].includes(z.tamper) ? z.tamper : null,
+      tamperSince: isoOrNull(z.tamperSince),
     }));
+  // Camera covered / dark / frozen / turned: tell TJ once per incident,
+  // during watch hours (the laptop already waited a minute or two).
+  rec.tamperAlerted = rec.tamperAlerted || {};
+  for (const z of rec.zones) {
+    const key = monitor.safeCode(code);
+    if (!z.tamper) { delete rec.tamperAlerted[z.label]; continue; }
+    if (rec.tamperAlerted[z.label] === z.tamper) continue;
+    rec.tamperAlerted[z.label] = z.tamper;
+    if (!monitor.watchingNow(key)) continue;
+    const words = { dark: 'the picture has gone almost black', covered: 'the picture is one flat colour — the lens may be covered', frozen: 'the picture is frozen', moved: 'the camera seems to have been turned to point somewhere else' };
+    monitor.alertOperator(key, 'tamper', `camera problem at ${z.label}`, `${words[z.tamper]} at ${z.label}. Entries may be missed until it's fixed.`).catch(() => {});
+  }
+
+  // How far the camera computer's clock is off ours. A live picture's last
+  // frame is under a second old, so (our time - its lastFrameAt) is its
+  // clock error. Works for laptops too old to send X-Runner-Time.
+  {
+    const hdr = Date.parse(req.get('X-Runner-Time') || '');
+    const live = rec.zones.find(z => z.streamOk && z.lastFrameAt);
+    const skew = !isNaN(hdr) ? Date.now() - hdr : live ? Date.now() - Date.parse(live.lastFrameAt) - 500 : null;
+    if (skew != null && Number.isFinite(skew)) rec.clockSkewMs = Math.abs(skew) < 3 * 864e5 ? skew : null;
+  }
 
   // When each camera lost its picture (server clock), for /monitor/runner/alive.
   const downSince = {};
@@ -1057,6 +1111,7 @@ app.post('/monitor/runner/heartbeat', runnerAuth, runnerJson, (req, res) => {
   });
 });
 
+const DIRS = ['up', 'down', 'left', 'right'];
 app.post('/monitor/runner/burst', runnerAuth, runnerJson, async (req, res) => {
   const b = req.body;
   const code = runnerGym(req, res);
@@ -1106,16 +1161,17 @@ app.post('/monitor/runner/burst', runnerAuth, runnerJson, async (req, res) => {
   // sends; if that is more than a minute off ours, shift the crossing time
   // by the difference, so times match the gym's check-in system.
   const rt = Date.parse(req.get('X-Runner-Time') || '');
-  if (capturedAt && !isNaN(rt)) {
-    const skew = Date.now() - rt;
-    if (Math.abs(skew) > 60e3 && Math.abs(skew) < 3 * 864e5) capturedAt = new Date(Date.parse(capturedAt) + skew).toISOString();
-  }
+  const hbSkew = (() => { const r = runners.get(code); return r && Number.isFinite(r.clockSkewMs) ? r.clockSkewMs : null; })();
+  const skew = !isNaN(rt) ? Date.now() - rt : hbSkew;   // older laptops: the error measured from heartbeats
+  if (capturedAt && skew != null && Math.abs(skew) > 60e3 && Math.abs(skew) < 3 * 864e5) capturedAt = new Date(Date.parse(capturedAt) + skew).toISOString();
   const zone = {
     label,
     expectedCount: (expected >= 1 && expected <= 20) ? expected : 1,
     accessibleGate: z.accessibleGate === true,
     durationSec: (Number.isFinite(dur) && dur > 0 && dur <= 120) ? Math.round(dur * 10) / 10 : null,
     lingerSec: (Number.isFinite(Number(z.lingerSec)) && Number(z.lingerSec) > 0) ? Math.min(600, Math.round(Number(z.lingerSec))) : null,
+    entryDirection: Array.isArray(z.entryDirection) ? z.entryDirection.filter(d => DIRS.includes(d)).slice(0, 3) : null,
+    direction: DIRS.includes(z.direction) ? z.direction : null,
     capturedAt,
     sentCapturedAt: rawCapturedAt !== capturedAt ? rawCapturedAt : null,
     before,
@@ -1407,11 +1463,12 @@ app.post('/admin/pair', (req, res) => {
     code = key;                              // tokens carry the data key, which never changes
     gymName = gyms.gymNameFor(key);
   }
-  // One open code per gym: making a new one cancels the old one.
-  for (const p of pairCodes.values()) if (p.gymCode === code && pairState(p) === 'waiting') p.revoked = true;
+  const role = (req.body || {}).role === 'reader' ? 'reader' : 'camera';
+  // One open code per gym (and per kind): making a new one cancels the old one.
+  for (const p of pairCodes.values()) if (p.gymCode === code && (p.role || 'camera') === role && pairState(p) === 'waiting') p.revoked = true;
   const digits = String(crypto.randomInt(0, 1000000)).padStart(6, '0');
   const now = Date.now();
-  const rec = { id: crypto.randomBytes(9).toString('base64url'), gymCode: code, gymName, createdAt: now, expiresAt: now + PAIR_TTL_MS };
+  const rec = { id: crypto.randomBytes(9).toString('base64url'), gymCode: code, gymName, role, createdAt: now, expiresAt: now + PAIR_TTL_MS };
   pairCodes.set(sha(digits), rec);
   pairWrongTotal = 0;
   res.json({ ok: true, id: rec.id, code: digits, display: `${digits.slice(0, 3)} ${digits.slice(3)}`, gymCode: code, gymName, expiresAt: new Date(rec.expiresAt).toISOString() });
@@ -1462,7 +1519,8 @@ app.post('/monitor/runner/pair', (req, res) => {
     pairingHistory.unshift({ gymCode: p.gymCode, gymName: p.gymName, host: p.usedBy, at: new Date(p.usedAt).toISOString() });
     pairingHistory.length = Math.min(pairingHistory.length, 20);
     try { if (PAIRING_LOG) require('fs').writeFileSync(PAIRING_LOG, JSON.stringify(pairingHistory, null, 2)); } catch (e) { /* history is a convenience */ }
-    console.log(`Pairing: ${p.usedBy} paired with gym "${p.gymCode}".`);
+    console.log(`Pairing: ${p.usedBy} paired with gym "${p.gymCode}"${p.role === 'reader' ? ' (front-desk reader)' : ''}.`);
+    if (p.role === 'reader') return res.json({ ok: true, readerToken: gymReaderToken(p.gymCode, store.readerGen(p.gymCode)), gymCode: p.gymCode, gymName: p.gymName });
     res.json({ ok: true, runnerToken: gymRunnerToken(p.gymCode, store.runnerGen(p.gymCode)), gymCode: p.gymCode, gymName: p.gymName });
   });
 });
@@ -1601,13 +1659,21 @@ app.get('/monitor/runner/alive', (req, res) => {
       if (now - since > ALIVE_PICTURE_GRACE_MS) return bad(`${n}camera "${label}" has had no picture for ${Math.round((now - since) / 60000)} min (recorder rebooting, cable, or password).`);
     }
     if (r.monitorProblem) return bad(`${n}the website is not monitoring this gym — see the admin page.`);
+    const tz = (r.zones || []).find(z => z.tamper);
+    if (tz) return bad(`${n}camera "${tz.label}" looks ${tz.tamper === 'moved' ? 'turned away' : tz.tamper} (since ${tz.tamperSince || 'just now'}).`);
+    // The front-desk reader went quiet during watch hours.
+    try {
+      const rd = require('./member-keys').loadDevices(r.gymCode).reader;
+      const quiet = rd && rd.lastSeen ? now - Date.parse(rd.lastSeen) : 0;
+      if (rd && quiet > 15 * 60e3 && quiet < 24 * 3600e3 && monitor.watchingNow(monitor.safeCode(r.gymCode))) return bad(`${n}the front-desk reader on the Ashbourne PC stopped checking in ${Math.round(quiet / 60000)} min ago (PC asleep, off, or Ashbourne closed).`);
+    } catch (e) { /* no reader */ }
   }
   if (want) return res.type('text/plain').send(`OK: ${name(want)}camera computer checking in, pictures coming through.`);
   res.type('text/plain').send(`OK: ${list.length === 1 ? 'camera computer' : list.length + ' camera computers'} checking in, pictures coming through.`);
 });
 
 // --- Code updates for the camera computer (node update.js) -------------
-// The website already runs exactly the code Joseph deployed, so the laptop
+// The website already runs exactly the code TJ deployed, so the laptop
 // updates FROM the website: no GitHub login, no zip, settings untouched.
 // Only plain code/doc files at the top level are offered — never data,
 // settings, logs or anything private — and only to a paired computer.
@@ -1673,6 +1739,188 @@ app.get('/admin/setup', (req, res) => {
 // reviews, sharing, alert list) live in gym-routes.js. Mounted here so the
 // route order is what it always was. Every one of them is scoped to ONE
 // gym: the gym signed in on this device, or any gym for the admin token.
+// ---- Protected member numbers (member-keys.js) -------------------------
+const memberKeys = require('./member-keys');
+const keysJson = express.json({ limit: '32kb' });
+app.get('/admin/keys', (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const owner = memberKeys.getOwner();
+  const out = {};
+  for (const key of knownGymKeys().keys()) {
+    const v = Object.assign({ name: gyms.gymNameFor(key) || key }, memberKeys.adminView(key));
+    // The plain-words fix next to a reader problem, and whether it's up to date.
+    if (v.reader && v.reader.problemCode && READER_FIX[v.reader.problemCode]) v.reader = Object.assign({}, v.reader, { fix: READER_FIX[v.reader.problemCode][1] });
+    if (v.reader && v.reader.version) v.reader = Object.assign({}, v.reader, { latest: READER_VERSION() });
+    out[key] = v;
+  }
+  res.set('Cache-Control', 'no-store').json({ ok: true, owner: owner ? { code: owner.code, fp: owner.fp, at: owner.at } : null, gyms: out });
+});
+app.post('/admin/keys/owner', keysJson, (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const b = req.body || {};
+  if (memberKeys.getOwner() && b.replace !== true) return res.status(409).json({ ok: false, error: 'There is already an owner device. Replacing it means setting the front-desk reader up again.' });
+  try { const o = memberKeys.setOwner(b.sign); res.json({ ok: true, code: o.code, fp: o.fp }); }
+  catch (err) { res.status(400).json({ ok: false, error: err.message }); }
+});
+app.post('/admin/keys/:gym/devices', keysJson, (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const key = adminGymKey(req, res); if (!key) return;
+  const b = req.body || {};
+  try { const d = memberKeys.addApprovedDevice(key, b.pub, b.name, b.at, b.sig); res.json({ ok: true, id: d.id, code: d.code, status: d.status }); }
+  catch (err) { res.status(400).json({ ok: false, error: err.message }); }
+});
+app.post('/admin/keys/:gym/devices/:id/approve', keysJson, (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const key = adminGymKey(req, res); if (!key) return;
+  try { const d = memberKeys.approveDevice(key, req.params.id, (req.body || {}).at, (req.body || {}).sig); res.json({ ok: true, id: d.id, status: d.status }); }
+  catch (err) { res.status(400).json({ ok: false, error: err.message }); }
+});
+app.post('/admin/keys/:gym/devices/:id/remove', keysJson, (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const key = adminGymKey(req, res); if (!key) return;
+  try { res.json(Object.assign({ ok: true }, memberKeys.removeDevice(key, req.params.id, (req.body || {}).at, (req.body || {}).sig))); }
+  catch (err) { res.status(400).json({ ok: false, error: err.message }); }
+});
+// The pending device's key, so the owner device can sign over its fingerprint.
+app.get('/admin/keys/:gym/devices/:id', (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const key = adminGymKey(req, res); if (!key) return;
+  const d = memberKeys.loadDevices(key).devices.find(x => x.id === req.params.id);
+  if (!d) return res.status(404).json({ ok: false, error: 'That device is gone.' });
+  res.json({ ok: true, id: d.id, pub: d.pub, fp: d.fp, code: d.code, status: d.status });
+});
+// Scans for the admin's own (owner) reading device, to look into problems.
+app.get('/admin/keys/:gym/scans', (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const key = adminGymKey(req, res); if (!key) return;
+  const hours = Math.min(48, Math.max(1, Number(req.query.hours) || 12));
+  res.set('Cache-Control', 'no-store').json({ ok: true, scans: memberKeys.scansFor(key, String(req.query.device || ''), Date.now() - hours * 3600e3, Date.now() + 60e3) });
+});
+app.post('/admin/gyms/:gym/unpair-reader', (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const key = adminGymKey(req, res); if (!key) return;
+  try { store.bumpReaderGen(key); res.json({ ok: true }); } catch (err) { res.status(500).json({ ok: false, error: err.message }); }
+});
+// The front-desk reader.
+app.get('/reader/trust', readerAuth, (req, res) => {
+  memberKeys.noteReader(req.readerGym, { host: cleanText(req.get('X-Reader-Host'), 80), version: cleanText(req.get('X-Reader-Version'), 20) });
+  res.set('Cache-Control', 'no-store').json(Object.assign({ ok: true }, memberKeys.trustFor(req.readerGym)));
+});
+app.post('/reader/scans', readerAuth, express.json({ limit: '1mb' }), (req, res) => {
+  const b = req.body || {};
+  const rt = Date.parse(req.get('X-Runner-Time') || '');
+  const skew = isNaN(rt) ? 0 : Date.now() - rt;
+  const added = memberKeys.addScans(req.readerGym, b.scans, skew);
+  memberKeys.noteReader(req.readerGym, { host: cleanText(b.host, 80), version: cleanText(b.version, 20), problem: cleanText(b.problem, 300), lastScanAt: added ? new Date().toISOString() : undefined, clockSkewSec: Math.round(skew / 1000) });
+  res.json({ ok: true, added });
+});
+// What each reader problem means, and how to fix it (the email says both).
+const READER_FIX = {
+  'ashbourne-closed': ['Ashbourne isn\'t open on the front-desk PC', 'Open Ashbourne on the Visit Log screen and leave it open (it\'s fine to use other screens, then come back). The reader picks it up again by itself.'],
+  'labels-changed': ['the reader can see Ashbourne\'s Live Entry pop-up but can\'t read the member number from it', 'Ashbourne may have changed its screen in an update. Run the Ashbourne screen check again (admin page > Ashbourne screen check) and send the report to Claude to adjust the reader.'],
+  'offline': ['the front-desk PC can\'t reach the website, so scans are waiting on that PC', 'Check that PC\'s internet / Wi-Fi. Nothing is lost: the waiting scans send by themselves when it\'s back.'],
+  'owner-mismatch': ['the owner device on the website is not the one the reader was set up with', 'If you replaced your owner device on purpose, set the reader up again (admin page > Front-desk reader > Set up). If you did NOT, someone may have changed it: change ADMIN_TOKEN on Render and tell Claude.'],
+  'no-devices': ['no devices are approved to read member numbers, so they aren\'t being kept', 'On your own phone: admin page > Protected member numbers > Make this my owner device.'],
+  'unpaired': ['the reader was unpaired on the website', 'Set it up again: admin page > Front-desk reader > Set up, and run the line on the Ashbourne PC.'],
+};
+const readerAlerted = new Map();   // gym|code -> time emailed
+// The reader version the website hands out (the reader updates itself to it).
+let readerVersionCache = null;
+function READER_VERSION() {
+  if (readerVersionCache) return readerVersionCache;
+  try { const m = /\$ReaderVersion = '([0-9.]+)'/.exec(require('fs').readFileSync(path.join(__dirname, 'securityai-reader.txt'), 'utf8')); readerVersionCache = m ? m[1] : null; } catch (e) { readerVersionCache = null; }
+  return readerVersionCache;
+}
+app.post('/reader/status', readerAuth, express.json({ limit: '8kb' }), (req, res) => {
+  const b = req.body || {};
+  const key = req.readerGym;
+  const before = memberKeys.loadDevices(key).reader || {};
+  const code = READER_FIX[b.problemCode] ? b.problemCode : null;
+  const c = b.counts && typeof b.counts === 'object' ? b.counts : {};
+  memberKeys.noteReader(key, { host: cleanText(b.host, 80), version: cleanText(b.version, 20), problem: cleanText(b.problem, 300), problemCode: code, watching: b.watching === true,
+    counts: { scans: Number(c.scans) || 0, otherZone: Number(c.otherZone) || 0, doubles: Number(c.doubles) || 0 }, queued: Number(b.queued) || 0 });
+  // Email TJ when a problem starts (again after 6 h if it lasts), and when it's fixed.
+  // Ashbourne closed outside watch hours (the PC restarted overnight) is normal: no email.
+  const k = key + '|' + code;
+  const quietHours = code === 'ashbourne-closed' && !monitor.watchingNow(key);
+  if (code && !quietHours && (!readerAlerted.has(k) || Date.now() - readerAlerted.get(k) > 6 * 3600e3)) {
+    readerAlerted.set(k, Date.now());
+    const [what, fix] = READER_FIX[code];
+    monitor.alertOperator(key, 'reader-' + code, 'front-desk reader needs attention', `${what}.\n\nWhat it said: ${cleanText(b.problem, 300) || '-'}\n\nHow to fix: ${fix}\n\nUntil then, entries are still checked by the camera; only the member numbers and scan matching are affected.`).catch(() => {});
+  } else if (!code && before.problemCode) {
+    const had = [...readerAlerted.keys()].filter(x => x.startsWith(key + '|'));
+    had.forEach(x => readerAlerted.delete(x));
+    if (had.length) monitor.alertOperator(key, 'reader-ok', 'front-desk reader back to normal', `the front-desk reader is working normally again (it had reported: ${READER_FIX[before.problemCode] ? READER_FIX[before.problemCode][0] : before.problemCode}). Nothing for you to do.`).catch(() => {});
+  }
+  res.json({ ok: true });
+});
+
+// ---- Ashbourne screen check reports ------------------------------------
+// The check on the front-desk PC sends its BLANKED report here (names and
+// numbers already turned into Xxxx / 9999 on the PC), so TJ can download
+// it on his phone. Anyone could post one, so: text only, 400 KB at most,
+// a few an hour, only the last 5 kept, and only the admin can read them.
+const CHECK_DIR = path.join(process.env.DATA_DIR || __dirname, 'ashbourne-reports');
+const checkPosts = [];
+app.post('/ashbourne-check/report', (req, res) => {
+  const now = Date.now();
+  while (checkPosts.length && now - checkPosts[0] > 3600e3) checkPosts.shift();
+  if (checkPosts.length >= 10) return res.status(429).json({ ok: false, error: 'Too many reports this hour.' });
+  let raw = '', size = 0, tooBig = false;
+  req.on('data', d => { size += d.length; if (size > 400 * 1024) { tooBig = true; return; } raw += d; });
+  req.on('end', () => {
+    if (tooBig || !raw.trim()) return res.status(400).json({ ok: false, error: tooBig ? 'Report too large.' : 'Empty report.' });
+    if (!/^\uFEFF?SecurityAI - Ashbourne screen check/.test(raw)) return res.status(400).json({ ok: false, error: 'Not a screen check report.' });
+    checkPosts.push(now);
+    try {
+      const fsx = require('fs');
+      if (!fsx.existsSync(CHECK_DIR)) fsx.mkdirSync(CHECK_DIR);
+      const host = String(req.get('X-Check-Host') || 'PC').replace(/[^A-Za-z0-9_-]/g, '').slice(0, 30) || 'PC';
+      const name = `${new Date(now).toISOString().replace(/[:.]/g, '-')}_${host}.txt`;
+      fsx.writeFileSync(path.join(CHECK_DIR, name), raw.replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g, ''), { mode: 0o600 });
+      const all = fsx.readdirSync(CHECK_DIR).filter(f => f.endsWith('.txt')).sort();
+      for (const old of all.slice(0, Math.max(0, all.length - 5))) fsx.unlinkSync(path.join(CHECK_DIR, old));
+      res.json({ ok: true });
+    } catch (err) { res.status(500).json({ ok: false, error: 'Could not save.' }); }
+  });
+});
+app.get('/admin/ashbourne-reports', (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const fsx = require('fs');
+  let files = [];
+  try { files = fsx.readdirSync(CHECK_DIR).filter(f => f.endsWith('.txt')).sort().reverse(); } catch (e) { /* none yet */ }
+  res.set('Cache-Control', 'no-store').json({ ok: true, reports: files.map(f => ({ id: f, at: f.slice(0, 24).replace(/^(\d{4}-\d{2}-\d{2}T\d{2})-(\d{2})-(\d{2})-(\d{3})Z.*/, '$1:$2:$3.$4Z'), host: (f.split('_')[1] || '').replace(/\.txt$/, ''), bytes: fsx.statSync(path.join(CHECK_DIR, f)).size })) });
+});
+app.get('/admin/ashbourne-reports/:id', (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const id = String(req.params.id || '');
+  if (!/^[0-9TZ-]+_[A-Za-z0-9_-]*\.txt$/.test(id)) return res.status(400).json({ ok: false, error: 'Bad name.' });
+  try {
+    const text = require('fs').readFileSync(path.join(CHECK_DIR, id), 'utf8');
+    res.set('Cache-Control', 'no-store');
+    res.set('Content-Type', 'text/plain; charset=utf-8');
+    res.send(text);
+  } catch (e) { res.status(404).json({ ok: false, error: 'Gone.' }); }
+});
+
+// The front-desk reader stopped checking in during watch hours: tell TJ
+// once (it checks in every minute while it runs).
+const readerQuietAlerted = new Map();
+setInterval(() => {
+  try {
+    for (const key of knownGymKeys().keys()) {
+      const rd = memberKeys.loadDevices(key).reader;
+      if (!rd || !rd.lastSeen) continue;
+      const quiet = Date.now() - Date.parse(rd.lastSeen);
+      if (quiet < 15 * 60e3) { readerQuietAlerted.delete(key); continue; }
+      if (quiet > 24 * 3600e3 || readerQuietAlerted.get(key) === rd.lastSeen || !monitor.watchingNow(key)) continue;
+      readerQuietAlerted.set(key, rd.lastSeen);
+      monitor.alertOperator(key, 'reader-offline', 'front-desk reader stopped', `the front-desk reader on the Ashbourne PC hasn't checked in for ${Math.round(quiet / 60000)} minutes, so member numbers aren't being matched (the camera still checks entries).\n\nHow to fix: make sure the Ashbourne PC is on, not asleep (Settings > System > Power > Sleep: Never) and signed in to Windows. If it was restarted, the reader starts by itself when Windows signs in. If it still doesn't come back, paste the reader line on that PC again and choose 1 (update/restart).`).catch(() => {});
+    }
+  } catch (e) { /* next time */ }
+}, 60e3).unref();
+
+adminAuth.mount(app, { publicBaseUrl: () => { try { return require('./gyms').publicBaseUrl(); } catch (e) { return null; } } });
 require('./gym-routes').mount(app, {
   runnerFor: code => runners.get(monitor.safeCode(code)) || null,
   zonePicture,

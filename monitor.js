@@ -429,9 +429,12 @@ function estimateCost(entries, model) {
   let cost = 0;
   for (const e of entries) {
     if (!e || e.error || e.systemEvent || e.capReached) continue;
-    const frames = e.burstFrames || 1;
-    const inTok = (384 * 288 / 750) * frames + 320;
-    cost += (inTok / 1e6) * p.in + (100 / 1e6) * p.out;
+    // Measured: ~1,000 tokens of instructions, ~147 per 384x288 photo, plus
+    // the extra photos sent with some checks (just before / earlier entry on
+    // the same code), and ~150 tokens of answer.
+    const frames = (e.burstFrames || 1) + (Number(e.beforeCount) || 0) + (e.repeatMins ? 2 : 0);
+    const inTok = (384 * 288 / 750) * frames + 1000;
+    cost += (inTok / 1e6) * p.in + (150 / 1e6) * p.out;
   }
   return cost;
 }
@@ -756,6 +759,21 @@ function operatorTargets(key, cfg) {
     phones: uniq([...(set.alertPhones || []), cfg && cfg.alertPhone]),
   };
 }
+// A problem only TJ needs to hear about (camera covered, reader off):
+// his addresses for the gym (admin settings) plus SUPPORT_EMAIL.
+async function alertOperator(key, kind, subject, text) {
+  const ops = operatorTargets(key, (stateFor(key) || {}).config);
+  const sup = supportEmail();
+  const emails = uniq([...(ops.emails || []), sup && sup.toLowerCase()]);
+  const gymName = gyms.gymNameFor(key) || key;
+  return deliver(key, kind, { emails, phones: ops.phones || [] }, { subject: `${gymName}: ${subject}`, text: `${gymName}: ${text}`, sms: `${gymName}: ${text}` });
+}
+// Is this gym inside its watch hours right now (and being watched)?
+function watchingNow(key) {
+  const s = stateFor(key);
+  const cfg = s.running ? s.config : (s.rearmed && s.rearmed.cfg) || null;
+  return !!cfg && isWithinSchedule(cfg);
+}
 function supportEmail() {
   const e = String(process.env.SUPPORT_EMAIL || '').trim();
   return e || null;
@@ -983,12 +1001,50 @@ function getActiveZoneNames(zones) {
 }
 
 // --- Analysis results -----------------------------------------------------
+// For a crossing whose scan is a "repeat" (same member code earlier):
+// the earlier entry's photo(s), its event id and how long ago.
+function compareWithEarlier(key, atMs, durSec) {
+  let mk; try { mk = require('./member-keys'); } catch (e) { return null; }
+  const scans = mk.scanList(key, atMs - 5 * 3600e3, atMs + (Math.min(12, durSec) + 5) * 1e3);
+  const rep = scans.find(x => x.repeat && x.t >= atMs - 10e3);
+  if (!rep) return null;
+  const prev = scans.find(x => x.id === rep.repeat.prev);
+  if (!prev) return null;
+  // The entry that came through just after the earlier scan.
+  const ev = getLogFor(key).find(e => {
+    const t = Date.parse(e.capturedAt || e.timestamp);
+    return e && !e.systemEvent && !e.error && t >= prev.t - 10e3 && t <= prev.t + 25e3 && e.frame;
+  });
+  if (!ev) return null;
+  const files = [ev.frame].concat((ev.frames || []).filter(f => f !== ev.frame)).slice(0, 2);
+  const frames = [];
+  for (const f of files) {
+    try { frames.push(fs.readFileSync(path.join(framesDirFor(key), path.basename(f))).toString('base64')); } catch (e) { /* gone */ }
+  }
+  if (!frames.length) return null;
+  return { frames, mins: rep.repeat.mins, eventId: gymStore.eventId(ev) };
+}
+
+// The time burned into the camera picture vs the real time of the
+// crossing, in minutes (positive = the picture's clock is fast). Staff
+// reading the picture's clock would look up the wrong scans.
+function pictureClockOffset(key, hhmmss, iso) {
+  const m = /^(\d{2}):(\d{2}):(\d{2})$/.exec(hhmmss || '');
+  const t = Date.parse(iso);
+  if (!m || isNaN(t)) return null;
+  const p = zonedAt(t, gyms.timeZoneFor(key));
+  let d = ((+m[1] * 3600 + +m[2] * 60 + +m[3]) - (p.hour * 3600 + p.minute * 60 + (p.second || 0))) % 86400;
+  if (d > 43200) d -= 86400; if (d < -43200) d += 86400;
+  return Math.round(d / 60);
+}
+
 async function handleEntryResult(s, result, cfg, extra) {
   let alertResult = null;
   // A phone (or card) handed back through the turnstile for a second scan
   // of the same code: someone got in on another member's code. Treated
   // as a flag, so it is listed, kept and alerted like a tailgate.
   if (result.phone_handoff) result.tailgate_flag = true;
+  if (result.went_out === true && !result.phone_handoff) result.tailgate_flag = false;
   // A low-confidence flag goes in the log but does not wake anyone up.
   const worthAlerting = result.tailgate_flag && result.confidence !== 'low';
   const id = gymStore.newEventId();
@@ -1006,6 +1062,12 @@ async function handleEntryResult(s, result, cfg, extra) {
     tailgate_flag: result.tailgate_flag,
     phone_handoff: result.phone_handoff || undefined,
     second_person_possible: typeof result.second_person_possible === 'boolean' ? result.second_person_possible : undefined,
+    turns: Number.isInteger(result.turns) ? result.turns : undefined,
+    went_out: result.went_out === true ? true : undefined,
+    same_person: result.same_person_checked ? result.same_person : undefined,
+    person: result.person || undefined,
+    extra_on_turn: Number.isInteger(result.extra_on_turn) ? result.extra_on_turn : undefined,
+    pictureClockOffsetMin: (() => { const o = pictureClockOffset(s.key, result.picture_clock, (extra && extra.capturedAt) || new Date().toISOString()); return o == null ? undefined : o; })(),
     note: result.note,
     alertResult: null,
     ...extra,
@@ -1138,9 +1200,24 @@ async function pushBurstFor(code, frames, zoneCfg, evidence, force) {
   // Per-gym hard spending ceiling (rolling 24 h). Analyses still waiting
   // on the model count too, so a burst of arrivals can't overshoot.
   const cap = s.config.dailyBurstCap || DEFAULT_DAILY_BURST_CAP;
-  if (!force && burstsLast24hOf(s) + (s.inFlight || 0) >= cap) {
+  // Someone could set off lots of fake "crossings" (waving at the camera)
+  // to use the limit up, then sneak in. Past the limit, a reserve of half
+  // the limit is kept for crossings that have a real scan at the front
+  // desk (every real entry, and every tailgate, starts with one). Fake
+  // movement has no scan, so it can't touch the reserve.
+  const usedNow = burstsLast24hOf(s) + (s.inFlight || 0);
+  let useReserve = false;
+  if (!force && usedNow >= cap && usedNow < cap + Math.ceil(cap / 2)) {
+    try {
+      const mk = require('./member-keys');
+      const at = zoneCfg.capturedAt ? Date.parse(zoneCfg.capturedAt) : Date.now();
+      useReserve = mk.readerCovered(s.key, at) && mk.scanTimes(s.key, at - 10e3, at + (Math.min(12, Number(zoneCfg.durationSec) || 4) + 5) * 1e3).length > 0;
+    } catch (e) { useReserve = false; }
+  }
+  if (!force && usedNow >= cap && !useReserve) {
     if (!s.capNotified) {
       s.capNotified = true;
+      alertOperator(s.key, 'cap', 'daily limit reached', `the daily limit of ${cap} checks was reached at ${fmtWhen(s.key, new Date().toISOString())}. If that's early in the night, someone may be setting off the camera on purpose. Crossings with a front-desk scan still get checked from a reserve (if the reader is set up).`).catch(() => {});
       pushLog(s, {
         timestamp: new Date().toISOString(),
         mode: 'entry',
@@ -1165,7 +1242,7 @@ async function pushBurstFor(code, frames, zoneCfg, evidence, force) {
     s.skippedGlobalCap = (s.skippedGlobalCap || 0) + 1;
     return { skipped: 'global-daily-cap' };
   }
-  s.capNotified = false;
+  if (!useReserve) s.capNotified = false;     // (in the reserve, the "limit reached" email was already sent)
   s.globalCapNotified = false;
 
   // Budget pacing, so the daily limit lasts the whole watch window instead
@@ -1189,6 +1266,8 @@ async function pushBurstFor(code, frames, zoneCfg, evidence, force) {
     durationSec: zoneCfg.durationSec || null,
     lingerSec: zoneCfg.lingerSec || null,
     before,
+    entryDirection: Array.isArray(zoneCfg.entryDirection) && zoneCfg.entryDirection.length ? zoneCfg.entryDirection : null,
+    direction: zoneCfg.direction || null,
     expectedCount: parseInt(zoneCfg.expectedCount, 10) || 1,
     accessibleGate: !!zoneCfg.accessibleGate,
   };
@@ -1212,6 +1291,15 @@ async function pushBurstFor(code, frames, zoneCfg, evidence, force) {
   if (!frame) frame = allFrames[mid] || allFrames.find(Boolean) || null;
   const savedFrames = beforeSaved.concat(allFrames.filter(Boolean));
 
+  // The same member's code was used earlier (the front-desk reader marks
+  // the scan "repeat"): show the model the earlier entry's photo too, to
+  // compare the two people by clothes and build. Leaving and coming back is
+  // normal; a different-looking person suggests a shared code.
+  try {
+    const cmp = compareWithEarlier(s.key, parsed && !isNaN(parsed) ? parsed.getTime() : Date.now(), Number(zoneCfg.durationSec) || 4);
+    if (cmp) cfg.compare = cmp;
+  } catch (e) { /* the comparison is extra */ }
+
   s.inFlight = (s.inFlight || 0) + 1;
   let held = true;
   const release = () => { if (held) { held = false; s.inFlight = Math.max(0, s.inFlight - 1); } };
@@ -1219,6 +1307,7 @@ async function pushBurstFor(code, frames, zoneCfg, evidence, force) {
     const result = singleFrame
       ? await vision.analyzeEntry(frames[0], cfg)
       : await vision.analyzeEntryBurst(frames, cfg);
+    if (cfg.compare && typeof result.same_person === 'boolean') result.same_person_checked = true;
     s.captureCount += 1;
     s.lastError = null;
     const entry = await handleEntryResult(s, result, cfg, {
@@ -1229,6 +1318,8 @@ async function pushBurstFor(code, frames, zoneCfg, evidence, force) {
       capturedAt: (parsed && !isNaN(parsed)) ? parsed.toISOString() : null,
       clockSkewMinutes: zoneCfg.clockSkewMinutes || null,
       lingerSec: zoneCfg.lingerSec || null,
+      repeatMins: cfg.compare ? cfg.compare.mins : undefined,
+      repeatOfEvent: cfg.compare ? cfg.compare.eventId : undefined,
       beforeSec: before ? before.sec : null,
       beforeKind: before ? before.kind : null,
       beforeCount: beforeSaved.length || null,
@@ -1269,6 +1360,7 @@ function analysisConfigFor(code, zoneCfg, rc) {
     label: z.label || base.label,
     durationSec: z.durationSec || null,
     lingerSec: z.lingerSec || null,
+    entryDirection: Array.isArray(z.entryDirection) && z.entryDirection.length ? z.entryDirection : null,
     expectedCount: parseInt(z.expectedCount, 10) || 1,
     accessibleGate: !!z.accessibleGate,
   };
@@ -1581,6 +1673,6 @@ module.exports = {
   localMinutes, buildReport, loadSummary, recordHeartbeat, sendTestAlert, sendSystemAlert, checkNoPicture,
   applySettings, effectiveRunnerConfig, retainForReview, purgeAt, todayUsage, listStates, defaultKey, checkHeartbeat,
   zonedAt, zonedMidnightUtc, monthRange, nightKeyFor, stampFor, fmtWhen, operatorTargets, rearmFromDisk, flushLogs, sweepRetention,
-  LOG_RETENTION_HOURS, SUMMARY_RETENTION_MS, ENV_MAX_TOTAL_DAILY_BURSTS,
+  LOG_RETENTION_HOURS, SUMMARY_RETENTION_MS, ENV_MAX_TOTAL_DAILY_BURSTS, alertOperator, watchingNow,
   platform: os.platform(),
 };

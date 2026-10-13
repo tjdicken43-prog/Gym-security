@@ -357,6 +357,58 @@ function stepZone(z, cells, sens, opts) {
   return out;
 }
 
+// ---- Camera tamper: covered, dark, frozen or turned away -------------------
+// Runs on the same 12x12 grey grid as motion, for free, every frame.
+//   dark     the picture is nearly black            (> 60 s)
+//   covered  one flat colour, no detail at all       (> 60 s)
+//   frozen   not a single value changes (a real camera always flickers) (> 60 s)
+//   moved    the picture's SHAPES no longer match the usual view (> 120 s).
+//            Compared after removing overall brightness, so lights going
+//            down or the night picture switching on don't count.
+// T keeps its own state; returns { kind, since } while a problem lasts, else null.
+const TAMPER_HOLD_MS = 60e3, MOVED_HOLD_MS = 120e3;
+function normCells(c) {
+  const n = c.length;
+  let m = 0; for (let i = 0; i < n; i++) m += c[i]; m /= n;
+  let v = 0; for (let i = 0; i < n; i++) v += (c[i] - m) * (c[i] - m);
+  const sd = Math.sqrt(v / n);
+  const out = new Array(n);
+  for (let i = 0; i < n; i++) out[i] = sd > 0 ? (c[i] - m) / sd : 0;
+  return { mean: m, sd, z: out };
+}
+function correlation(a, b) { let s = 0; for (let i = 0; i < a.length; i++) s += a[i] * b[i]; return s / a.length; }
+function tamperStep(T, cells, prev, now) {
+  if (!cells || !cells.length) return T.active || null;
+  const st = normCells(cells);
+  let frozen = false;
+  if (prev && prev.length === cells.length) { let d = 0; for (let i = 0; i < cells.length; i++) d += Math.abs(cells[i] - prev[i]); frozen = d === 0; }
+  const now_ = now == null ? Date.now() : now;
+  const cond = { dark: st.mean < 14, covered: st.sd < 2.5 && st.mean >= 14, frozen };
+  // The usual view: built from calm frames, slowly, after the first minute.
+  if (T.started == null) T.started = now_;
+  let moved = false;
+  if (st.sd >= 2.5) {
+    if (!T.ref) { if (now_ - T.started > 60e3) T.ref = st.z.slice(); }
+    else {
+      const r = correlation(st.z, T.ref);
+      if (r > 0.75) { for (let i = 0; i < T.ref.length; i++) T.ref[i] = T.ref[i] * 0.98 + st.z[i] * 0.02; }
+      moved = r < 0.45;
+    }
+  }
+  cond.moved = moved;
+  T.since = T.since || {};
+  for (const k of Object.keys(cond)) {
+    if (cond[k]) { if (T.since[k] == null) T.since[k] = now_; } else delete T.since[k];
+  }
+  const firing = ['dark', 'covered', 'frozen', 'moved'].find(k => T.since[k] != null && now_ - T.since[k] >= (k === 'moved' ? MOVED_HOLD_MS : TAMPER_HOLD_MS));
+  if (firing) {
+    if (!T.active || T.active.kind !== firing) T.active = { kind: firing, since: new Date(T.since[firing]).toISOString() };
+    // Turned for 10 minutes: accept it as the new view (one report is enough).
+    if (firing === 'moved' && now_ - T.since.moved > 10 * 60e3) { T.ref = st.z.slice(); delete T.since.moved; }
+  } else if (T.active && !Object.keys(T.since).length) T.active = null;
+  return T.active || null;
+}
+
 function resetZone(z) {
   z.prevCells = null; z.consecutiveHits = 0; z.quietTicks = 0;
   z.eventActive = false; z.eventTicks = 0; z.eventPath = [];
@@ -365,7 +417,7 @@ function resetZone(z) {
 }
 
 return {
-  classifyMotion, didCrossThreshold, crossingDirection, OPPOSITE, selectEventFrames, stepZone, resetZone,
+  classifyMotion, didCrossThreshold, crossingDirection, OPPOSITE, selectEventFrames, stepZone, resetZone, tamperStep,
   SENSITIVITY, DIFF_GRID, MOTION_CHECK_MS, EVENT_FRAMES_SENT, EVENT_FRAMES_MAX, framesForDuration,
   MOTION_CONSECUTIVE_REQUIRED, MOTION_COOLDOWN_MS,
 };

@@ -367,6 +367,7 @@ function setupLocal(cfg) {
         label: z.label, expectedCount: z.expectedCount, accessibleGate: z.accessibleGate,
         durationSec: ev.durationSec, lingerSec: Number(ev.lingerSec) || null, capturedAt,
         before: ev.before || null,
+        entryDirection: z.entryDirection ? [].concat(z.entryDirection) : null, direction: ev.direction || null,
       }, evidence || undefined);
       if (r && r.skipped) return printVerdict(z.label, r);
       // monitor.pushBurst returns { entry } / { entry, error }; older
@@ -396,7 +397,8 @@ function setupRemote(cfg, handles, warningsOf, testLink) {
     async send(z, framesB64, ev, capturedAt, evidence, test) {
       const item = {
         gymCode: cfg.gymCode || null,
-        zone: { label: z.label, expectedCount: z.expectedCount, accessibleGate: z.accessibleGate, durationSec: Number(ev.durationSec), lingerSec: Number(ev.lingerSec) || undefined },
+        zone: { label: z.label, expectedCount: z.expectedCount, accessibleGate: z.accessibleGate, durationSec: Number(ev.durationSec), lingerSec: Number(ev.lingerSec) || undefined,
+          entryDirection: z.entryDirection ? [].concat(z.entryDirection) : undefined, direction: ev.direction || undefined },
         frames: framesB64.slice(0, 6),
         capturedAt,
       };
@@ -420,6 +422,8 @@ function setupRemote(cfg, handles, warningsOf, testLink) {
         lastFrameAt: h.stats.lastFrameAt ? new Date(h.stats.lastFrameAt).toISOString() : null,
         lastEventAt: h.stats.lastEventAt ? new Date(h.stats.lastEventAt).toISOString() : null,
         lastError: h.stats.lastError || null,
+        tamper: h.stats.tamper ? h.stats.tamper.kind : null,
+        tamperSince: h.stats.tamper ? h.stats.tamper.since : null,
         warnings: (warningsOf.get(z) || []).concat(recentNotes()).slice(0, 10),
       }));
       return remote.heartbeat({
@@ -614,6 +618,25 @@ let shownEntryHint = false;
 // over so a second person can scan in on the same code.
 const gateVisits = new Map();
 const GATE_VISIT_WINDOW_MS = 90 * 1000;
+// One entry can show as two movements (at J Street: walking UP to the
+// turnstile, then LEFT through it). A crossing is held this long; more
+// movement in that time joins it and the lot is checked once, so the
+// model sees the whole entry (and it costs one check, not two).
+const HOLD_MS = 4000;           // quiet this long after the last movement = send
+const HOLD_MAX_MS = 15000;      // never hold one entry longer than this
+// Up to 6 photos from several movements: the first and last of the
+// earlier ones, the rest spread over the last one (the going-through).
+function mergeFrames(lists) {
+  const all = [].concat(...lists);
+  if (all.length <= 6) return all;
+  const early = [].concat(...lists.slice(0, -1));
+  const late = lists[lists.length - 1];
+  const keepEarly = early.length ? [early[0], early[early.length - 1]].filter((f, i, a) => a.indexOf(f) === i) : [];
+  const room = 6 - keepEarly.length;
+  const pick = [];
+  for (let i = 0; i < room; i++) pick.push(late[Math.min(late.length - 1, Math.round(i * (late.length - 1) / Math.max(1, room - 1)))]);
+  return keepEarly.concat(pick.filter((f, i, a) => a.indexOf(f) === i));
+}
 
 // node rtsp-run.js --entry up|down|left|right|off
 // Saves which way people come IN on the picture. Crossings the other way
@@ -775,12 +798,53 @@ async function main() {
   for (const r of results) {
     const z = r.z;
     let lastMotionLine = 0, lastRejectLine = 0, slowWarned = false, lastTestMotion = 0, lastBetweenLine = 0;
+    // A crossing waiting a few seconds in case the person goes on through
+    // (see HOLD_MS): { parts:[{frames, ev, evd, crossing}], capturedAt, firstAt, timer, busy }
+    let held = null;
+    const sendHeld = () => {
+      const hd = held; held = null;
+      if (!hd) return;
+      clearTimeout(hd.timer);
+      const crossings = hd.parts.filter(p => p.crossing);
+      const last = crossings[crossings.length - 1];
+      const frames = mergeFrames(hd.parts.map(p => p.frames));
+      const span = (hd.lastAt - Date.parse(hd.capturedAt)) / 1000;
+      const linger = Math.max(0, ...hd.parts.map(p => Number(p.ev.lingerSec) || 0));
+      const ev = Object.assign({}, last.ev, {
+        durationSec: Math.max(Number(last.ev.durationSec) || 0, span).toFixed(1),
+        lingerSec: linger || undefined,
+        before: hd.parts[0].ev.before,
+      });
+      const evd = last.evd || (hd.parts.find(p => p.evd) || {}).evd || null;
+      const joined = hd.parts.length > 1 ? ` (${hd.parts.length} movements together, ${ev.durationSec} s)` : '';
+      sayAt(`${z.label}  → sending ${plural(frames.length, 'photo')} to be counted${joined}${evd ? ' + a larger copy to look at' : ''}…`);
+      if (process.env.RUNNER_DUMP_DIR) dumpEvent(z, frames, { evidence: evd });
+      Promise.resolve(mode.send(z, frames, ev, hd.capturedAt, evd))
+        .catch(err => warn(`${z.label}: ${err.message}`));
+    };
+    const holdTimer = () => {
+      clearTimeout(held.timer);
+      const left = HOLD_MAX_MS - (Date.now() - held.firstAt);
+      held.timer = setTimeout(sendHeld, Math.max(0, Math.min(HOLD_MS, left)));
+    };
     const h = rtsp.startRtspZoneResilient({
       cameraUrl: z.cameraUrl,
       cropSet: z.cropSet, cropX: z.cropX, cropY: z.cropY, cropW: z.cropW, cropH: z.cropH,
       frameW: z.frameW, frameH: z.frameH,
       sensitivity: sens, jpegMaxPx: 384, evidenceMaxPx: EVIDENCE_PX, secrets: SECRETS,
     }, {
+      onEventStart: () => {
+        // More movement while a crossing is held: wait for it to finish
+        // (up to HOLD_MAX_MS) so it can join the same check.
+        if (!held) return;
+        clearTimeout(held.timer);
+        held.timer = setTimeout(sendHeld, Math.max(0, HOLD_MAX_MS - (Date.now() - held.firstAt)));
+      },
+      onTamper: kind => {
+        const words = { dark: 'the picture has gone almost black', covered: 'the picture is one flat colour (lens covered?)', frozen: 'the picture is frozen', moved: 'the camera seems to point somewhere else' };
+        sayAt(kind ? `${z.label}  ⚠ CAMERA PROBLEM: ${words[kind] || kind}. SecurityAI is told.` : `${z.label}  ✓ the camera picture looks normal again.`);
+        beatSoon();
+      },
       onFlowing: () => {
         sayAt(`${z.label}  ✓ picture is coming through.`);
         beatSoon();          // tell the website straight away, not in 30 s
@@ -830,22 +894,31 @@ async function main() {
         // Someone came back out, or stood at the turnstile, shortly before
         // this crossing: send that moment too (1-2 small photos), so a phone
         // handed over for a second scan of the same code can be seen.
-        const visit = gateVisits.get(z.label);
-        gateVisits.delete(z.label);
+        const visit = held ? null : gateVisits.get(z.label);
+        if (!held) gateVisits.delete(z.label);
         const crossStart = Date.now() - Number(ev.durationSec || 0) * 1000;
         if (visit && visit.frames && visit.frames.length && crossStart - visit.at <= GATE_VISIT_WINDOW_MS) {
           ev = Object.assign({}, ev, { before: { frames: visit.frames.slice(0, 2), sec: Math.max(0, Math.round((crossStart - visit.at) / 1000)), kind: visit.kind } });
           sayAt(`${z.label}  ⚠ someone ${visit.kind === 'left' ? 'came out through' : 'was at'} the turnstile ${ev.before.sec} s before this — sending that moment too, to check for a phone handed over`);
         }
         if (ev.lingerSec) sayAt(`${z.label}  ⚠ someone was at the turnstile for about ${ev.lingerSec} s before this — looking closely`);
-        sayAt(`${z.label}  ▶ crossing detected (${ev.durationSec} s${dirWord}) — sending ${plural(framesB64.length, 'photo')} to be counted${evd ? ' + a larger copy of the middle one to look at' : ''}…`);
+        sayAt(`${z.label}  ▶ crossing detected (${ev.durationSec} s${dirWord})${held ? ' — same entry as the movement just before' : ''}`);
         if (FLAG.verbose && extra && extra.evidenceSize) say(`    larger copy: ${extra.evidenceSize.width}x${extra.evidenceSize.height}, ${Math.round(extra.evidenceSize.bytes / 1024)} KB`);
-        if (process.env.RUNNER_DUMP_DIR) dumpEvent(z, framesB64, extra);
-        Promise.resolve(mode.send(z, framesB64, ev, capturedAt, evd))
-          .catch(err => warn(`${z.label}: ${err.message}`));
+        const part = { frames: framesB64, ev, evd, crossing: true };
+        if (held) { held.parts.push(part); held.lastAt = Date.now(); }
+        else held = { parts: [part], capturedAt, firstAt: Date.now(), lastAt: Date.now() };
+        if (held.parts.length >= 4 || Date.now() - held.firstAt >= HOLD_MAX_MS) return sendHeld();
+        holdTimer();
       },
       onRejected: (reason, info) => {
         const now = Date.now();
+        if (held) {
+          // Movement that didn't count as a crossing on its own, right after
+          // one: often the going-through itself. Its photos join the check.
+          if (info && info.frames && info.frames.length) { held.parts.push({ frames: info.frames, ev: {}, crossing: false }); held.lastAt = now; }
+          holdTimer();
+          return;
+        }
         if (info && info.frames && info.frames.length) gateVisits.set(z.label, { at: now, kind: 'waited', frames: info.frames });
         const ts = testHere && testHere.session(z.label);
         if (ts && ts.trial) testHere.emit({ type: 'rejected', runId: ts.runId, trial: ts.trial.n, reason });
@@ -862,7 +935,7 @@ async function main() {
       },
       onFatal: (info, tail) => {
         if (info.kind === 'auth') rememberLoginFailed(z.cameraUrl);
-        if (info.kind === 'eof') { sayAt(`${z.label}  the video file finished.`); maybeExitAllDone(); return; }
+        if (info.kind === 'eof') { sendHeld(); sayAt(`${z.label}  the video file finished.`); maybeExitAllDone(); return; }
         loud([`${z.label}: STOPPED — ${info.message}`, info.fix ? `Do this: ${info.fix}` : '', tail && FLAG.verbose ? `ffmpeg said: ${tail}` : ''].filter(Boolean));
         maybeExitAllDone();
       },

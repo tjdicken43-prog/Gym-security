@@ -1,0 +1,498 @@
+# SecurityAI front-desk reader (Windows PowerShell 5.1)
+#
+# Notes each Zone 1 scan as Ashbourne shows it, to the second, and sends
+# SecurityAI the time plus the member number SCRAMBLED so that only devices
+# you approved can read it. Nothing else leaves this computer: no names, no
+# card numbers, no payment details, no other zones (Iron Street etc.).
+# It only reads the screen. It can't change anything in Ashbourne.
+#
+# Set up, update or remove (paste into Windows PowerShell):
+#     irm https://gym-security.onrender.com/securityai-reader.txt | iex
+#
+# Everything it keeps is in %LOCALAPPDATA%\SecurityAI (the pairing key is
+# locked to this Windows user with Windows' own protection, DPAPI).
+
+$ReaderVersion = '1.1.0'
+$ErrorActionPreference = 'Stop'
+try { [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12 } catch { }
+
+$OnWindows = ($PSVersionTable.PSEdition -ne 'Core') -or ($IsWindows -eq $true)
+$Site = 'https://gym-security.onrender.com'
+if ($env:SECURITYAI_SITE) { $Site = $env:SECURITYAI_SITE.TrimEnd('/') }
+if ($env:SECURITYAI_READER_HOME) { $RHome = $env:SECURITYAI_READER_HOME } else { $RHome = Join-Path $env:LOCALAPPDATA 'SecurityAI' }
+$ConfigFile = Join-Path $RHome 'reader.json'
+$QueueFile = Join-Path $RHome 'reader-queue.json'
+$LogFile = Join-Path $RHome 'reader-log.txt'
+$ScriptFile = Join-Path $RHome 'reader.ps1'
+$SeenFile = Join-Path $RHome 'reader-seen.json'
+$ALPHA = '23456789ABCDEFGHJKMNPQRSTUVWXYZ'
+$RepeatMinutes = 240     # same code again within 4 h (and after 1 min) = "repeat"
+$DoubleSec = 60          # same code twice within this = one double scan
+$RepeatMinSec = 600      # Ashbourne's lockout: the same code can't scan again sooner
+$AshGoneMin = 5         # Ashbourne closed this long = email
+$BadMin = 2             # pop-up unreadable this long = email
+if ($env:SECURITYAI_TEST_FAST) { $DoubleSec = 1; $RepeatMinSec = 1; $AshGoneMin = 0.2; $BadMin = 0.1 }   # testing only
+
+# ---------------------------------------------------------------- helpers
+function Say([string]$m, [string]$color) { if ($color) { Write-Host $m -ForegroundColor $color } else { Write-Host $m } }
+function Log([string]$m) {
+  # Never member numbers: times, counts and problems only.
+  try {
+    if (-not (Test-Path $RHome)) { New-Item -ItemType Directory -Path $RHome | Out-Null }
+    Add-Content -Path $LogFile -Value ((Get-Date).ToString('yyyy-MM-dd HH:mm:ss') + '  ' + $m)
+    $fi = Get-Item $LogFile
+    if ($fi.Length -gt 1MB) { $lines = Get-Content $LogFile | Select-Object -Last 2000; Set-Content -Path $LogFile -Value $lines }
+  } catch { }
+}
+function FromB64([string]$s) {
+  $t = $s.Replace('-', '+').Replace('_', '/')
+  while ($t.Length % 4) { $t += '=' }
+  return [Convert]::FromBase64String($t)
+}
+function ToB64u([byte[]]$b) { return [Convert]::ToBase64String($b).TrimEnd('=').Replace('+', '-').Replace('/', '_') }
+function Sha256Hex([string]$s) {
+  $h = [System.Security.Cryptography.SHA256]::Create().ComputeHash([Text.Encoding]::UTF8.GetBytes($s))
+  return (($h | ForEach-Object { $_.ToString('x2') }) -join '')
+}
+function Fingerprint($jwk) { return Sha256Hex ($jwk.n + '.' + $jwk.e) }
+function CodeOf([string]$fp) {
+  [uint64]$v = [Convert]::ToUInt32($fp.Substring(0, 8), 16) -shr 2
+  $out = ''
+  for ($i = 0; $i -lt 6; $i++) { $out = $ALPHA[[int]($v % 31)] + $out; $v = [uint64][math]::Floor($v / 31) }
+  return $out.Substring(0, 3) + '-' + $out.Substring(3)
+}
+function NewRsa($jwk) {
+  # Windows: RSACng (has OAEP-SHA256). Elsewhere (testing): the default RSA.
+  $rsa = $null
+  try { $rsa = New-Object System.Security.Cryptography.RSACng } catch { $rsa = $null }
+  if (-not $rsa) { $rsa = [System.Security.Cryptography.RSA]::Create() }
+  $p = New-Object System.Security.Cryptography.RSAParameters
+  $p.Modulus = FromB64 $jwk.n
+  $p.Exponent = FromB64 $jwk.e
+  $rsa.ImportParameters($p)
+  return $rsa
+}
+function VerifySig($signJwk, [string]$payload, [string]$sig) {
+  try {
+    $rsa = NewRsa $signJwk
+    return $rsa.VerifyData([Text.Encoding]::UTF8.GetBytes($payload), (FromB64 $sig), [System.Security.Cryptography.HashAlgorithmName]::SHA256, [System.Security.Cryptography.RSASignaturePadding]::Pkcs1)
+  } catch { return $false }
+}
+function RandomBytes([int]$n) { $b = New-Object byte[] $n; [System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($b); return $b }
+
+# The pairing key, locked to this Windows user (DPAPI).
+function Lock([string]$s) {
+  if ($OnWindows) {
+    Add-Type -AssemblyName System.Security
+    $b = [System.Security.Cryptography.ProtectedData]::Protect([Text.Encoding]::UTF8.GetBytes($s), $null, [System.Security.Cryptography.DataProtectionScope]::CurrentUser)
+    return 'dpapi:' + [Convert]::ToBase64String($b)
+  }
+  return 'plain:' + $s
+}
+function Unlock([string]$s) {
+  if ($s.StartsWith('dpapi:')) {
+    Add-Type -AssemblyName System.Security
+    $b = [System.Security.Cryptography.ProtectedData]::Unprotect([Convert]::FromBase64String($s.Substring(6)), $null, [System.Security.Cryptography.DataProtectionScope]::CurrentUser)
+    return [Text.Encoding]::UTF8.GetString($b)
+  }
+  return $s.Substring(6)
+}
+function LoadConfig() { if (Test-Path $ConfigFile) { return (Get-Content $ConfigFile -Raw | ConvertFrom-Json) } else { return $null } }
+function SaveConfig($c) {
+  if (-not (Test-Path $RHome)) { New-Item -ItemType Directory -Path $RHome | Out-Null }
+  ($c | ConvertTo-Json -Depth 8) | Set-Content -Path $ConfigFile -Encoding UTF8
+}
+
+function Api([string]$method, [string]$path, $body, [string]$token) {
+  $h = @{ 'Authorization' = 'Bearer ' + $token; 'X-Runner-Time' = (Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ss.fffZ'); 'X-Reader-Host' = $env:COMPUTERNAME; 'X-Reader-Version' = $ReaderVersion }
+  if ($null -ne $body) {
+    return Invoke-RestMethod -Method $method -Uri ($Site + $path) -Headers $h -ContentType 'application/json' -Body ($body | ConvertTo-Json -Depth 8 -Compress) -TimeoutSec 30
+  }
+  return Invoke-RestMethod -Method $method -Uri ($Site + $path) -Headers $h -TimeoutSec 30
+}
+
+# ------------------------------------------------------- trust (who reads)
+# Only devices whose approval was signed by the owner key pinned at setup.
+$script:Trusted = @()     # @{ id; rsa }
+$script:TrustProblem = $null
+function RefreshTrust($cfg, $token) {
+  $t = Api 'GET' '/reader/trust' $null $token
+  $pinned = $cfg.owner
+  if (-not $t.owner -or $t.owner.fp -ne $pinned.fp) {
+    $script:TrustProblem = 'The owner device on the website is not the one this reader was set up with. Member numbers are only scrambled for devices approved before. Set the reader up again to change it.'
+    Log 'owner key mismatch - keeping the last trusted devices'
+    return
+  }
+  $script:TrustProblem = $null
+  $revoked = @{}
+  foreach ($fp in @($cfg.revoked)) { if ($fp) { $revoked[$fp] = 1 } }
+  $newRevoked = $false
+  foreach ($r in @($t.revoked)) {
+    if ($r -and $r.fp -and -not $revoked.ContainsKey($r.fp)) {
+      if (VerifySig $pinned.sign ('securityai-revoke-v1|' + $t.gym + '|' + $r.fp + '|' + $r.at) $r.sig) { $revoked[$r.fp] = 1; $newRevoked = $true }
+    }
+  }
+  if ($newRevoked) { $cfg.revoked = @($revoked.Keys); SaveConfig $cfg }
+  $list = @()
+  foreach ($d in @($t.devices)) {
+    if (-not $d -or -not $d.pub) { continue }
+    $fp = Fingerprint $d.pub
+    if ($revoked.ContainsKey($fp)) { continue }
+    if (-not (VerifySig $pinned.sign ('securityai-approve-v1|' + $t.gym + '|' + $fp + '|' + $d.approval.at) $d.approval.sig)) { Log ('ignored a device without a valid owner signature: ' + (CodeOf $fp)); continue }
+    $list += @{ id = $d.id; rsa = (NewRsa $d.pub) }
+  }
+  $script:Trusted = $list
+}
+
+# ------------------------------------------------------- scrambling a scan
+function ProtectScan([string]$member, [string]$zone, [datetime]$when) {
+  $k = RandomBytes 64
+  $encKey = [byte[]]$k[0..31]; $macKey = [byte[]]$k[32..63]
+  $aes = [System.Security.Cryptography.Aes]::Create()
+  $aes.KeySize = 256; $aes.Mode = 'CBC'; $aes.Padding = 'PKCS7'
+  $aes.Key = $encKey; $aes.GenerateIV()
+  $iv = $aes.IV
+  $pt = [Text.Encoding]::UTF8.GetBytes((@{ m = $member } | ConvertTo-Json -Compress))
+  $ct = $aes.CreateEncryptor().TransformFinalBlock($pt, 0, $pt.Length)
+  $hm = New-Object System.Security.Cryptography.HMACSHA256 -ArgumentList (, $macKey)
+  $mac = $hm.ComputeHash([byte[]]($iv + $ct))
+  $keys = @{}
+  foreach ($d in $script:Trusted) { $keys[$d.id] = ToB64u ($d.rsa.Encrypt($k, [System.Security.Cryptography.RSAEncryptionPadding]::OaepSHA256)) }
+  [Array]::Clear($k, 0, $k.Length)
+  return @{ t = $when.ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ss.fffZ'); zone = $zone; iv = (ToB64u $iv); ct = (ToB64u $ct); mac = (ToB64u $mac); keys = $keys }
+}
+
+# ------------------------------------------------- the same code again
+# A shared code shows up as the same member's code scanned twice, minutes
+# apart, while (usually) the first person is still inside. Kept here only as
+# a scrambled tag of the member number (HMAC with a key made on this PC), so
+# this file holds no member numbers. The scan it sends says "repeat, N
+# minutes after scan X" but never which member.
+function MemberTag($cfg, [string]$member) {
+  $h = New-Object System.Security.Cryptography.HMACSHA256 -ArgumentList (, (FromB64 $cfg.salt))
+  $b = $h.ComputeHash([Text.Encoding]::UTF8.GetBytes($member))
+  return (($b[0..11] | ForEach-Object { $_.ToString('x2') }) -join '')
+}
+function LoadSeen() {
+  $m = @{}
+  if (Test-Path $SeenFile) { try { $o = Get-Content $SeenFile -Raw | ConvertFrom-Json; foreach ($p in $o.PSObject.Properties) { $m[$p.Name] = @{ t = [datetime]::Parse($p.Value.t).ToUniversalTime(); id = $p.Value.id } } } catch { } }
+  return $m
+}
+function SaveSeen($m) {
+  $o = @{}
+  $cut = (Get-Date).ToUniversalTime().AddMinutes(-$RepeatMinutes)
+  foreach ($k in @($m.Keys)) { if ($m[$k].t -gt $cut) { $o[$k] = @{ t = $m[$k].t.ToString('o'); id = $m[$k].id } } }
+  ($o | ConvertTo-Json -Compress) | Set-Content -Path $SeenFile -Encoding UTF8
+}
+
+# ------------------------------------------------------- queue + sending
+function LoadQueue() { if (Test-Path $QueueFile) { try { return @(Get-Content $QueueFile -Raw | ConvertFrom-Json) } catch { return @() } } else { return @() } }
+function SaveQueue($q) { if (@($q).Count -eq 0) { if (Test-Path $QueueFile) { Remove-Item $QueueFile } } else { (ConvertTo-Json -InputObject @($q) -Depth 8 -Compress) | Set-Content -Path $QueueFile -Encoding UTF8 } }
+function Flush($token, $problem) {
+  $q = LoadQueue
+  if ($q.Count -eq 0) { return }
+  try {
+    $r = Api 'POST' '/reader/scans' @{ scans = @($q | Select-Object -First 100); host = $env:COMPUTERNAME; version = $ReaderVersion; problem = $problem } $token
+    SaveQueue (@($q | Select-Object -Skip 100))
+    Log ('sent ' + [Math]::Min(100, $q.Count) + ' scan(s)')
+  } catch { Log ('send failed, will retry: ' + $_.Exception.Message) }
+}
+
+# ------------------------------------------------------- reading Ashbourne
+# The Live Entry pop-up shows for every scan. Read its fields by their
+# labels. (Adjusted to Ashbourne's exact layout from the screen check.)
+$script:UiaReady = $false
+function InitUia() {
+  if ($script:UiaReady) { return $true }
+  try { Add-Type -AssemblyName UIAutomationClient; Add-Type -AssemblyName UIAutomationTypes; $script:UiaReady = $true } catch { $script:UiaReady = $false }
+  return $script:UiaReady
+}
+# Found by its "Membership No" label (the menu also has a "Live Entry"
+# item), widened to the box that also holds "Entry Message". The Ashbourne
+# windows are remembered once found (by process), so this stays quick.
+$script:AshPids = @{}
+$script:AshSeenAt = $null       # last time an Ashbourne window was found
+$script:Rebase = $false
+$script:BadSince = $null        # since when the pop-up is there but the member number can't be read
+# Labels the member number may sit under (Ashbourne versions differ).
+$MemberLabels = @('Membership No', 'Membership Number', 'Member No', 'Member Number', 'Mem No')
+function FindLiveEntry() {
+  # Ashbourne restarted (a new process): forget the old one and look again.
+  if ($script:AshPids.Count -gt 0 -and $script:AshSeenAt -and ((Get-Date) - $script:AshSeenAt).TotalSeconds -gt 30) { $script:AshPids = @{}; $script:Rebase = $true }
+  $AE = [System.Windows.Automation.AutomationElement]
+  $walker = [System.Windows.Automation.TreeWalker]::ControlViewWalker
+  $conds = @($MemberLabels | ForEach-Object { New-Object System.Windows.Automation.PropertyCondition($AE::NameProperty, $_) })
+  $cond = New-Object System.Windows.Automation.OrCondition(, [System.Windows.Automation.Condition[]]$conds)
+  $tops = $AE::RootElement.FindAll([System.Windows.Automation.TreeScope]::Children, [System.Windows.Automation.Condition]::TrueCondition)
+  foreach ($w in $tops) {
+    $pid_ = $w.Current.ProcessId
+    if ($script:AshPids.Count -gt 0 -and -not $script:AshPids.ContainsKey($pid_)) { continue }
+    if ($script:AshPids.Count -eq 0) {
+      $pn = ''
+      try { $pn = (Get-Process -Id $pid_ -ErrorAction Stop).ProcessName } catch { }
+      if ($pn -notmatch 'ashbourne' -and $w.Current.Name -notmatch 'ashbourne|live entry|visit log') { continue }
+    }
+    $script:AshSeenAt = Get-Date
+    try {
+      # Every place a member-number label shows; only the one inside the
+      # pop-up counts (the Visit Log grid has a "Mem No" column too).
+      $found = $w.FindAll([System.Windows.Automation.TreeScope]::Descendants, $cond)
+      $wh = $w.Current.NativeWindowHandle
+      foreach ($f in $found) {
+        if ($f.Current.ControlType.ProgrammaticName -match 'Header|DataItem') { continue }   # a grid column, not the pop-up
+        $box = $walker.GetParent($f)
+        for ($i = 0; $i -lt 4 -and $box; $i++) {
+          if ($wh -ne 0 -and $box.Current.NativeWindowHandle -eq $wh) { break }           # never the whole window
+          $t = ReadTexts $box
+          if ($t -contains 'Entry Message' -or $t -contains 'Entry Time') { $script:AshPids[$pid_] = 1; return $box }
+          $box = $walker.GetParent($box)
+        }
+      }
+      # The pop-up is there but none of the labels: Ashbourne changed it.
+      $em = $w.FindFirst([System.Windows.Automation.TreeScope]::Descendants, (New-Object System.Windows.Automation.PropertyCondition($AE::NameProperty, 'Entry Message')))
+      if ($em) { $script:AshPids[$pid_] = 1; if (-not $script:BadSince) { $script:BadSince = Get-Date } }
+    } catch { }
+  }
+  return $null
+}
+function ReadTexts($el) {
+  $out = New-Object System.Collections.Generic.List[string]
+  $walker = [System.Windows.Automation.TreeWalker]::ControlViewWalker
+  $stack = New-Object System.Collections.Stack
+  $stack.Push($el)
+  $n = 0
+  while ($stack.Count -gt 0 -and $n -lt 400) {
+    $e = $stack.Pop(); $n++
+    try {
+      $nm = $e.Current.Name
+      $val = ''
+      try { $vp = $e.GetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern); if ($vp) { $val = $vp.Current.Value } } catch { }
+      if ($nm) { $out.Add($nm.Trim()) }
+      if ($val -and $val -ne $nm) { $out.Add($val.Trim()) }
+    } catch { }
+    $kids = @()
+    try { $c = $walker.GetFirstChild($e); while ($c -ne $null) { $kids += $c; $c = $walker.GetNextSibling($c) } } catch { }
+    for ($i = $kids.Count - 1; $i -ge 0; $i--) { $stack.Push($kids[$i]) }
+  }
+  return $out
+}
+function ValueAfter($texts, [string]$label) {
+  for ($i = 0; $i -lt $texts.Count - 1; $i++) { if ($texts[$i] -ieq $label) { return $texts[$i + 1] } }
+  return $null
+}
+function ReadPopup() {
+  $le = FindLiveEntry
+  if (-not $le) { return $null }
+  $t = ReadTexts $le
+  $member = $null
+  foreach ($lbl in $MemberLabels) { if (-not $member) { $member = ValueAfter $t $lbl } }
+  $zone = ValueAfter $t 'Entry Message'
+  # The zone wherever it shows ("Zone 1"), if it moved.
+  if (-not $zone -or $zone -notmatch 'zone') { $z = $t | Where-Object { $_ -match '^\s*Zone\s*\d+\s*$' } | Select-Object -First 1; if ($z) { $zone = $z } }
+  $time = ValueAfter $t 'Entry Time'
+  if (-not $member -or $member -notmatch '^\s*\w[\w-]{0,19}\s*$') { if (-not $script:BadSince) { $script:BadSince = Get-Date }; return $null }
+  if ($script:BadSince) { $script:Rebase = $true }
+  $script:BadSince = $null
+  return @{ member = $member.Trim(); zone = ('' + $zone).Trim(); entryTime = ('' + $time).Trim(); sig = (($t | Select-Object -First 60) -join '|') }
+}
+
+# ---------------------------------------------------------- self-update
+# Every 6 hours: if the website has a newer reader, install it and restart
+# (settings, key and waiting scans are kept). Only from the same website it
+# was set up from, over https.
+function UpdateSelf() {
+  try {
+    $new = (Invoke-WebRequest -Uri ($Site + '/securityai-reader.txt') -UseBasicParsing -TimeoutSec 60).Content
+    if ($new -is [byte[]]) { $new = [Text.Encoding]::UTF8.GetString($new) }
+    $m = [regex]::Match($new, "\`$ReaderVersion = '([0-9.]+)'")
+    if (-not $m.Success -or $m.Groups[1].Value -eq $ReaderVersion) { return $false }
+    $errs = $null
+    [void][System.Management.Automation.Language.Parser]::ParseInput($new, [ref]$null, [ref]$errs)
+    if ($errs -and $errs.Count) { Log 'update skipped: the new version did not check out'; return $false }
+    Set-Content -Path ($ScriptFile + '.new') -Value $new -Encoding ASCII
+    Move-Item -Path ($ScriptFile + '.new') -Destination $ScriptFile -Force
+    Log ('updated to ' + $m.Groups[1].Value + '; restarting')
+    if ($OnWindows) { Start-Process powershell.exe -WindowStyle Hidden -ArgumentList @('-NoProfile', '-WindowStyle', 'Hidden', '-ExecutionPolicy', 'Bypass', '-File', $ScriptFile) }
+    return $true
+  } catch { Log ('update check failed: ' + $_.Exception.Message); return $false }
+}
+
+# --------------------------------------------------------------- health
+# What's wrong right now, as a code the website turns into an email with
+# the fix. Checked every loop; sent at once when it changes.
+function Health($startedAt) {
+  $now = Get-Date
+  $q = LoadQueue
+  if ($script:Unpaired) { return @{ code = 'unpaired'; text = 'This reader was unpaired on the website.' } }
+  if ($q.Count -gt 0) {
+    $oldest = $null
+    try { $oldest = [datetime]::Parse($q[0].t).ToUniversalTime() } catch { }
+    if ($q.Count -ge 20 -or ($oldest -and (($now.ToUniversalTime() - $oldest).TotalMinutes -ge 10))) { return @{ code = 'offline'; text = ('' + $q.Count + ' scan(s) are waiting on this PC: it cannot reach the website.') } }
+  }
+  if (-not $env:SECURITYAI_SIMULATE) {
+    $since = $script:AshSeenAt; if (-not $since) { $since = $startedAt }
+    if (($now - $since).TotalMinutes -ge $AshGoneMin) { return @{ code = 'ashbourne-closed'; text = 'Ashbourne is not open on this PC.' } }
+    if ($script:BadSince -and (($now - $script:BadSince).TotalMinutes -ge $BadMin)) { return @{ code = 'labels-changed'; text = 'The Live Entry pop-up is there but the member number cannot be read.' } }
+  }
+  if ($script:TrustProblem) { return @{ code = 'owner-mismatch'; text = $script:TrustProblem } }
+  if ($script:Trusted.Count -eq 0 -and $script:TrustChecked) { return @{ code = 'no-devices'; text = 'No approved devices yet, so member numbers are not kept.' } }
+  return $null
+}
+
+# ------------------------------------------------------------- run loop
+function RunReader() {
+  $cfg = LoadConfig
+  if (-not $cfg) { Say 'Not set up. Paste the setup line again.' Yellow; return }
+  $token = Unlock $cfg.token
+  $zoneWanted = '' + $cfg.zone
+  if (-not $cfg.salt) { $cfg | Add-Member -NotePropertyName salt -NotePropertyValue (ToB64u (RandomBytes 32)) -Force; SaveConfig $cfg }
+  $seen = LoadSeen
+  Log ('reader ' + $ReaderVersion + ' started')
+  $lastTrust = [datetime]::MinValue; $lastStatus = [datetime]::MinValue; $lastFlush = [datetime]::MinValue
+  $lastUpdate = Get-Date
+  # Whatever the pop-up shows when the reader starts is an OLD scan: only
+  # changes after that are new scans.
+  $lastSig = $null; $recent = @{}
+  $simulate = $env:SECURITYAI_SIMULATE
+  $simNext = (Get-Date).AddSeconds(3); $simList = @(); if ($simulate) { $simList = $simulate.Split(',') }; $simI = 0
+  $problem = $null; $problemCode = $null; $lastCode = 'start'
+  $script:Unpaired = $false; $script:TrustChecked = $false
+  $counts = @{ scans = 0; otherZone = 0; doubles = 0 }
+  while ($true) {
+    try {
+      $now = Get-Date
+      if (($now - $lastTrust).TotalSeconds -ge 60) {
+        try { RefreshTrust $cfg $token; $lastTrust = $now; $script:TrustChecked = $true; $script:Unpaired = $false } catch {
+          $msg = $_.Exception.Message
+          Log ('trust check failed: ' + $msg)
+          if ($msg -match '401') { $script:Unpaired = $true }
+          $lastTrust = $now.AddSeconds(-45)
+        }
+      }
+      # One scan = one change of the pop-up's contents.
+      $scan = $null
+      if ($simulate) {
+        if ($now -ge $simNext -and $simI -lt $simList.Count) {
+          $scan = @{ member = $simList[$simI].Trim(); zone = $zoneWanted; entryTime = ''; sig = 'sim' + $simI }
+          $simI++; $simNext = $now.AddSeconds(2)
+        }
+      } elseif (InitUia) {
+        $p = ReadPopup
+        if ($p) {
+          # Back after Ashbourne was closed or unreadable: what it shows now
+          # may be from before, so start fresh rather than count it.
+          if ($script:Rebase) { $script:Rebase = $false; $lastSig = $null }
+          if ($null -eq $lastSig) { $lastSig = $p.sig; Log 'pop-up found; watching for new scans' }
+          elseif ($p.sig -ne $lastSig) { $lastSig = $p.sig; $scan = $p }
+        }
+      } else { $problem = 'Windows screen reading is not available here.' }
+      if ($scan) {
+        # Other zones (Iron Street, studios) never leave this computer.
+        if ($zoneWanted -and $scan.zone -and ($scan.zone -ne $zoneWanted)) { $scan = $null; $counts.otherZone++ }
+      }
+      if ($scan) {
+        # The same member again within 60 s (a double scan): once only.
+        $key = $scan.member
+        if ($recent.ContainsKey($key) -and (($now - $recent[$key]).TotalSeconds -lt $DoubleSec)) { $scan = $null; $counts.doubles++ } else { $recent[$key] = $now }
+      }
+      if ($scan) {
+        $counts.scans++
+        $p = ProtectScan $scan.member $zoneWanted $now
+        $tag = MemberTag $cfg $scan.member
+        $utc = $now.ToUniversalTime()
+        if ($seen.ContainsKey($tag)) {
+          $mins = ($utc - $seen[$tag].t).TotalMinutes
+          if ($mins * 60 -ge $RepeatMinSec -and $mins -le $RepeatMinutes) { $p.repeat = @{ mins = [int][math]::Max(1, [math]::Round($mins)); prev = $seen[$tag].id } }
+        }
+        $seen[$tag] = @{ t = $utc; id = (Sha256Hex $p.mac).Substring(0, 16) }
+        SaveSeen $seen
+        $q = LoadQueue
+        $q += $p
+        SaveQueue $q
+        Log ('scan noted at ' + $now.ToString('HH:mm:ss') + ' (' + $script:Trusted.Count + ' device(s))')
+        $lastFlush = [datetime]::MinValue
+      }
+      foreach ($k in @($recent.Keys)) { if (($now - $recent[$k]).TotalSeconds -gt 120) { $recent.Remove($k) } }
+      if (($now - $lastUpdate).TotalHours -ge 6 -and $PSCommandPath -ieq $ScriptFile) {
+        $lastUpdate = $now
+        if ((LoadQueue).Count -eq 0 -and (UpdateSelf)) { return }      # the new version takes over
+      }
+      $h = Health $script:StartedAt
+      if ($h) { $problem = $h.text; $problemCode = $h.code } else { $problem = $null; $problemCode = $null }
+      if (($now - $lastFlush).TotalSeconds -ge 5) { Flush $token $problem; $lastFlush = $now }
+      # Every 5 minutes, and straight away when something goes wrong or is fixed.
+      if ((($now - $lastStatus).TotalMinutes -ge 5) -or ('' + $problemCode) -ne ('' + $lastCode)) {
+        try {
+          Api 'POST' '/reader/status' @{ host = $env:COMPUTERNAME; version = $ReaderVersion; problem = $problem; problemCode = $problemCode; watching = $true; counts = $counts; queued = (LoadQueue).Count } $token | Out-Null
+          $lastCode = $problemCode
+          if ($problemCode) { Log ('problem: ' + $problemCode) }
+        } catch { }
+        $lastStatus = $now
+      }
+      if ($env:SECURITYAI_RUN_SECONDS -and ((Get-Date) - $script:StartedAt).TotalSeconds -gt [int]$env:SECURITYAI_RUN_SECONDS) { Flush $token $problem; return }
+    } catch { Log ('error: ' + $_.Exception.Message) }
+    Start-Sleep -Milliseconds 300
+  }
+}
+
+# ---------------------------------------------------------------- setup
+function Install-Start() {
+  # Starts when this Windows user signs in, hidden. No admin rights needed.
+  $startup = [Environment]::GetFolderPath('Startup')
+  $cmd = Join-Path $startup 'SecurityAI reader.cmd'
+  $line = 'start "" /min powershell.exe -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File "' + $ScriptFile + '"'
+  Set-Content -Path $cmd -Value $line -Encoding ASCII
+  Get-CimInstance Win32_Process -Filter "Name='powershell.exe'" -ErrorAction SilentlyContinue | Where-Object { $_.CommandLine -like ('*' + $ScriptFile + '*') } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+  Start-Process powershell.exe -WindowStyle Hidden -ArgumentList @('-NoProfile', '-WindowStyle', 'Hidden', '-ExecutionPolicy', 'Bypass', '-File', $ScriptFile)
+}
+function Remove-Reader() {
+  Get-CimInstance Win32_Process -Filter "Name='powershell.exe'" -ErrorAction SilentlyContinue | Where-Object { $_.CommandLine -like ('*' + $ScriptFile + '*') } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+  $cmd = Join-Path ([Environment]::GetFolderPath('Startup')) 'SecurityAI reader.cmd'
+  if (Test-Path $cmd) { Remove-Item $cmd }
+  if (Test-Path $RHome) { Remove-Item $RHome -Recurse -Force }
+  Say 'Removed. Nothing from SecurityAI is left on this computer.' Green
+}
+
+function Setup() {
+  Say ''
+  Say 'SecurityAI front-desk reader setup' Cyan
+  $cfg = LoadConfig
+  if ($cfg) {
+    Say ('Already set up for gym "' + $cfg.gym + '". 1 = update the reader, 2 = set up again, 3 = remove it, Enter = cancel')
+    $c = Read-Host 'Choose'
+    if ($c -eq '3') { Remove-Reader; return }
+    if ($c -eq '1') {
+      Invoke-WebRequest -Uri ($Site + '/securityai-reader.txt') -OutFile $ScriptFile -UseBasicParsing
+      if ($OnWindows) { Install-Start }
+      Say 'Updated and restarted.' Green; return
+    }
+    if ($c -ne '2') { return }
+  }
+  Say 'On the admin page: J Street > Front-desk reader > Get a code. Type the 6 numbers here.'
+  $code = (Read-Host 'Pairing code') -replace '\D', ''
+  try {
+    $r = Invoke-RestMethod -Method POST -Uri ($Site + '/monitor/runner/pair') -ContentType 'application/json' -Body (@{ code = $code; host = ('front desk: ' + $env:COMPUTERNAME) } | ConvertTo-Json -Compress) -TimeoutSec 60
+  } catch { Say ('That did not work: ' + $_.Exception.Message) Red; return }
+  if (-not $r.readerToken) { Say 'That code is for a camera computer, not the front-desk reader. Make a "Front-desk reader" code on the admin page.' Red; return }
+  $token = $r.readerToken
+  $t = Api 'GET' '/reader/trust' $null $token
+  if (-not $t.owner) { Say 'Set up your owner device on the admin page first (Protected member numbers), then run this again.' Yellow; return }
+  Say ''
+  Say ('Owner device code on the website: ' + $t.owner.code) Cyan
+  Say 'Check it matches the owner device code on YOUR admin page. This stops anyone else from approving devices.'
+  $ok = Read-Host 'Does it match? (y/n)'
+  if ($ok -notmatch '^[yY]') { Say 'Stopped. Nothing was saved. Tell Claude what you saw.' Yellow; return }
+  if ((Fingerprint $t.owner.sign) -ne $t.owner.fp) { Say 'The owner key did not check out. Stopped.' Red; return }
+  $zone = Read-Host 'Which Ashbourne zone is the front turnstile? (Enter = Zone 1)'
+  if (-not $zone) { $zone = 'Zone 1' }
+  $cfg = [pscustomobject]@{ gym = $r.gymCode; gymName = $r.gymName; token = (Lock $token); owner = [pscustomobject]@{ sign = $t.owner.sign; fp = $t.owner.fp; code = $t.owner.code }; zone = $zone; revoked = @(); salt = (ToB64u (RandomBytes 32)); setupAt = (Get-Date).ToString('o') }
+  SaveConfig $cfg
+  Invoke-WebRequest -Uri ($Site + '/securityai-reader.txt') -OutFile $ScriptFile -UseBasicParsing
+  if ($OnWindows) { Install-Start }
+  Say ''
+  Say ('Done. The reader is running for ' + $zone + ' and starts by itself when this computer signs in.') Green
+  Say 'Keep Ashbourne open. The screen can be off, but the computer must not go to sleep.'
+}
+
+$script:StartedAt = Get-Date
+if ($PSCommandPath -and ($PSCommandPath -ieq $ScriptFile -or $env:SECURITYAI_RUN)) { RunReader } else { Setup }

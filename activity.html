@@ -87,7 +87,7 @@
   .thumbs button[aria-current="true"]{border-color:var(--text);}
   .thumbs img{display:block;width:64px;height:48px;object-fit:cover;border-radius:4px;}
   .inc .body{padding:12px 16px 16px;}
-  .clock{color:var(--muted);font-size:13px;padding:6px 10px 0;}
+  .clock{color:var(--amber);font-size:14px;font-weight:600;padding:8px 12px 0;}
   .kept{color:var(--muted);font-size:13px;margin-top:2px;}
   .ynote{margin:10px 0 0;font-size:15px;overflow-wrap:anywhere;}
   .ynote b{font-weight:600;color:var(--muted);font-size:14px;}
@@ -133,6 +133,10 @@
   .tag.bad{background:rgba(255,107,107,.16);color:#FFB3B3;}
   .tag.warn{background:rgba(255,181,74,.16);color:var(--amber);}
   .tag.ok{background:rgba(63,207,142,.13);color:#8CE8BD;}
+  .tag.out{background:rgba(163,171,179,.14);color:var(--muted);}
+  .scanline{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 8px;}
+  .scanline span{font-size:13px;font-weight:700;padding:3px 10px;border-radius:12px;background:rgba(255,255,255,.06);}
+  .scanline .bad{background:rgba(255,107,107,.16);color:#FFB3B3;} .scanline .good{background:rgba(63,207,142,.13);color:#8CE8BD;}
 
   .empty{padding:22px 16px;text-align:center;color:var(--muted);}
   .empty .big{color:var(--text);font-size:18px;font-weight:600;margin-bottom:4px;}
@@ -205,6 +209,17 @@
   .scan .lbl{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:2px;}
   .scan .times{font-size:21px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1.3;}
   .scan .hint{color:var(--muted);font-size:14px;margin-top:4px;}
+  .scan .hint b{color:var(--text);}
+  .seq{list-style:none;margin:6px 0 2px;padding:0;font-size:15px;font-variant-numeric:tabular-nums;}
+  .seq li{padding:3px 8px;border-radius:6px;}
+  .seq li span{color:var(--muted);display:inline-block;min-width:1.6em;}
+  .seq li small{color:var(--muted);font-size:13px;}
+  .seq{counter-reset:q;} .seq li::before{counter-increment:q;content:counter(q) ".";color:var(--muted);display:inline-block;min-width:1.6em;}
+  .check{margin-top:8px;font-size:15px;padding:8px 10px;border-radius:8px;background:rgba(255,255,255,.04);}
+  .check.yes{border-left:3px solid var(--green);} .check.no{border-left:3px solid var(--amber);}
+  .seq li.me{background:rgba(255,107,107,.14);}
+  .careful{margin:10px 0 0;padding:10px 12px;border-radius:8px;background:rgba(255,181,74,.1);border:1px solid rgba(255,181,74,.35);font-size:14px;}
+  .careful b{color:var(--amber);}
   .choices{display:grid;gap:8px;margin-top:8px;}
   .btn.choice{flex-direction:column;align-items:flex-start;justify-content:center;text-align:left;gap:1px;padding:10px 14px;min-height:56px;}
   .btn.choice small{font-weight:500;font-size:14px;opacity:.8;}
@@ -223,6 +238,15 @@
   .toast.show{opacity:1;transform:translate(-50%,0);}
 
   /* results so far */
+  .who{margin:10px 0 2px;padding:12px;border-radius:10px;background:rgba(63,207,142,.12);border:1px solid rgba(63,207,142,.45);}
+  .who .l{font-size:13px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:#8CE8BD;}
+  .who.maybe .l{color:var(--amber);}
+  .who .m{font-size:26px;font-weight:800;line-height:1.2;font-variant-numeric:tabular-nums;}
+  .who .q{font-size:14px;color:var(--muted);margin-top:2px;}
+  .who.maybe{background:rgba(255,181,74,.1);border-color:rgba(255,181,74,.45);}
+  details.manual{margin-top:8px;} details.manual > summary{cursor:pointer;color:var(--muted);font-size:14px;text-decoration:underline;list-style:none;min-height:36px;display:flex;align-items:center;}
+  details.manual > summary::-webkit-details-marker{display:none;}
+  .codebig{font-size:30px;font-weight:800;letter-spacing:2px;font-variant-numeric:tabular-nums;margin:6px 0;}
   .big3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:12px 0 10px;}
   .big3 div{background:var(--panel-2);border-radius:10px;padding:12px 6px;text-align:center;}
   .big3 b{display:block;font-size:30px;line-height:1.15;font-variant-numeric:tabular-nums;}
@@ -233,7 +257,7 @@
 
   @media (min-width:700px){
     .inc{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);}
-    .inc .media{border-right:1px solid var(--line);}
+    .inc .media{border-right:1px solid var(--line);align-self:start;position:sticky;top:12px;}
     .inc .photo img{aspect-ratio:4/3;}
   }
   @media (orientation:landscape) and (max-height:500px){
@@ -307,6 +331,11 @@
     <div id="list"></div>
     <p class="retention" id="retention"></p>
 
+    <div class="card" id="memberCard" hidden>
+      <h2>Member numbers</h2>
+      <div id="memberBody"></div>
+    </div>
+
     <div class="card" id="resultsCard" hidden>
       <h2>Results so far</h2>
       <p class="muted small" id="rSince" style="margin:0;"></p>
@@ -370,6 +399,7 @@
   </div>
 </div>
 
+<script src="member-crypto.js"></script>
 <script>
 // The gym's page. One job: "is everything OK, and did anything happen?"
 // Everything the camera computer, the model or the gym typed (zone names,
@@ -463,6 +493,18 @@ function scheduleWords(){ return effSchedule && effSchedule.start && effSchedule
 // ---- plain words for an entry -----------------------------------------
 function headline(e){
   const n = e.people, exp = e.expected || 1;
+  const sc = e.scanCheck;
+  if(e.kind === 'out') return 'Someone leaving';
+  if(e.kind === 'none') return 'Movement, nobody came in';
+  if(sc && sc.repeat){
+    if(sc.repeat.same === true) return `Came back in (same member, ${sc.repeat.mins} min later)`;
+    if(sc.repeat.same === false) return `Same member code, different-looking person (${sc.repeat.mins} min apart)`;
+    return `Same member code used again, ${sc.repeat.mins} min later`;
+  }
+  if(sc && sc.repeatLater) return `This member code was used again ${sc.repeatLater.mins} min later, by someone who looks different`;
+  if(sc && sc.short && e.kind === 'flag') return `${n} ${n === 1 ? 'person' : 'people'} came in, only ${sc.scans} scan${sc.scans === 1 ? '' : 's'}`;
+  if(sc && sc.matched && e.kind === 'check' && n > 1) return `${n} people seen and ${sc.scans} scans — probably fine`;
+  if(sc && sc.noScan) return '1 person came in, no scan found';
   if(e.phoneHandoff && e.kind === 'flag') return 'Someone may have scanned in on another member’s phone';
   if(e.phoneHandoff && e.kind === 'possible') return 'Maybe a phone was handed over to scan in — not certain';
   if(e.kind === 'flag'){
@@ -488,28 +530,222 @@ function headline(e){
 // What to look for in the check-in system, under the scan times.
 function todo(e){
   const n = e.people, exp = e.expected || 1;
-  if(e.phoneHandoff) return `Note whose code scanned. If that member was already inside, they handed over their code.${e.beforeSec != null ? ` Some photos are from ${e.beforeSec} s earlier, when someone was at the turnstile.` : ''}`;
-  if(e.kind === 'unchecked') return 'We couldn’t count this one. Look at the photos, then count the scans.';
-  if(e.kind === 'flag' && n != null && n > exp) return `The camera counted ${n}. Fewer than ${n} scans means someone got in free.`;
-  if(e.kind === 'possible' || e.kind === 'check') return 'Flip through the photos first. Fewer scans than people = tailgate.';
-  return 'Fewer scans than people = tailgate.';
+  const sc = e.scanCheck;
+  if(sc && sc.repeat && sc.repeat.same !== true) return `The same member’s code was also used ${sc.repeat.mins} min earlier${sc.repeat.prevAt ? ' (' + timeOf(sc.repeat.prevAt) + ')' : ''}. People do leave and come back, so compare the person in both entries. If they’re different people, the code was shared.${e.person ? ' This time: ' + e.person + '.' : ''}`;
+  if(sc && sc.repeatLater) return `The same member’s code was used again ${sc.repeatLater.mins} min later, and the camera thinks it was a different person. Compare both entries.`;
+  if(sc && sc.short) return `The front desk recorded ${sc.scans} scan${sc.scans === 1 ? '' : 's'} for the ${sc.people} people the camera saw.`;
+  if(sc && sc.noScan) return 'The front desk recorded no scan for this entry. Check the photos: did someone come in without scanning (exit button, a held door)? Or the scan was missed.';
+  if(sc && sc.matched && e.kind === 'check' && (e.people || 0) > 1) return `Everyone the camera saw has a scan (${sc.scans} for ${sc.people}), so probably two members close together.`;
+  if(e.phoneHandoff) return `If that member was already inside before this, they handed over their code.${e.beforeSec != null ? ` Some photos are from ${e.beforeSec} s earlier, when someone was at the turnstile.` : ''}`;
+  if(e.kind === 'unchecked') return 'We couldn’t count this one automatically. Look at the photos first.';
+  if(e.kind === 'possible' || e.kind === 'check') return 'The camera wasn’t sure. Flip through the photos before deciding.';
+  return '';
 }
 const VERDICT_WORD = { tailgate:'Tailgate', shared:'Shared code', fine:'It was fine' };
 const isBad = v => v === 'tailgate' || v === 'shared';
+// ---- Lining entries up with the check-in system's scans ------------------
+// Ashbourne-style systems list scans to the MINUTE, newest first. The camera
+// knows every turn of the turnstile to the second. Take the whole minutes a
+// scan for this entry could show under; every entry in those minutes is one
+// turn = one scan, in the same order. If the scan count there matches the
+// turns we saw, scan #k is entry #k, exactly. If it doesn't, nobody is named.
+const MIN = 60e3;
+const fl = t => Math.floor(t / MIN) * MIN;
+// When this entry's scan could have happened: from just before the camera
+// saw movement (clocks are never perfect) to a little after it started.
+function scanRange(x){
+  // + the check-in system's own clock error (admin setting), so the
+  // minutes match what IT shows.
+  const off = ((data.gym && Number(data.gym.checkinClockOffsetSec)) || 0) * 1e3;
+  const t = Date.parse(x.at) + off, d = Math.min(10, Math.max(2, Number(x.durationSec) || 4));
+  return [t - 4e3, t + (d + 2) * 1e3];
+}
+const entriesNear = () => (data.events || []).filter(x => x.kind !== 'gate' && x.kind !== 'out' && !x.notEntry);
+function lineUp(e){
+  const all = entriesNear();
+  let [lo, hi] = scanRange(e);
+  let ws = fl(lo), we = fl(hi) + MIN;              // [ws, we): whole minutes
+  // An entry whose scan could fall either side of the window's edge would
+  // break the count: widen to its minute too (a few times at most).
+  let edge = false;
+  for(let i = 0; i < 3; i++){
+    let grew = false;
+    for(const x of all){
+      const [a, b] = scanRange(x);
+      if(b < ws || a >= we) continue;
+      if(a < ws){ ws = fl(a); grew = true; }
+      if(b >= we){ we = fl(b) + MIN; grew = true; }
+    }
+    if(!grew) break;
+    if(i === 2) edge = true;
+  }
+  const list = all.filter(x => { const [a, b] = scanRange(x); return !(b < ws || a >= we); })
+                  .sort((p, q) => Date.parse(p.at) - Date.parse(q.at));
+  const turns = x => Math.max(1, x.turns || 1);
+  const scans = list.reduce((n, x) => n + turns(x), 0);
+  const people = list.reduce((n, x) => n + (Number.isFinite(x.people) && x.people > 0 ? x.people : 1), 0);
+  let before = 0;
+  for(const x of list){ if(x.id === e.id) break; before += turns(x); }
+  const k = before + (e.extraOnTurn && e.extraOnTurn <= turns(e) ? e.extraOnTurn : turns(e) > 1 ? null : 1);
+  return { list, ws, we, scans, people, k, edge };
+}
+function ordinal(n){ const s = ['th','st','nd','rd'], v = n % 100; return n + (s[(v - 20) % 10] || s[v] || s[0]); }
+const hm = iso => fmt(iso, { hour:'numeric', minute:'2-digit' });
+function where(){
+  const g = (data && data.gym) || {};
+  const sys = g.checkinSystem, zone = g.checkinZone;
+  if(sys && zone) return `In ${sys}’s Visit Log, set the zone to ${zone}`;
+  if(sys) return `In ${sys}’s Visit Log, find`;
+  if(zone) return `In your check-in system (${zone}), find`;
+  return 'In your check-in system, find';
+}
+function minutesWords(ws, we){
+  const a = hm(new Date(ws).toISOString()), b = hm(new Date(we - MIN).toISOString());
+  if(a === b) return b;
+  const ap = /\s?(AM|PM)$/;
+  return (a.match(ap) || [])[1] === (b.match(ap) || [])[1] ? `${a.replace(ap, '')} – ${b}` : `${a} – ${b}`;
+}
+function scanMinutes(e){ const L = lineUp(e); return minutesWords(L.ws, L.we); }
+function matchHelp(e){
+  const L = lineUp(e);
+  const zone = (data.gym && data.gym.checkinZone) || '';
+  const z = zone ? zone + ' ' : '';
+  const mins = minutesWords(L.ws, L.we);
+  const who = e.phoneHandoff ? 'the member whose code was shared' : 'the member who let the extra person in';
+  const rows = L.list.length > 1 ? `<ol class="seq">${L.list.map(x => {
+      const t = Math.max(1, x.turns || 1);
+      return `<li${x.id === e.id ? ' class="me"' : ''}>${esc(timeOf(x.at))} — ${x.people == null ? 'entry' : x.people === 1 ? '1 person' : x.people + ' people'}${t > 1 ? `, ${t} turns` : ''}${x.id === e.id ? ' <b>← this one</b>' : ''}</li>`;
+    }).join('')}</ol>` : '';
+  const intro = L.list.length > 1
+    ? `<div class="hint">The camera saw <b>${L.scans} turns</b> of the turnstile in these minutes (${L.people} people), in this order:</div>${rows}`
+    : '';
+  const check = `<div class="check"><b>1. Count the ${esc(z)}scans from ${esc(mins)}.</b> If someone scanned twice in a row, count them once.</div>`;
+  const yes = L.k
+    ? (L.scans === 1
+        ? `<div class="check yes"><b>2. Exactly 1?</b> That scan is ${who}.</div>`
+        : `<div class="check yes"><b>2. Exactly ${L.scans}?</b> Then they line up with the turns. Count up from the bottom (oldest first): the <b>${ordinal(L.k)} scan</b> is ${who}.</div>`)
+    : `<div class="check yes"><b>2. Exactly ${L.scans}?</b> The scans line up, but this entry covered ${Math.max(1, e.turns || 1)} turns and the camera couldn’t tell which one had the extra person, so don’t charge anyone for it.</div>`;
+  const no = `<div class="check no"><b>Any other number?</b> Something doesn’t line up (a missed or extra scan). <b>Don’t charge anyone</b> for this one.${L.people > L.scans ? ` If there are fewer than ${L.people} scans, it’s still a tailgate. Mark it as one.` : ''}</div>`;
+  const edge = L.edge ? `<div class="hint">It was very busy right then, so double-check the count carefully.</div>` : '';
+  return intro + check + yes + no + edge;
+}
 function scanTimes(e){
   if(!e.scanFrom || !e.scanTo) return timeOf(e.at);
-  const a = fmt(e.scanFrom, { hour:'numeric', minute:'2-digit', second:'2-digit' }), b = fmt(e.scanTo, { hour:'numeric', minute:'2-digit', second:'2-digit' });
+  const from = e.scanFrom;
+  const a = fmt(from, { hour:'numeric', minute:'2-digit', second:'2-digit' }), b = fmt(e.scanTo, { hour:'numeric', minute:'2-digit', second:'2-digit' });
   const ap = /\s?(AM|PM)$/;
   // "2:14:05 – 2:14:40 AM" (one AM/PM when both share it)
   return (a.match(ap) || [])[1] === (b.match(ap) || [])[1] ? `${a.replace(ap, '')} – ${b}` : `${a} – ${b}`;
 }
 const needsLook = e => (e.kind === 'flag' || e.kind === 'possible' || e.kind === 'unchecked' || e.kind === 'check');
 const photoUrl = f => `/monitor/frame/${encodeURIComponent(gymCode)}/${encodeURIComponent(f)}`;
-const clockNote = () => ((data && data.gym && data.gym.cameraClockNote) || '').trim();
+function offsetWords(m){
+  const a = Math.abs(m), h = Math.floor(a / 60), mm = a % 60;
+  const amt = h && mm >= 10 ? `${h} h ${mm} min` : h ? `${h === 1 ? 'an hour' : h + ' hours'}` : `${mm} minutes`;
+  return `${amt} ${m > 0 ? 'fast' : 'slow'}`;
+}
+// The time printed ON the camera picture is often wrong (J Street's runs
+// about an hour fast). The model reads it on every check; say so plainly.
+function clockNote(e){
+  const typed = ((data && data.gym && data.gym.cameraClockNote) || '').trim();
+  if(typed) return typed;
+  const m = e && Number.isFinite(e.pictureClockOffsetMin) ? e.pictureClockOffsetMin : data && data.gym && data.gym.pictureClockOffsetMin;
+  if(!Number.isFinite(m) || Math.abs(m) < 2) return '';
+  return `Ignore the clock printed on the picture — it's about ${offsetWords(m)}. The real time is ${e ? timeOf(e.at) : 'the one shown here'}.`;
+}
 function keptWords(e){
   if(!e.keptUntil) return '';
   const t = Date.parse(e.keptUntil); if(isNaN(t)) return '';
   return `Photos kept until ${fmt(e.keptUntil, { weekday:'short', month:'short', day:'numeric', hour:'numeric', minute:'2-digit' })}`;
+}
+
+// ---- member numbers (protected) ----------------------------------------
+// This phone has its own key (made here; the private half can't leave this
+// browser). Once TJ approves it, scans come scrambled for this phone
+// only, and are opened here. Nothing readable is stored on the website.
+let member = { state: 'off', id: null, code: null };
+let opened = [];            // [{ t, zone, m }] scans opened on this phone
+let memberBusy = false, memberPoll = null, lastScanFetch = 0;
+const devKey = () => 'sai:dev:' + gymCode;
+async function initMember(force){
+  if(memberBusy || !gymCode) return;
+  if(!window.MemberCrypto || !MemberCrypto.supported){ member.state = 'unsupported'; renderMember(); return; }
+  memberBusy = true;
+  try{
+    const id = store(devKey());
+    const key = await MemberCrypto.getKey('read');
+    if(!id || !key){ member = { state: 'none', id: null, code: null }; return; }
+    const r = await api('/gym/keys/device/' + encodeURIComponent(id));
+    if(!r.ok || !r.body.ok){ member = { state: 'removed', id, code: key.code }; return; }
+    member = { state: r.body.status === 'approved' ? 'approved' : 'pending', id, code: r.body.code };
+    if(member.state === 'approved' && (force || Date.now() - lastScanFetch > 60e3)){
+      lastScanFetch = Date.now();
+      const s = await api('/gym/keys/scans?device=' + encodeURIComponent(id));
+      if(s.ok){
+        const have = new Map(opened.map(x => [x.id, x]));
+        const next = [];
+        for(const sc of s.body.scans || []){
+          if(have.has(sc.id)){ next.push(have.get(sc.id)); continue; }
+          try{ const o = await MemberCrypto.openScan(sc); next.push({ id: sc.id, t: sc.t, zone: sc.zone, m: String(o.m) }); }catch(e){ /* not for us / changed */ }
+        }
+        const changed = next.length !== opened.length;
+        opened = next.sort((a, b) => Date.parse(a.t) - Date.parse(b.t));
+        if(changed && data) renderList();
+      }
+    }
+  }catch(e){ /* stays as it was */ }
+  finally{ memberBusy = false; renderMember(); }
+}
+async function requestMember(){
+  const btn = $('memberAsk'); if(btn) btn.disabled = true;
+  try{
+    const nameBox = $('memberName');
+    const who = nameBox ? nameBox.value.trim() : 'Staff';
+    if(nameBox && !who){ nameBox.focus(); if(btn) btn.disabled = false; return; }
+    await MemberCrypto.forget('read');
+    const k = await MemberCrypto.makeKey('read');
+    const kind = (navigator.userAgent.match(/iPhone|iPad|Android|Mac|Windows/) || ['device'])[0];
+    const r = await api('/gym/keys/device', { method:'POST', body: JSON.stringify({ pub: k.pub, name: `${who} · ${kind}` }) });
+    if(!r.ok) throw new Error(r.body.error || 'Couldn’t ask just now.');
+    store(devKey(), r.body.id);
+    member = { state: 'pending', id: r.body.id, code: r.body.code };
+  }catch(e){ alert(e.message); }
+  renderMember();
+}
+function askForm(text, label, primary){
+  return `<p class="muted" style="margin:0 0 10px;">${esc(text)}</p>
+    <label class="f" for="memberName">Your name</label>
+    <input class="in" id="memberName" maxlength="40" autocomplete="name" placeholder="e.g. Sarah, manager">
+    <button class="btn${primary ? ' primary' : ''}" type="button" id="memberAsk" style="width:100%;margin-top:10px;">${esc(label)}</button>`;
+}
+function renderMember(){
+  const c = $('memberCard'); if(!c) return;
+  c.hidden = member.state === 'off' || member.state === 'checking';
+  const b = $('memberBody');
+  clearInterval(memberPoll); memberPoll = null;
+  if(member.state === 'unsupported') b.innerHTML = '<p class="muted small" style="margin:0;">This browser can’t keep the key safely. Use Safari or Chrome on your own phone.</p>';
+  else if(member.state === 'none') b.innerHTML = askForm('See exactly which member each flagged person came in behind. For privacy, TJ approves each phone first, and member numbers can only be opened on approved phones.', 'Ask for access on this phone', true);
+  else if(member.state === 'pending'){
+    b.innerHTML = `<p class="muted" style="margin:0;">Waiting for TJ to approve this phone. Tell him this code:</p>
+      <div class="codebig">${esc(member.code || '')}</div><p class="muted small" style="margin:0;">He’ll check it matches before approving. This page updates by itself.</p>`;
+    memberPoll = setInterval(() => { if(!document.hidden) initMember(true); }, 10000);
+  }
+  else if(member.state === 'approved') b.innerHTML = `<p style="margin:0;"><b style="color:var(--green);">✓ This phone can see member numbers.</b> <span class="muted small">Code ${esc(member.code || '')}. ${opened.length} scans in the last 48 hours.</span></p>`;
+  else if(member.state === 'removed') b.innerHTML = askForm('This phone’s access was removed or reset. You can ask again.', 'Ask again', false);
+  const ask = $('memberAsk'); if(ask) ask.onclick = requestMember;
+}
+// Which member a flagged entry came in behind. The website pairs every
+// entry with its scans by the exact second (scanCheck.ids, in order); this
+// phone opens those scans. Certain when the scans around it and the people
+// who needed one come out exactly equal.
+function memberFor(e){
+  if(member.state !== 'approved' || !opened.length || !e.scanCheck || !e.scanCheck.ids || !e.scanCheck.ids.length) return null;
+  const ids = e.scanCheck.ids;
+  // The turn with the extra person (or the only one).
+  const i = e.extraOnTurn && e.extraOnTurn <= ids.length ? e.extraOnTurn - 1 : ids.length - 1;
+  const s = opened.find(x => x.id === ids[i]);
+  if(!s) return null;
+  return { m: s.m, t: s.t, sure: !!e.scanCheck.certain, scans: e.scanCheck.scans, turns: Math.max(1, e.turns || 1) };
 }
 
 // ---- loading ---------------------------------------------------------
@@ -538,10 +774,12 @@ async function load(){
   effSchedule = statusSched || (act.body.gym && act.body.gym.schedule) || null;
   const json = JSON.stringify(act.body) + JSON.stringify(effSchedule);
   $('gate').hidden = true; $('app').hidden = false;
-  if(json === lastJson) { renderStatus(act.body.gym); openPendingLink(); return; }   // nothing new: leave the page (and scroll, open sections) alone
+  if(json === lastJson) { renderStatus(act.body.gym); openPendingLink(); initMember(); return; }   // nothing new: leave the page (and scroll, open sections) alone
   lastJson = json; data = act.body;
+  if(member.state === 'off') member.state = 'checking';
   render();
   openPendingLink();
+  initMember();
 }
 
 function showOffline(){
@@ -569,6 +807,7 @@ function render(){
   renderSummary();
   renderList();
   renderResults();
+  renderMember();
   $('welcome').hidden = !!store('sai:welcomed');
   $('alertsCard').hidden = !data.canManageAlerts;
   $('alertsLink').hidden = !data.canManageAlerts;
@@ -597,10 +836,16 @@ function renderStatus(g){
     case 'offline':
       dot.className = 'dot warn';
       t.textContent = g.since ? `Camera computer offline since ${dayWords(g.since) === 'Today' ? '' : dayWords(g.since) + ' '}${timeOf(g.since)}` : 'Camera computer offline';
-      s.textContent = 'Joseph at SecurityAI has been told. If it’s still offline when you open, check the laptop in the back room is plugged in with the lid open.'; break;
+      s.textContent = 'TJ at SecurityAI has been told. If it’s still offline when you open, check the laptop in the back room is plugged in with the lid open.'; break;
     case 'no-picture':
       dot.className = 'dot warn'; t.textContent = `No picture from ${bad.length ? bad.join(', ') : 'the camera'}`;
-      s.textContent = 'Joseph at SecurityAI is told when a camera has had no picture for 5 minutes. If it’s still like this when you open, check the camera recorder in the back room is switched on.'; break;
+      s.textContent = 'TJ at SecurityAI is told when a camera has had no picture for 5 minutes. If it’s still like this when you open, check the camera recorder in the back room is switched on.'; break;
+    case 'tamper': {
+      const z = (g.zones || []).find(x => x.tamper) || {};
+      const w = { dark: 'The camera picture has gone almost black', covered: 'The camera looks covered', frozen: 'The camera picture is frozen', moved: 'The camera seems to have been turned' };
+      dot.className = 'dot warn'; t.textContent = w[z.tamper] || 'Camera problem';
+      s.textContent = 'TJ at SecurityAI has been told. Entries may be missed until it’s fixed: check nothing is covering or has moved the camera above the turnstile.'; break;
+    }
     case 'problem':
       dot.className = 'dot warn'; t.textContent = 'Not recording right now';
       s.textContent = 'Something on SecurityAI’s side needs fixing, and it shows on their screen too. Nothing you need to do.'; break;
@@ -628,7 +873,8 @@ function renderSummary(){
   const openNow = w ? open.filter(inW) : open;
   const earlier = open.filter(e => !openNow.includes(e));
   const winEv = w ? ev.filter(inW) : ev;
-  const normal = winEv.filter(e => !needsLook(e) && e.kind !== 'gate').length;
+  const normal = winEv.filter(e => !needsLook(e) && e.kind !== 'gate' && e.kind !== 'out' && e.kind !== 'none').length;
+  const leaving = winEv.filter(e => e.kind === 'out').length;
   const gates = winEv.filter(e => e.kind === 'gate').length;
   const checked = winEv.filter(e => needsLook(e) && e.review).length;
   if(!ev.length){
@@ -637,6 +883,7 @@ function renderSummary(){
   }
   const bits = [plural(normal, 'normal entry', 'normal entries')];
   if(checked) bits.push(`${checked} already checked`);
+  if(leaving) bits.push(plural(leaving, 'person leaving', 'people leaving'));
   if(gates) bits.push(`${plural(gates, 'accessible-gate entry', 'accessible-gate entries')} to match to your log`);
   const older = earlier.length
     ? `<div class="older">${esc(plural(earlier.length, 'more', 'more'))} still open from ${w && !w.always ? 'earlier' : 'before that'}</div>` : '';
@@ -681,7 +928,8 @@ function renderList(){
     const confirmed = ev.filter(e => needsLook(e) && e.review && isBad(e.review.verdict));
     const unsure = ev.filter(e => (e.kind === 'possible' || e.kind === 'unchecked' || e.kind === 'check') && !e.review);
     const gates = ev.filter(e => e.kind === 'gate');
-    const passed = ev.filter(e => (!needsLook(e) && e.kind !== 'gate') || (needsLook(e) && e.review && !isBad(e.review.verdict)));
+    // "Movement, nobody came in" stays out of this view (Timeline shows it).
+    const passed = ev.filter(e => (!needsLook(e) && e.kind !== 'gate' && e.kind !== 'none') || (needsLook(e) && e.review && !isBad(e.review.verdict)));
     const tier = (cls, title, n, sub) => `<h2 class="tier ${cls}"><span class="pip"></span>${esc(title)}<span class="cnt">${n}</span></h2>${sub ? `<div class="tier-sub">${esc(sub)}</div>` : ''}`;
     let h = pinHtml;
     const toCheck = flagged.length + unsure.length;
@@ -699,7 +947,7 @@ function renderList(){
       if(gates.length) h += `<div class="rows" style="padding:0;">${rows(gates, true)}</div>`;
     }
 
-    h += tier('green', 'Passed', passed.length, passed.length ? 'One person per swipe, as expected.' : '');
+    h += tier('green', 'Passed', passed.length, passed.length ? 'One person per swipe, as expected. People leaving are listed here too.' : '');
     h += passed.length ? group('normal', `Show ${plural(passed.length, 'entry', 'entries')}`, passed, !!openState.normal, 'passed')
                        : `<div class="tier-empty">No normal entries yet.</div>`;
     el.innerHTML = h;
@@ -735,9 +983,9 @@ function rows(list, gateRows){
     const tag = needsLook(e)
       ? (e.review ? `<span class="tag ${isBad(e.review.verdict) ? 'bad' : 'ok'}">${e.review.verdict === 'fine' ? 'Fine' : esc(VERDICT_WORD[e.review.verdict] || '')}</span>`
                   : `<span class="tag ${e.kind === 'flag' ? 'bad' : 'warn'}">${e.kind === 'flag' ? 'Flagged' : 'Check'}</span>`)
-      : (e.kind === 'gate' ? '<span class="tag warn">Gate</span>' : '<span class="tag ok">Passed</span>');
+      : (e.kind === 'gate' ? '<span class="tag warn">Gate</span>' : e.kind === 'out' ? '<span class="tag out">Leaving</span>' : e.kind === 'none' ? '<span class="tag out">No one</span>' : e.scanCheck && e.scanCheck.matched ? '<span class="tag ok">Scan ✓</span>' : '<span class="tag ok">Passed</span>');
     const img = e.photos.length ? `<img src="${esc(photoUrl(e.photos[0]))}" alt="" loading="lazy">` : '<span class="noimg"></span>';
-    const sub = gateRows ? `Accessible gate used · ${dayWords(e.at)} — match to your check-in log` : headline(e);
+    const sub = gateRows ? `Accessible gate used · ${dayWords(e.at)} — match to your check-in log` : headline(e);  // (includes "Came back in")
     h += `<button type="button" class="row${gateRows ? ' gate' : ''}" id="row-${esc(e.id)}" data-open="${esc(e.id)}" aria-label="${esc(headline(e) + ', ' + timeOf(e.at))}. Show photos">${img}
       <span style="min-width:0;"><span class="rt">${esc(timeOf(e.at))}</span> <span class="rs">${esc(e.zone || '')}</span><br><span class="rs">${esc(sub)}</span></span>${tag}</button>`;
   }
@@ -748,7 +996,7 @@ function card(e){
   const p = e.photos;
   const cls = e.review ? 'done' : e.kind;
   const max = data.reviewNoteMax || 120;
-  const note = clockNote();
+  const note = clockNote(e);
   const main = p.length
     ? `<button type="button" class="photo" data-open="${esc(e.id)}" data-i="0" aria-label="Show photos full screen"><img src="${esc(photoUrl(p[0]))}" alt="Entrance photo, ${esc(timeOf(e.at))}" loading="lazy">${p.length > 1 ? `<span class="n">${p.length} photos</span>` : ''}</button>`
     : '';
@@ -760,10 +1008,22 @@ function card(e){
        ${e.review.note ? `<p class="ynote"><b>Your note:</b> ${esc(e.review.note)}</p>` : ''}`
     : `<div class="scan">
          <div class="st one">
-           <div class="lbl">Step 1 · In your check-in system, look at scans between</div>
-           <div class="times">${esc(scanTimes(e))}</div>
-           <div class="hint">${esc(todo(e))}</div>
+           ${e.scanCheck ? `<div class="scanline"><span>Camera: ${esc(e.scanCheck.people)} ${e.scanCheck.people === 1 ? 'person' : 'people'}</span><span class="${e.scanCheck.scans < e.scanCheck.people ? 'bad' : 'good'}">Front desk: ${esc(e.scanCheck.scans)} scan${e.scanCheck.scans === 1 ? '' : 's'}</span></div>` : ''}
+           <div class="lbl">${memberFor(e) ? 'Step 1 · Who they came in behind' : `Step 1 · ${esc(where())}, and look at`}</div>
+           ${(() => {
+             const w = memberFor(e);
+             if(!w) return `<div class="times">${esc(scanMinutes(e))}</div>${matchHelp(e)}`;
+             return `<div class="who${w.sure ? '' : ' maybe'}"><div class="l">${e.phoneHandoff ? 'Code that was used' : 'Came in behind'}${w.sure ? '' : ' · likely'}</div><div class="m">Member #${esc(w.m)}</div>
+                 <div class="q">Scanned ${esc(timeOf(w.t))}. ${w.sure ? 'Certain: the scans and the people coming in line up exactly, to the second.' : 'Likely, not certain: the scans around then don’t line up exactly. Check the photos first.'}</div></div>
+               <details class="manual"><summary>Check it yourself in ${esc((data.gym && data.gym.checkinSystem) || 'your check-in system')}</summary>
+                 <div class="times">${esc(scanMinutes(e))}</div>${matchHelp(e)}</details>`;
+           })()}
+           ${todo(e) ? `<div class="hint">${esc(todo(e))}</div>` : ''}
+           ${(() => { const sc = e.scanCheck || {}; const other = (sc.repeat && sc.repeat.same !== true && sc.repeat.prevEvent) || (sc.repeatLater && sc.repeatLater.laterEvent); return other ? `<button class="btn" type="button" data-goto="${esc(other)}" style="width:100%;margin-top:8px;">See the ${sc.repeat ? 'earlier' : 'later'} entry</button>` : ''; })()}
          </div>
+         ${e.phoneHandoff ? '' : (() => { const w = memberFor(e); return w
+             ? `<div class="st"><div class="careful"><b>Before you charge #${esc(w.m)}:</b> they’re the member the extra person followed in (who didn’t scan, so isn’t in the list). Check the photos show that person right behind them.</div></div>`
+             : `<div class="st"><div class="careful"><b>Before you charge anyone:</b> the person who snuck in didn’t scan, so they’re not in the list. The scan you find is the member who let them in. Check the photos show the extra person right behind them.</div></div>`; })()}
          <div class="st">
            <div class="lbl">Step 2 · What did you find?</div>
            <div class="choices">
@@ -843,6 +1103,7 @@ document.addEventListener('click', async ev => {
   }
   if(t.dataset.go){ const n = firstOpen(); if(n) n.scrollIntoView({ block:'start', behavior:'smooth' }); return; }
   if(t.dataset.copy) return copyTimes(t);
+  if(t.dataset.goto){ if(view !== 'flagged'){ view = 'flagged'; renderList(); } highlight(t.dataset.goto); return; }
   if(t.dataset.unpin){ pinned = null; renderList(); return; }
   if(t.dataset.share) return share(t.dataset.share, t);
   if(t.dataset.swap){
@@ -871,12 +1132,13 @@ function toast(text){
 async function copyTimes(btn){
   const list = openList().sort((a, b) => Date.parse(a.at) - Date.parse(b.at));
   const gym = (data.gym && data.gym.name) || 'Entrance';
-  const lines = [`${gym}: please check the scans at these times`];
+  const zone = (data.gym && data.gym.checkinZone) || '';
+  const lines = [`${gym}: please check these${zone ? ' ' + zone : ''} scans`, 'For each one: count the scans in those minutes (someone scanning twice in a row counts once). Only if the count matches exactly, count up from the bottom to the scan number given. If the count is different, don’t charge anyone.'];
   let day = '';
   for(const e of list){
     const d = dayWords(e.at); if(d !== day){ lines.push('', d); day = d; }
-    const n = e.people;
-    lines.push(`• ${scanTimes(e)} (${e.phoneHandoff ? 'phone handed over?' : n != null ? `${n} ${n === 1 ? 'person' : 'people'} seen` : 'not sure how many'})`);
+    const L = lineUp(e);
+    lines.push(`• ${minutesWords(L.ws, L.we)}: should be ${L.scans} scan${L.scans === 1 ? '' : 's'} (${L.people} people came in).${L.k ? ` If it’s exactly ${L.scans}, ${L.scans === 1 ? 'that scan' : `the ${ordinal(L.k)} from the bottom`} is ${e.phoneHandoff ? 'the code that was shared' : 'who let someone in'}.` : ''}`);
   }
   const text = lines.join('\n');
   try{ await navigator.clipboard.writeText(text); toast('Copied — paste it into a text or email.'); }
@@ -916,7 +1178,7 @@ let vEvent = null, vIndex = 0, vReturn = null;
 function openViewer(id, i){
   vEvent = byId(id); if(!vEvent || !vEvent.photos.length) return;
   vReturn = document.activeElement; vIndex = i || 0;
-  const n = clockNote();
+  const n = clockNote(vEvent);
   $('vClock').textContent = n; $('vClock').hidden = !n;
   $('viewer').classList.add('open'); showPhoto(); $('vClose').focus();
 }

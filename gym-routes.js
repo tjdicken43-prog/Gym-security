@@ -30,8 +30,7 @@ function sameSecret(given, expected) {
   return crypto.timingSafeEqual(a, b);
 }
 function isOperator(req) {
-  const token = process.env.ADMIN_TOKEN;
-  return !!token && sameSecret(req.get('X-Admin-Token') || '', token);
+  return require('./admin-auth').isAdmin(req);
 }
 function clientKey(req) {
   // Behind Render's proxy the real client is the LAST X-Forwarded-For
@@ -96,6 +95,10 @@ function mount(app, deps) {
 
   function kindOf(e) {
     if (e.error) return 'unchecked';
+    if (e.went_out === true && !e.phone_handoff) return 'out';      // someone leaving (exit button): never needs a scan
+    // Movement with nobody coming in (a shadow, a light, someone walking
+    // past): never something for the gym to check, whatever the confidence.
+    if (Number(e.people_count) === 0 && !e.tailgate_flag && !e.phone_handoff && !e.error) return 'none';
     if (e.tailgate_flag) return e.confidence === 'low' ? 'possible' : 'flag';
     if (e.accessible_gate_used) return 'gate';
     // Not flagged, but worth a human glance rather than a green "Passed":
@@ -143,6 +146,15 @@ function mount(app, deps) {
       // started until just after it ended (both in true time).
       ...scanWindow(e),
       phoneHandoff: !!e.phone_handoff,
+      samePerson: typeof e.same_person === 'boolean' ? e.same_person : null,   // vs the earlier entry on the same code
+      repeatOfEvent: e.repeatOfEvent || null,
+      person: e.person || null,
+      // Not an entry that needs a scan: someone leaving, or nobody came in.
+      notEntry: e.went_out === true || Number(e.people_count) === 0,
+      turns: Number.isInteger(e.turns) && e.turns >= 1 ? e.turns : 1,
+      extraOnTurn: Number.isInteger(e.extra_on_turn) ? e.extra_on_turn : null,
+      durationSec: Number(e.durationSec) || null,
+      pictureClockOffsetMin: Number.isFinite(e.pictureClockOffsetMin) ? e.pictureClockOffsetMin : null,
       secondPossible: e.second_person_possible === true,
       beforeSec: e.beforeCount ? (Number(e.beforeSec) || 0) : null,   // first photos taken this long before the crossing
       note: e.error ? null : (e.note || null),
@@ -154,6 +166,136 @@ function mount(app, deps) {
       keptUntil: keptIds ? new Date((Date.parse(e.timestamp) || Date.now()) + (keptIds.has(id) ? monitor.SUMMARY_RETENTION_MS : monitor.LOG_RETENTION_HOURS * 3600e3)).toISOString() : undefined,
     };
   }
+  // ---- Scans vs people (the front-desk reader's scan TIMES; no member
+  // data is needed or read). Each entry takes the scans made just before
+  // and while it came through, in order, up to the number it needs. Then:
+  //   fewer scans than people  -> red, confirmed by the count
+  //   as many scans as people  -> a doubtful entry is cleared (unless a
+  //                               second person couldn't be ruled out)
+  //   no scan at all           -> worth a check (exit button, door held...)
+  // Only for moments the reader was running; otherwise nothing changes.
+  function applyScanCheck(code, events) {
+    let memberKeys;
+    try { memberKeys = require('./member-keys'); } catch (e) { return; }
+    const entries = events.filter(e => e.kind !== 'gate' && e.kind !== 'out' && e.kind !== 'none' && !e.notEntry && e.people != null)
+      .slice().sort((a, b) => Date.parse(a.at) - Date.parse(b.at));
+    if (!entries.length) return;
+    const t0 = Date.parse(entries[0].at) - 5 * 3600e3, t1 = Date.parse(entries[entries.length - 1].at) + 120e3;
+    const scans = memberKeys.scanList(code, t0, t1);
+    const scanById = new Map(scans.map(s => [s.id, s]));
+    const eventByScan = new Map();
+    const endOf = e => Date.parse(e.at) + (Math.min(12, Math.max(2, Number(e.durationSec) || 4)) + 3) * 1e3;
+    const need = e => Math.max(e.people, e.turns || 1);
+    // Entries close together form a group; the group is CERTAIN when its
+    // scans and the scans it needs come out exactly equal.
+    const groups = [];
+    for (const e of entries) {
+      const g = groups[groups.length - 1];
+      if (g && Date.parse(e.at) - 8e3 <= g.end + 2e3) { g.list.push(e); g.end = Math.max(g.end, endOf(e)); }
+      else groups.push({ list: [e], start: Date.parse(e.at) - 8e3, end: endOf(e) });
+    }
+    const used = new Set();
+    for (const g of groups) {
+      if (!memberKeys.readerCovered(code, g.start + 8e3)) continue;
+      const inGroup = scans.filter(s => s.t >= g.start && s.t <= g.end);
+      const certain = inGroup.length === g.list.reduce((n, e) => n + Math.min(need(e), e.people), 0)
+        || inGroup.length === g.list.reduce((n, e) => n + (e.turns || 1), 0);
+      for (const e of g.list) {
+        const at = Date.parse(e.at), end = endOf(e);
+        const ids = [];
+        for (const s of scans) {
+          if (ids.length >= need(e)) break;
+          if (used.has(s.id) || s.t < at - 8e3 || s.t > end) continue;
+          used.add(s.id); ids.push(s.id);
+        }
+        const found = ids.length;
+        e.scanCheck = { scans: found, people: e.people, ids, certain };
+        for (const id of ids) eventByScan.set(id, e);
+        // The same member's code came in earlier too (a few minutes to hours
+        // before): possibly a shared code, even with no hand-off on camera.
+        const rep = ids.map(id => scanById.get(id)).find(s => s && s.repeat);
+        if (rep) {
+          const prevScan = scanById.get(rep.repeat.prev);
+          const prevEvent = eventByScan.get(rep.repeat.prev);
+          e.scanCheck.repeat = { mins: rep.repeat.mins, prevAt: prevScan ? new Date(prevScan.t).toISOString() : null, prevEvent: prevEvent ? prevEvent.id : null };
+        }
+        if (e.review) continue;                            // the gym already decided
+        if (e.scanCheck.repeat) {
+          // Same code earlier. Same-looking person = left and came back
+          // (normal). Different-looking or unsure = worth a check; when the
+          // camera says different, the earlier entry is marked too.
+          const r = e.scanCheck.repeat;
+          r.same = e.samePerson;
+          if (!r.prevEvent && e.repeatOfEvent) r.prevEvent = e.repeatOfEvent;
+          if (e.samePerson !== true && e.kind === 'ok') e.kind = 'check';
+          if (e.samePerson === false && r.prevEvent) {
+            const prev = events.find(x => x.id === r.prevEvent);
+            if (prev && !prev.review) {
+              prev.scanCheck = Object.assign({}, prev.scanCheck || {}, { repeatLater: { mins: r.mins, laterEvent: e.id } });
+              if (prev.kind === 'ok') prev.kind = 'check';
+            }
+          }
+        }
+        if (e.phoneHandoff) continue;                      // a shared code scans normally: the count can't clear it
+        if (found < e.people) {
+          if (found === 0 && e.people === 1) {
+          // Only when the reader was clearly working right then (other scans
+          // within 20 minutes): a quiet or restarting reader is not a reason
+          // to put an entry in front of the gym.
+          const busy = scans.some(x => Math.abs(x.t - at) <= 20 * 60e3);
+          if (busy) { e.scanCheck.noScan = true; if (e.kind === 'ok') e.kind = 'check'; } else delete e.scanCheck;
+        }
+          else { e.scanCheck.short = true; e.kind = 'flag'; }
+        } else if (e.kind === 'flag') { e.scanCheck.matched = true; e.kind = 'check'; }      // flagged, but everyone scanned
+        else if ((e.kind === 'check' || e.kind === 'possible') && !e.secondPossible && !(e.scanCheck.repeat && e.samePerson !== true)) { e.scanCheck.matched = true; e.kind = 'ok'; }
+        else e.scanCheck.matched = true;
+      }
+    }
+  }
+  // ---- Hourly cross-check: do the camera and the front-desk reader agree?
+  // Over the last hour (only while both were running):
+  //   many entries with no scan   -> the reader may be missing pop-ups
+  //   many scans with no entry    -> the camera may be missing people
+  // TJ gets an email saying what was seen and how to fix it (6 h apart at most).
+  const crossAlerted = new Map();
+  function crossCheck() {
+    let memberKeys; try { memberKeys = require('./member-keys'); } catch (e) { return; }
+    for (const s of monitor.listStates ? monitor.listStates() : []) {
+      const code = s.key || s;
+      try {
+        if (!monitor.watchingNow(code)) continue;
+        const now = Date.now(), from = now - 3600e3;
+        if (!memberKeys.readerCovered(code, from) || !memberKeys.readerCovered(code, now)) continue;
+        const events = monitor.getLogFor(code).filter(e => e && !e.systemEvent && !e.capReached && e.mode !== 'wall')
+          .map(e => gymEvent(e, {}, null)).filter(e => Date.parse(e.at) >= from - 120e3);
+        applyScanCheck(code, events);
+        // Every camera entry in the hour counts, including ones the matching
+        // left alone: a reader that is running but sees NO pop-ups is the
+        // very thing to catch.
+        const entries = events.filter(e => Date.parse(e.at) >= from && e.kind !== 'gate' && e.kind !== 'out' && e.kind !== 'none' && !e.notEntry && e.people >= 1);
+        const noScan = entries.filter(e => !e.scanCheck || !e.scanCheck.scans).length;
+        const used = new Set(); events.forEach(e => (e.scanCheck && e.scanCheck.ids || []).forEach(id => used.add(id)));
+        const scans = memberKeys.scanList(code, from, now - 60e3);
+        const orphan = scans.filter(x => !used.has(x.id)).length;
+        const send = (kind, subject, text) => {
+          const k = code + '|' + kind;
+          if (crossAlerted.has(k) && now - crossAlerted.get(k) < 6 * 3600e3) return;
+          crossAlerted.set(k, now);
+          monitor.alertOperator(code, kind, subject, text).catch(() => {});
+        };
+        if (entries.length >= 5 && noScan / entries.length >= 0.4) {
+          send('cross-no-scan', 'scans and entries don\'t line up', `in the last hour the camera saw ${entries.length} entries, but ${noScan} had no scan from the front-desk reader.\n\nEither the reader is missing Ashbourne's Live Entry pop-ups, or people are really getting in without scanning.\n\nHow to tell: open the activity page and look at those entries (they're in "Worth a check" as "no scan found"). If the photos show normal entries with people scanning, the reader is missing pop-ups: on the Ashbourne PC make sure the Live Entry pop-up still shows on each scan, then run the screen check again (admin page) and send it to Claude. If the photos show people pushing through without scanning, it's real.`);
+        }
+        if (scans.length >= 5 && orphan / scans.length >= 0.4) {
+          send('cross-no-entry', 'scans without camera entries', `in the last hour the front desk recorded ${scans.length} Zone 1 scans, but ${orphan} had no matching entry from the camera.\n\nThe camera may be missing people (covered, moved, a bad picture, or its laptop asleep), or people scanned and didn't come through.\n\nHow to fix: on the camera laptop run  node rtsp-run.js  and walk through the turnstile: each entry should show "crossing detected". If it doesn't, check the camera picture (node rtsp-run.js --check) and that the laptop isn't asleep. Then tell Claude what you saw.`);
+        }
+      } catch (e) { /* next gym */ }
+    }
+  }
+  module.exports._crossCheck = crossCheck;   // for tests
+  const crossTimer = setInterval(crossCheck, 15 * 60e3);
+  if (crossTimer.unref) crossTimer.unref();
+
   function keptIdSet(code) { return new Set(monitor.loadSummary(code).map(e => store.eventId(e))); }
 
   function findEvent(code, id) {
@@ -185,7 +327,7 @@ function mount(app, deps) {
     const schedule = (cfg.scheduleStart && cfg.scheduleEnd && cfg.scheduleStart !== cfg.scheduleEnd) ? { start: cfg.scheduleStart, end: cfg.scheduleEnd } : null;
     const inWindow = monitor.isWithinSchedule(cfg);
     let state, since = null;
-    const zones = rec ? (rec.zones || []).map(z => ({ label: z.label, ok: z.streamOk === true, picture: deps.zonePicture ? deps.zonePicture(z) : (z.streamOk ? 'ok' : 'no-picture') })) : [];
+    const zones = rec ? (rec.zones || []).map(z => ({ label: z.label, ok: z.streamOk === true, tamper: z.tamper || null, picture: deps.zonePicture ? deps.zonePicture(z) : (z.streamOk ? 'ok' : 'no-picture') })) : [];
     if (rec && !deps.runnerIsOnline(rec)) { state = 'offline'; since = rec.lastSeen ? new Date(rec.lastSeen).toISOString() : null; }
     else if (st.stoppedByOperator && !st.running) state = 'paused';
     else if (rec) {
@@ -194,6 +336,7 @@ function mount(app, deps) {
       // fix, but it must not read as "Watching".
       if (rec.monitorProblem) state = 'problem';
       else if (zones.some(z => z.picture === 'no-picture')) state = 'no-picture';
+      else if (zones.some(z => z.tamper)) state = 'tamper';
       else if (zones.some(z => z.picture === 'starting')) state = 'starting';
       else if (!inWindow) state = 'off-hours';
       else state = 'watching';
@@ -218,6 +361,15 @@ function mount(app, deps) {
       keptDays: Math.round(monitor.SUMMARY_RETENTION_MS / 864e5),
       // "Camera clock runs about 1 hour fast" — shown under each photo.
       cameraClockNote: settings.cameraClockNote || null,
+      checkinSystem: settings.checkinSystem || null,
+      checkinZone: settings.checkinZone || null,
+      checkinClockOffsetSec: Number(settings.checkinClockOffsetSec) || 0,
+      // How far off the clock printed on the camera picture usually is (the
+      // model reads it on every check): the middle of the latest readings.
+      pictureClockOffsetMin: (() => {
+        const v = monitor.getLogFor(code).map(e => e && e.pictureClockOffsetMin).filter(x => Number.isFinite(x)).slice(0, 15).sort((a, b) => a - b);
+        return v.length ? v[Math.floor(v.length / 2)] : null;
+      })(),
     };
   }
 
@@ -298,6 +450,7 @@ function mount(app, deps) {
       .filter(e => e && !e.systemEvent && !e.capReached && e.mode !== 'wall')
       .map(e => gymEvent(e, reviews, kept))
       .sort((a, b) => Date.parse(b.at) - Date.parse(a.at));
+    try { applyScanCheck(v.code, events); } catch (err) { /* a nicety on top */ }
     const r = monitor.buildReport(v.code, 30);
     // Reviews made before the tally existed (or on another device): add them.
     try {
@@ -407,12 +560,47 @@ function mount(app, deps) {
       const review = store.setReview(v.code, id, verdict || null, note);
       // The lasting results tally (counts for showing what the camera found).
       try { store.tallyReview(v.code, String(id), review ? review.verdict : null, gymEvent(e, {})); } catch (err) { /* tally is a nicety */ }
+      try { memberKeys.keepAround(v.code, eventTime(e), !!(review && store.isConfirmed(review.verdict))); } catch (err) { /* nicety */ }
       // Marked Tailgate: keep it (and its photos) for 35 days, not 48 h.
       monitor.retainForReview(v.code, String(id), review ? review.verdict : null);
       res.json({ ok: true, review, keptUntil: new Date(monitor.purgeAt(v.code, e)).toISOString() });
     } catch (err) {
       res.status(400).json({ error: err.message });
     }
+  });
+
+  // ---- Protected member numbers: this device's access ----------------
+  // A phone asks for access with its own public key; TJ approves it on
+  // his owner device. Only approved devices get scans, and each gets only
+  // its own scrambled copy of the key (member-keys.js).
+  const memberKeys = require('./member-keys');
+  app.post('/gym/keys/device', (req, res) => {
+    const v = needViewer(req, res);
+    if (!v) return;
+    if (store.limited(`keyreq:${v.code}`, 20, 3600e3)) return res.status(429).json({ error: 'Too many requests — try again later.' });
+    try {
+      const b = req.body || {};
+      const d = memberKeys.requestDevice(v.code, b.pub, b.name);
+      res.json({ ok: true, id: d.id, code: d.code, status: d.status });
+    } catch (err) { res.status(400).json({ error: err.message }); }
+  });
+  app.get('/gym/keys/device/:id', (req, res) => {
+    const v = needViewer(req, res);
+    if (!v) return;
+    const st = memberKeys.deviceStatus(v.code, req.params.id);
+    res.set('Cache-Control', 'no-store').json(st ? Object.assign({ ok: true }, st) : { ok: false, status: 'gone' });
+  });
+  app.get('/gym/keys/scans', (req, res) => {
+    const v = needViewer(req, res);
+    if (!v) return;
+    const id = String(req.query.device || '');
+    const st = memberKeys.deviceStatus(v.code, id);
+    if (!st || st.status !== 'approved') return res.status(403).json({ error: 'This device isn’t approved to see member numbers.' });
+    memberKeys.touchDevice(v.code, id);
+    const now = Date.now();
+    const from = Math.max(now - 49 * 3600e3, Date.parse(req.query.from) || now - 48 * 3600e3);
+    const to = Math.min(now + 60e3, Date.parse(req.query.to) || now + 60e3);
+    res.set('Cache-Control', 'no-store').json({ ok: true, scans: memberKeys.scansFor(v.code, id, from, to) });
   });
 
   // ---- Results download (a spreadsheet of every checked entry) ---------

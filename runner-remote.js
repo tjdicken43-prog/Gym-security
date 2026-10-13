@@ -30,7 +30,7 @@ const FATAL_RETRY_MS = Number(process.env.RUNNER_FATAL_RETRY_MS) || 10 * 60 * 10
 // file one gym's crossings under another gym).
 function serverSaid(r) {
   let e = r && r.json && r.json.error ? String(r.json.error) : '';
-  if (/make gymCode|gymCode in rtsp-zones/i.test(e)) e = e.replace(/\s*Do this:.*$/i, '') + ' Tell Joseph at SecurityAI.';
+  if (/make gymCode|gymCode in rtsp-zones/i.test(e)) e = e.replace(/\s*Do this:.*$/i, '') + ' Tell TJ at SecurityAI.';
   return e.trim();
 }
 
@@ -85,7 +85,7 @@ function explainFailure(r) {
   }
   if (r.status === 403 && r.json && r.json.fatal) {
     return { retry: true, fatal: true, key: '403-fatal', waitMs: FATAL_RETRY_MS,
-      msg: `The website refused this computer: ${serverSaid(r) || 'not allowed (403)'}\n   Tell Joseph at SecurityAI. Crossings are kept on this computer and sent once that is fixed (it checks again every ${FATAL_RETRY_MS >= 60000 ? `${Math.round(FATAL_RETRY_MS / 60000)} minutes` : `${Math.round(FATAL_RETRY_MS / 1000)} seconds`}).` };
+      msg: `The website refused this computer: ${serverSaid(r) || 'not allowed (403)'}\n   Tell TJ at SecurityAI. Crossings are kept on this computer and sent once that is fixed (it checks again every ${FATAL_RETRY_MS >= 60000 ? `${Math.round(FATAL_RETRY_MS / 60000)} minutes` : `${Math.round(FATAL_RETRY_MS / 1000)} seconds`}).` };
   }
   if (r.status === 403) return { retry: true, key: '403', msg: `The website refused this computer (403): ${serverSaid(r) || 'not allowed'}` };
   if (r.status === 409) return { retry: true, key: '409', msg: `The website cannot take crossings right now: ${serverSaid(r) || 'conflict'}. Will retry.` };

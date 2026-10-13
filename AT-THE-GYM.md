@@ -194,7 +194,7 @@ spare)? `node install-service.js --remove` instead: settings stay.
 | `does not recognise this computer (401)` | Get a pairing code on the phone, then `cd ~/securityai` and `node pair.js`. |
 | Admin page: *Not paired* / *Computer is on but not paired* | Same: admin page > *Connect a camera computer* > **Get a pairing code**, then on the laptop `cd ~/securityai` and `node pair.js`. |
 | Admin page: *Computer OFFLINE (asleep: lid closed? unplugged? no internet?)* | Lid open? Charger in? Wi-Fi on? It checks in again by itself within a minute of waking. |
-| The website doesn't know this gym / *Tell Joseph at SecurityAI* | Admin page > **Gyms**: check the gym is there. Then get a pairing code for that gym and run `node pair.js` again. |
+| The website doesn't know this gym / *Tell TJ at SecurityAI* | Admin page > **Gyms**: check the gym is there. Then get a pairing code for that gym and run `node pair.js` again. |
 | `ffmpeg is not on this computer` | Download ffmpeg (RTSP-SETUP.md A2), double-click the zip in Downloads, then `node setup-camera.js` again. |
 | `password or username rejected (401)` | Check the login on the recorder's web page. You get **one** retry, then it stops so the account isn't locked. |
 | `rejected the login AGAIN` / account locked | Recorder: System > User Management. Check the account is enabled. Wait 30 min if it's locked. |
@@ -246,3 +246,96 @@ From then on people moving the other way show
   **Flagged**: "Someone may have scanned in on another member's phone".
   The manager looks up whose code scanned at that time: that member shared it.
   Screen line: `⚠ someone came out through the turnstile N s before this`.
+
+## Check Ashbourne's clock (2 minutes, once)
+
+Matching a flag to the right scan relies on Ashbourne's times being right.
+Open a clock with seconds on your phone (e.g. time.is).
+
+1. Scan in at the turnstile when your phone shows **:55** seconds. Go through.
+2. Wait for the next minute, then scan in again at **:05** seconds. Go through.
+3. In Ashbourne's Visit Log (Zone 1), look at both scans:
+   - Scan 1 shows the same minute as your phone, and scan 2 shows the next one: **Ashbourne is within 5 seconds. Nothing to do.**
+   - Scan 1 already shows the NEXT minute: Ashbourne is fast. Repeat with :45, :35… to see by how much.
+   - Scan 2 still shows the EARLIER minute: Ashbourne is slow. Repeat with :15, :25… to see by how much.
+4. If it's off, put the seconds in the admin page → J Street → settings →
+   "Check-in system's clock" (e.g. 20 if it's 20 s fast, -20 if 20 s slow).
+
+## Ashbourne screen check (once, before the reader)
+
+1. Upload the latest zip to GitHub and wait for Render to say Live.
+2. On the Ashbourne PC: Ashbourne open on the **Visit Log**.
+3. On that PC, open the admin page in a browser → **Ashbourne screen check** →
+   **Copy**.
+4. Click Start, type **Windows PowerShell**, open it, right-click to paste,
+   press Enter.
+5. It says *Found Ashbourne* (or shows a numbered list: type the number of
+   Ashbourne). When it says **go SCAN IN**, scan in at the turnstile 2–3
+   times, come back and press **Enter**.
+6. On your phone: admin page → Ashbourne screen check → **Download** → send
+   the file to Claude.
+
+## Member numbers: the front-desk reader (once)
+
+The flagged entries can say **"Came in behind member #1776"**, exact to the
+second, with member numbers scrambled so only phones you approve can read
+them. The website itself can't.
+
+**1. Your owner device (on your own phone, once).** Admin page → *Protected
+member numbers* → **Make this my owner device**. Note its code (e.g. Z7P-P76).
+Use this phone for approvals. It can always see member numbers for every gym.
+(Losing it: "Make this the owner device instead" on a new phone, then set the
+reader up again, step 2.)
+
+**2. The reader on the Ashbourne PC.** Admin page → J Street → **Set up the
+front-desk reader** gives a 6-number code. On the Ashbourne PC open **Windows
+PowerShell** and paste:
+
+    irm https://gym-security.onrender.com/securityai-reader.txt | iex
+
+Type the code. It shows an **owner device code**: it must match yours. Press
+Enter for Zone 1. Done: it runs hidden and starts by itself when the PC signs
+in. Keep Ashbourne open; the screen can be off, but the PC must not sleep
+(Settings → System → Power → Sleep: Never).
+
+**3. Staff phones.** On the gym page a manager taps **Ask for access on this
+phone** and types their name. A code shows on their screen. On your owner
+device: admin page → **Approve**, after checking the code matches theirs.
+**Remove** cuts a phone off straight away.
+
+Update the reader: paste the same line on the Ashbourne PC and pick 1.
+Remove it: same line, pick 3. Nothing is left behind.
+
+Admin sign-in: with email set up on Render (SMTP_* and SUPPORT_EMAIL or
+ADMIN_EMAIL), each new browser also needs the **Approve** link emailed to you.
+If email ever breaks, set ADMIN_EMAIL_CONFIRM=off on Render to get in with the
+token alone.
+
+**With the reader running, scans are counted against people automatically**
+(scan times only; member numbers stay scrambled):
+- 1 person seen, 1 scan → cleared to Passed ("Scan ✓"), unless the camera
+  couldn't rule out a second person.
+- 2 people seen, 1 scan → red: "2 people came in, only 1 scan".
+- Flagged but everyone scanned → moved to Worth a check ("probably fine").
+- Someone came in with no scan (exit button, held door) → Worth a check.
+- People leaving (exit button) are listed as "Leaving" and never need a scan.
+
+## What it fixes by itself, and what it emails you about
+
+Fixes by itself (no email):
+- Ashbourne closed and reopened, or restarted: the reader finds it again and starts fresh (never counts an old pop-up).
+- Ashbourne renames the member-number label to a common wording (Member No, Member Number, Mem No…): read anyway.
+- The zone moves somewhere else on the pop-up: found anyway.
+- Internet drops on the front-desk PC: scans wait on the PC and send when it's back.
+- A newer reader on the website: the PC installs it within 6 hours (only when no scans are waiting).
+
+Emails you (subject starts with the gym name), each with what happened and how to fix it:
+- Ashbourne not open on the PC for 5 min during watch hours (not overnight).
+- The pop-up is there but the member number can't be read for 2 min (Ashbourne changed its screen).
+- The PC can't reach the website (scans waiting).
+- The reader went quiet, was unpaired, or the owner device changed.
+- Scans and camera entries don't line up over the last hour (checked every 15 min), either way round.
+- Camera covered, dark, frozen or turned; the daily limit reached.
+- A "back to normal" email when a reader problem clears.
+
+Emails need SMTP and SUPPORT_EMAIL set on Render. The admin page shows the same problem and fix under Protected member numbers.

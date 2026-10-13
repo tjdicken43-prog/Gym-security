@@ -108,10 +108,15 @@ function parseModelJson(raw) {
   }
   const bool = v => v === true || (typeof v === 'string' && v.trim().toLowerCase() === 'true');
   const int = v => { const n = typeof v === 'string' ? Number(v.trim()) : v; return (typeof n === 'number' && Number.isFinite(n)) ? Math.max(0, Math.round(n)) : null; };
-  for (const k of ['tailgate_flag', 'accessible_gate_used', 'flag', 'phone_handoff', 'second_person_possible']) if (k in obj) obj[k] = bool(obj[k]);
-  for (const k of ['people_count', 'queued_count']) if (k in obj) obj[k] = int(obj[k]);
+  for (const k of ['tailgate_flag', 'accessible_gate_used', 'flag', 'phone_handoff', 'second_person_possible', 'went_out']) if (k in obj) obj[k] = bool(obj[k]);
+  if ('same_person' in obj) obj.same_person = obj.same_person === true || obj.same_person === 'true' ? true : obj.same_person === false || obj.same_person === 'false' ? false : null;
+  for (const k of ['people_count', 'queued_count', 'turns', 'extra_on_turn']) if (k in obj) obj[k] = int(obj[k]);
+  if (obj.turns != null && (obj.turns < 1 || obj.turns > 8)) obj.turns = null;
+  if (obj.extra_on_turn != null && (obj.extra_on_turn < 1 || obj.extra_on_turn > (obj.turns || 1))) obj.extra_on_turn = null;
   if ('confidence' in obj) { const c = String(obj.confidence || '').toLowerCase(); obj.confidence = ['high', 'medium', 'low'].includes(c) ? c : null; }
   if ('note' in obj && obj.note != null) obj.note = String(obj.note).slice(0, 500);
+  if ('person' in obj) obj.person = obj.person == null ? null : String(obj.person).slice(0, 140);
+  if ('picture_clock' in obj) { const m = /^(\d{1,2}):(\d{2})(?::(\d{2}))?$/.exec(String(obj.picture_clock || '').trim()); obj.picture_clock = m && +m[1] < 24 && +m[2] < 60 ? `${m[1].padStart(2, '0')}:${m[2]}:${m[3] || '00'}` : null; }
   if (Array.isArray(obj.cameras)) {
     obj.cameras = obj.cameras.filter(c => c && typeof c === 'object').map(c => Object.assign({}, c, { flag: bool(c.flag), people_count: int(c.people_count) }));
   }
@@ -183,28 +188,42 @@ async function analyzeEntryBurst(framesInOrder, cfg) {
   // same prompt: "two on one rotation" must flag, "two on separate
   // rotations" must not.
   const expected = cfg.expectedCount || 1;
+  // Which way is IN on this camera (set at the gym with --entry), so people
+  // walking out, or only walking up to the turnstile, aren't counted.
+  const W = { left: 'the left', right: 'the right', up: 'the top of the picture', down: 'the bottom of the picture' };
+  const OPP = { left: 'right', right: 'left', up: 'down', down: 'up' };
+  const ins = Array.isArray(cfg.entryDirection) ? cfg.entryDirection.filter(d => W[d]) : [];
+  const dirText = ins.length
+    ? `On this camera, people coming IN move toward ${ins.map(d => W[d]).join(' or ')}; people going OUT move toward ${ins.map(d => W[OPP[d]]).join(' or ')}. Someone walking out is leaving the gym: never count them and never call it a tailgate, even if two leave together. Someone who only walks up to the turnstile or waits at it has not got in yet.${cfg.direction && W[cfg.direction] ? ` The main movement in these stills was toward ${W[cfg.direction]}.` : ''}\n`
+    : 'Only count people coming IN. People walking out, or only walking up to the turnstile and waiting, have not got in.\n';
   // Stills from someone at the turnstile just before this crossing (they
   // came back out through it, or stood there): sent first, and labelled,
   // so a phone handed over for a second scan can be seen.
   const before = (cfg.before && Array.isArray(cfg.before.frames) && cfg.before.frames.length) ? cfg.before : null;
   const nb = before ? before.frames.length : 0;
-  const images = before ? before.frames.concat(framesInOrder) : framesInOrder;
-  const beforeText = before
-    ? `The first ${nb === 1 ? 'image is' : `${nb} images are`} NOT part of the crossing: ${nb === 1 ? 'it was' : 'they were'} taken about ${before.sec} seconds before it, when someone ${before.kind === 'left' ? 'had just come back out through the turnstile' : 'was at the turnstile without going through'}. The other ${framesInOrder.length} images are the crossing. Only count people from the crossing images.\n\n`
+  // Photos of an EARLIER entry on the same member code (a "repeat" scan).
+  const cmp = (cfg.compare && Array.isArray(cfg.compare.frames) && cfg.compare.frames.length) ? cfg.compare : null;
+  const nc = cmp ? cmp.frames.length : 0;
+  const images = (cmp ? cmp.frames : []).concat(before ? before.frames : [], framesInOrder);
+  const cmpText = cmp
+    ? `The first ${nc === 1 ? 'image is' : `${nc} images are`} from an EARLIER entry, about ${cmp.mins} minutes ago, on the same member code as this crossing. People do leave and come back, so compare the person in the earlier image with the person coming in now by clothes, build, hair and bag (not by face), and set same_person true if they look like the same person, false if clearly different, null if you can't tell. Don't count anyone from the earlier image.\n\n`
     : '';
-  const promptText = `${beforeText}${before ? `The crossing images` : `These are ${framesInOrder.length} stills`} from a fixed security camera at a gym entrance, in time order${cfg.durationSec ? `, over about ${cfg.durationSec} seconds` : ''}. Such cameras usually sit high up and look down at an angle through a wide-angle lens: straight lines bend near the edges and people show mostly as heads and shoulders.
+  const beforeText = cmpText + (before
+    ? `${cmp ? 'The next' : 'The first'} ${nb === 1 ? 'image is' : `${nb} images are`} NOT part of the crossing: ${nb === 1 ? 'it was' : 'they were'} taken about ${before.sec} seconds before it, when someone ${before.kind === 'left' ? 'had just come back out through the turnstile' : 'was at the turnstile without going through'}. The other ${framesInOrder.length} images are the crossing. Only count people from the crossing images.\n\n`
+    : cmp ? `The other ${framesInOrder.length} images are the crossing, in time order. Only count people from those.\n\n` : '');
+  const promptText = `${beforeText}${before || cmp ? `The crossing images` : `These are ${framesInOrder.length} stills`} from a fixed security camera at a gym entrance, in time order${cfg.durationSec ? `, over about ${cfg.durationSec} seconds` : ''}. Such cameras usually sit high up and look down at an angle through a wide-angle lens: straight lines bend near the edges and people show mostly as heads and shoulders.
 
-The entrance is usually a full-height turnstile: a cage of metal bars that turns round a post and lets one person through per turn after they scan. Turnstile bars, wire-mesh walls, doors, lights, reflections and shadows are not people. Count heads.
+The entrance is usually a full-height turnstile: a cage of metal bars that turns round a post and lets one person through per turn after they scan. Turnstile bars, wire-mesh walls, doors, lights, reflections and shadows are not people. Count PEOPLE only, by their heads: a dog or other animal, a duffle bag, gym bag, backpack, suitcase, stroller or scooter is never a person and never a second person, however big it looks or however close it follows.
 
 The stills are taken on a timer, so the moment someone passes may fall between two of them. Judge from where people are across the sequence: on one side early and the other side later means they went through; standing still in every frame means they have not (they may be scanning in or waiting).
 ${gate}
-${cfg.lingerSec ? `Before these stills, someone had been at the turnstile for about ${cfg.lingerSec} seconds without going straight through. Waiting at the gate and then slipping in right behind someone is a common way to tailgate, so look carefully for a second person close behind or squeezed into the same turn. Still only flag what you can see.\n` : ''}Count the DISTINCT people who got through. Expected per scan: ${expected}.
+${cfg.lingerSec ? `Before these stills, someone had been at the turnstile for about ${cfg.lingerSec} seconds without going straight through. Waiting at the gate and then slipping in right behind someone is a common way to tailgate, so look carefully for a second person close behind or squeezed into the same turn. Still only flag what you can see.\n` : ''}${dirText}Count the DISTINCT people who got through. Expected per scan: ${expected}.
 Tailgating means more than ${expected} going through on the same turn (sharing one gap between the bars, or squeezed in right behind) or through a door held open. People who each get their own turn, even seconds apart, are not tailgating.
 
 Members scan in with a code on their phone, and the same code works again after a short lockout. Code sharing: a member already inside comes back to the turnstile and hands their phone (or card) over or through it, so the person outside can scan in on the same code. Set phone_handoff true only if you can see something passed between a person inside and a person outside, or someone inside reaching through or over the turnstile to the person about to enter. Someone scanning their own phone at the reader is normal.
 
 Respond with ONLY a JSON object, no other text:
-{"people_count": <number who got through>, "queued_count": <number waiting, not through>, "accessible_gate_used": <true|false>, "tailgate_flag": <true|false>, "phone_handoff": <true|false>, "second_person_possible": <true|false>, "confidence": "<high|medium|low>", "note": "<one plain sentence for gym staff saying what you see>"}
+{"people_count": <number who got through>, "queued_count": <number waiting, not through>, "accessible_gate_used": <true|false>, "tailgate_flag": <true|false>, "phone_handoff": <true|false>, "second_person_possible": <true|false>, "went_out": <true if the people in these stills were LEAVING (walking out), else false>,${cmp ? ' "same_person": <true|false|null, comparing with the EARLIER entry>, "person": "<short description of who came in now: clothes, build, hair>",' : ''} "turns": <how many separate turns of the turnstile (separate scans) these people used, usually 1>, "extra_on_turn": <if more people got through than scanned: which of those turns (1 = first) the extra person squeezed into, else null>, "picture_clock": "<the time printed on the camera picture, 24-hour HH:MM:SS, or null if none>", "confidence": "<high|medium|low>", "note": "<one plain sentence for gym staff saying what you see>"}
 
 second_person_possible: true ONLY if a second person could have got through on the same turn and these photos can't rule it out (someone partly hidden behind the first person, the view blocked at the key moment, or a second shape you can't make out). false when you can see one person went through and nobody was close behind them, even if the picture is dark, blurry or bent at the edges.
 

@@ -56,6 +56,20 @@
   .note strong{color:var(--text);}
   .note.red{border-left-color:var(--red);} .note.green{border-left-color:var(--green);} .note.blue{border-left-color:var(--blue);}
   .empty{color:var(--muted);font-size:13.5px;padding:6px 0;}
+  /* protected member numbers */
+  .kgym{margin-top:18px;padding-top:14px;border-top:1px solid var(--line);}
+  .kgym h3{font-size:16px;margin:0 0 10px;}
+  .kline{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 0;border-bottom:1px solid var(--line);font-size:14px;}
+  .kline:last-of-type{border-bottom:0;}
+  .kline .kl{flex:1 1 220px;min-width:0;}
+  .kline .kl b{font-weight:600;}
+  .kline .ks{color:var(--muted);font-size:12.5px;margin-top:2px;}
+  .kline .ka{display:flex;gap:8px;flex-shrink:0;}
+  .chip{display:inline-block;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:13px;letter-spacing:1px;padding:2px 8px;border-radius:6px;background:var(--panel-2);border:1px solid var(--line);}
+  .pill{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600;}
+  .pill::before{content:"";width:8px;height:8px;border-radius:50%;background:currentColor;}
+  .pill.on{color:var(--green);} .pill.off{color:var(--amber);} .pill.none{color:var(--muted);}
+  .kbtns{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;}
   #gate{max-width:420px;margin:40px auto;}
 
   label.f{display:block;font-size:12.5px;color:var(--muted);margin-bottom:4px;}
@@ -225,6 +239,27 @@
       <div id="pairHistory" style="margin-top:8px;"></div>
     </div>
 
+    <div class="card" id="checkCard">
+      <h2>Ashbourne screen check</h2>
+      <div class="sub">Run once on the Ashbourne PC so the front-desk reader can be fitted to Ashbourne’s screen. Read-only; member names and numbers are blanked out before anything leaves that PC.</div>
+      <ol class="steps">
+        <li>On the Ashbourne PC, open Ashbourne on the <strong>Visit Log</strong>.</li>
+        <li>Click Start, type <strong>Windows PowerShell</strong>, open it (the blue one).</li>
+        <li>Paste this and press Enter (on that PC, open this admin page to copy it):
+          <div class="copyrow"><input type="text" id="checkCmd" readonly aria-label="Screen check command"><button class="btn" type="button" data-copy="#checkCmd">Copy</button></div></li>
+        <li>When it says <strong>go SCAN IN</strong>, scan in at the turnstile 2–3 times, come back and press Enter.</li>
+        <li>The report appears below. Download it and send it to Claude.</li>
+      </ol>
+      <div id="checkReports"><p class="empty">No reports yet.</p></div>
+    </div>
+
+    <div class="card" id="keysCard">
+      <h2>Protected member numbers</h2>
+      <div class="sub">The front-desk reader scrambles member numbers so only devices you approve can read them. This website can’t read them. Approvals are signed by your owner device.</div>
+      <div id="keysOwner"><p class="empty">Loading…</p></div>
+      <div id="keysGyms"></div>
+    </div>
+
     <div class="card" id="setupCard">
       <h2>Render settings</h2>
       <div class="sub">Render &gt; your service &gt; Environment. Shows only whether each one is set — never the value.</div>
@@ -261,6 +296,7 @@
 
 </div></main>
 
+<script src="member-crypto.js"></script>
 <script>
 // The admin token is held for this tab (and on this phone if ticked) and
 // sent as a header. It is a shared secret that keeps costs, codes and
@@ -269,6 +305,8 @@
 // names, zone labels, errors, notes) goes through esc() before it
 // becomes HTML.
 let token = '';
+// Email approval: a signed session for this browser (30 days), kept with the token.
+let adminSession = (() => { try{ return localStorage.getItem('securityai:adminSession') || ''; }catch(e){ return ''; } })();
 const SITE = location.origin;
 function esc(v){
   return String(v == null ? '' : v)
@@ -298,16 +336,37 @@ async function call(path, opts){
   const o = Object.assign({}, opts || {});
   o.headers = Object.assign({}, o.headers || {});
   if(token) o.headers['X-Admin-Token'] = token;
+  if(adminSession) o.headers['X-Admin-Session'] = adminSession;
   if(o.json !== undefined){ o.method = o.method || 'POST'; o.headers['Content-Type'] = 'application/json'; o.body = JSON.stringify(o.json); delete o.json; }
   const r = await fetch(path, o);
   if(r.status === 403){
     const e = new Error('Token rejected.'); e.status = 403;
-    try{ const b = await r.json(); e.noAdminToken = b.adminTokenSet === false; }catch(x){}
+    try{ const b = await r.json(); e.noAdminToken = b.adminTokenSet === false; e.needEmail = !!b.needEmail; }catch(x){}
     throw e;
   }
   let body = {}; try{ body = await r.json(); }catch(e){}
   return { status: r.status, ok: r.ok, body };
 }
+
+// Right token, new browser: email TJ an Approve link and wait for it.
+let approvalPoll = null;
+async function emailApproval(){
+  const msg = $('gateMsg');
+  msg.textContent = 'Right token. Sending you an approval email…';
+  const r = await call('/admin/login/start', { method:'POST' }).catch(e => ({ ok:false, body:{ error: e.message } }));
+  if(!r.ok){ msg.textContent = r.body.error || 'Could not send the approval email.'; return; }
+  if(r.body.session){ saveSession(r.body.session); return unlock(); }      // email check is off
+  msg.innerHTML = `<b>Check your email</b> (${esc(r.body.sentTo)}) and tap <b>Approve</b>. This page opens by itself. The link works for ${esc(r.body.minutes)} minutes.`;
+  clearInterval(approvalPoll);
+  const id = r.body.id, until = Date.now() + r.body.minutes * 60e3;
+  approvalPoll = setInterval(async () => {
+    if(Date.now() > until){ clearInterval(approvalPoll); msg.textContent = 'The approval link expired. Tap Open to send a new one.'; return; }
+    const s = await call('/admin/login/status?id=' + encodeURIComponent(id)).catch(() => null);
+    if(s && s.body && s.body.session){ clearInterval(approvalPoll); saveSession(s.body.session); unlock(); }
+    else if(s && s.body && s.body.expired){ clearInterval(approvalPoll); msg.textContent = 'The approval link expired. Tap Open to send a new one.'; }
+  }, 3000);
+}
+function saveSession(s){ adminSession = s; try{ localStorage.setItem('securityai:adminSession', s); }catch(e){} }
 
 let refreshTimer = null;
 async function unlock(){
@@ -330,8 +389,12 @@ async function unlock(){
     await refresh();
     loadSetup();
     loadPairings();
+    loadKeys();
+    $('checkCmd').value = `[Net.ServicePointManager]::SecurityProtocol='Tls12'; irm ${SITE}/ashbourne-check.txt | iex`;
+    loadCheckReports();
     if(!refreshTimer) refreshTimer = setInterval(() => { if(!document.hidden) refresh(); }, 15000);
   } catch(err){
+    if(err.needEmail) return emailApproval();
     msg.textContent = err.status === 403
       ? (err.noAdminToken ? 'ADMIN_TOKEN is not set on Render. Add it (Generate), Save, wait until it says Live.' : 'That is not the ADMIN_TOKEN. Copy it again from Render > Environment.')
       : err.message;
@@ -701,6 +764,12 @@ function drawSettings(el, v){
     </div>
     <label class="f">Camera clock note (shown under the gym's photos, ${esc(lim.noteMax || 120)} characters max)</label>
     <input type="text" data-f="clock" maxlength="${esc(lim.noteMax || 120)}" autocomplete="off" value="${esc(s.cameraClockNote || '')}" placeholder="Camera clock runs about 1 hour fast">
+    <div class="grid2">
+      <div><label class="f">Check-in system (named on the gym's page)</label><input type="text" data-f="cisys" maxlength="40" autocomplete="off" value="${esc(s.checkinSystem || '')}" placeholder="Ashbourne"></div>
+      <div><label class="f">Front entrance zone in it</label><input type="text" data-f="cizone" maxlength="30" autocomplete="off" value="${esc(s.checkinZone || '')}" placeholder="Zone 1"></div>
+    </div>
+    <label class="f">Check-in system's clock (seconds ahead of real time; minus if behind)</label>
+    <input type="number" data-f="cioff" min="-3600" max="3600" step="1" inputmode="numeric" value="${esc(s.checkinClockOffsetSec || '')}" placeholder="0 = right on time">
     <button class="btn primary" type="button" data-act="save">Save settings</button>
     <div class="out" data-out="settings" role="status"></div>`;
   box.querySelector('[data-f="mode"]').value = mode;
@@ -721,6 +790,9 @@ async function saveSettings(el, key, btn){
     model: f('model').value || null,
     dailyBurstCap: f('cap').value.trim() ? Number(f('cap').value) : null,
     cameraClockNote: f('clock').value.trim(),
+    checkinSystem: f('cisys').value.trim(),
+    checkinZone: f('cizone').value.trim(),
+    checkinClockOffsetSec: f('cioff').value.trim() === '' ? null : Number(f('cioff').value),
   };
   if(mode === 'set') Object.assign(body, { scheduleStart: f('start').value, scheduleEnd: f('end').value });
   else if(mode === 'always') body.watchHours = 'always';
@@ -993,6 +1065,183 @@ async function backfill(count){
     refresh();
   } catch(err){ el.innerHTML = `<div class="note red">${esc(err.message)}</div>`; }
 }
+
+// ---------- Ashbourne screen check reports ----------
+async function loadCheckReports(){
+  const el = $('checkReports');
+  const r = await call('/admin/ashbourne-reports').catch(() => null);
+  if(!r || !r.ok){ el.innerHTML = '<p class="empty">Couldn’t load reports.</p>'; return; }
+  const list = r.body.reports || [];
+  el.innerHTML = list.length ? list.map(x => `<div class="kline"><div class="kl"><b>${esc(when(x.at))}</b><div class="ks">${esc(x.host || 'PC')} · ${Math.round(x.bytes / 1024)} KB</div></div>
+      <div class="ka"><button class="btn primary" type="button" data-report="${esc(x.id)}">Download</button></div></div>`).join('')
+    : '<p class="empty">No reports yet. They show up here a few seconds after the check finishes.</p>';
+}
+document.addEventListener('click', async e => {
+  const b = e.target.closest('button[data-report]'); if(!b) return;
+  b.disabled = true;
+  try{
+    const r = await fetch('/admin/ashbourne-reports/' + encodeURIComponent(b.dataset.report), { headers: Object.assign({ 'X-Admin-Token': token }, adminSession ? { 'X-Admin-Session': adminSession } : {}) });
+    if(!r.ok) throw new Error('Could not download (' + r.status + ').');
+    const blob = new Blob([await r.text()], { type: 'text/plain' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob); a.download = 'ashbourne-check-' + b.dataset.report;
+    document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 2000);
+  }catch(err){ alert(err.message); }
+  finally{ b.disabled = false; }
+});
+setInterval(() => { if(!document.hidden && $('panel') && $('panel').style.display === 'block') loadCheckReports(); }, 20000);
+
+// ---------- protected member numbers ----------
+// Owner device = this browser holds the signing key (made here, can't be
+// copied out). Approvals and removals are signed here; the front-desk
+// reader checks them against the owner key it pinned at setup.
+let keysData = null, myKeys = { sign: null, read: null };
+async function loadKeys(){
+  const el = $('keysOwner');
+  if(!window.MemberCrypto || !MemberCrypto.supported){ el.innerHTML = '<div class="note red">This browser can’t hold keys. Use Safari or Chrome on your own phone.</div>'; return; }
+  try{
+    myKeys.sign = await MemberCrypto.getKey('sign');
+    myKeys.read = await MemberCrypto.getKey('read');
+    const r = await call('/admin/keys');
+    if(!r.ok) throw new Error(r.body.error || 'Could not load.');
+    keysData = r.body;
+    await ensureOwnReadDevices();
+    renderKeys();
+  }catch(err){ el.innerHTML = `<div class="note red">${esc(err.message)}</div>`; }
+}
+const isOwnerHere = () => !!(keysData && keysData.owner && myKeys.sign && myKeys.sign.fp === keysData.owner.fp);
+// The owner device can read member numbers for every gym (to fix things).
+async function ensureOwnReadDevices(){
+  if(!isOwnerHere()) return;
+  if(!myKeys.read) myKeys.read = await MemberCrypto.makeKey('read');
+  for(const [key, g] of Object.entries(keysData.gyms || {})){
+    const mine = localStorage.getItem('sai:dev:' + key);
+    if(mine && g.devices.some(d => d.id === mine && d.status === 'approved')) continue;
+    const at = String(Date.now());
+    const sig = await MemberCrypto.sign(MemberCrypto.approvePayload(key, myKeys.read.fp, at));
+    const r = await call(`/admin/keys/${encodeURIComponent(key)}/devices`, { json: { pub: myKeys.read.pub, name: 'Owner device (admin)', at, sig } });
+    if(r.ok){ localStorage.setItem('sai:dev:' + key, r.body.id); }
+  }
+  const r = await call('/admin/keys'); if(r.ok) keysData = r.body;
+}
+function renderKeys(){
+  const o = keysData.owner;
+  let h = '';
+  if(!o) h = `<div class="note">No owner device yet. Do this on <strong>your own phone</strong> (the one you’ll approve staff from):</div>
+      <button class="btn primary" type="button" data-k="makeOwner" style="margin-top:10px;">Make this my owner device</button>`;
+  else if(isOwnerHere()) h = `<div class="note green"><strong>This is your owner device</strong> · code <span class="mono">${esc(o.code)}</span>. You can approve and remove devices here, and see member numbers for every gym.</div>`;
+  else h = `<div class="note blue">Your owner device is another phone or computer (code <span class="mono">${esc(o.code)}</span>). Approve and remove devices from there.
+      <br><button class="btn" type="button" data-k="replaceOwner" style="margin-top:8px;">Lost it? Make this the owner device instead</button></div>`;
+  $('keysOwner').innerHTML = h;
+  const gyms = Object.entries(keysData.gyms || {});
+  $('keysGyms').innerHTML = gyms.map(([key, g]) => {
+    const rd = g.reader;
+    const fresh = rd && rd.lastSeen && Date.now() - Date.parse(rd.lastSeen) < 15 * 60e3;
+    const reader = !rd || !rd.lastSeen
+      ? `<div class="kline"><div class="kl"><b>Front-desk reader</b><div class="ks">Not set up yet. Get a code below and run it on the Ashbourne PC.</div></div><span class="pill none">Not set up</span></div>`
+      : `<div class="kline"><div class="kl"><b>Front-desk reader</b> · ${esc(rd.host || 'Ashbourne PC')}
+           <div class="ks">Checked in ${esc(ago(rd.lastSeen))}${rd.lastScanAt ? ' · last scan ' + esc(ago(rd.lastScanAt)) : ' · no scans yet'}${rd.clockSkewSec ? ` · PC clock ${Math.abs(rd.clockSkewSec)} s ${rd.clockSkewSec > 0 ? 'slow' : 'fast'} (corrected)` : ''}</div></div>
+         <span class="pill ${fresh && !rd.problem ? 'on' : 'off'}">${fresh ? (rd.problem ? 'Needs attention' : 'Online') : 'Offline'}</span></div>
+         ${rd.problem ? `<div class="note red" style="margin:0 0 6px;"><strong>${esc(rd.problem)}</strong>${rd.fix ? `<br>How to fix: ${esc(rd.fix)}` : ''}</div>` : ''}
+         ${rd.version && rd.latest && rd.version !== rd.latest ? `<div class="note" style="margin:0 0 6px;">Reader ${esc(rd.version)} on the PC; ${esc(rd.latest)} is out. It updates itself within 6 hours (or on the PC: run the setup line and choose 1).</div>` : ''}`;
+    const staff = g.devices.filter(d => !d.owner);
+    const devs = staff.map(d => `<div class="kline"><div class="kl"><b>${esc(d.name)}</b> <span class="chip">${esc(d.code)}</span>
+          <div class="ks">${d.status === 'approved' ? 'Approved ' + esc(ago(d.approvedAt)) + (d.lastSeen ? ' · last used ' + esc(ago(d.lastSeen)) : '') : 'Asked ' + esc(ago(d.createdAt)) + ' · check their screen shows this code'}</div></div>
+        <div class="ka">${d.status === 'pending'
+          ? (isOwnerHere() ? `<button class="btn primary" type="button" data-k="approve" data-g="${esc(key)}" data-dev="${esc(d.id)}">Approve</button>` : '') + `<button class="btn" type="button" data-k="remove" data-g="${esc(key)}" data-dev="${esc(d.id)}">Reject</button>`
+          : (isOwnerHere() ? `<button class="btn danger" type="button" data-k="remove" data-g="${esc(key)}" data-dev="${esc(d.id)}" data-approved="1">Remove</button>` : '<span class="pill on">Approved</span>')}</div></div>`).join('');
+    const nApproved = staff.filter(d => d.status === 'approved').length;
+    return `<div class="kgym"><h3>${esc(g.name)}</h3>
+      ${reader}
+      <div class="kline"><div class="kl"><b>Who can see member numbers</b><div class="ks">You${nApproved ? ` and ${nApproved} approved ${nApproved === 1 ? 'device' : 'devices'}` : ' only'}. Staff ask from the gym page and appear here with a code.</div></div></div>
+      ${devs}
+      <div class="kbtns">
+        <button class="btn" type="button" data-k="readerCode" data-g="${esc(key)}">${rd && rd.lastSeen ? 'Reader: new code' : 'Set up the front-desk reader'}</button>
+        ${isOwnerHere() ? `<button class="btn" type="button" data-k="scans" data-g="${esc(key)}">Recent scans</button>` : ''}
+        ${rd && rd.lastSeen ? `<button class="btn danger" type="button" data-k="unpairReader" data-g="${esc(key)}">Unpair reader</button>` : ''}
+      </div>
+      <div id="keysOut-${esc(key)}"></div></div>`;
+  }).join('');
+}
+function ago(iso){
+  const t = Date.parse(iso); if(isNaN(t)) return '—';
+  const s = Math.max(0, Math.round((Date.now() - t) / 1000));
+  if(s < 60) return 'just now';
+  if(s < 3600) return Math.round(s / 60) + ' min ago';
+  if(s < 86400) return Math.round(s / 3600) + ' h ago';
+  return new Date(t).toLocaleDateString('en-US', { month:'short', day:'numeric' });
+}
+async function keysAction(b){
+  const k = b.dataset.k, key = b.dataset.g, id = b.dataset.dev, out = key ? $('keysOut-' + key) : null;
+  const show = (html, cls) => { if(out) out.innerHTML = `<div class="note ${cls || ''}">${html}</div>`; };
+  b.disabled = true;
+  try{
+    if(k === 'makeOwner' || k === 'replaceOwner'){
+      if(k === 'replaceOwner' && !confirm('Make THIS browser the owner device? The front-desk reader will then need setting up again (it only trusts the owner device it was set up with).')) return;
+      myKeys.sign = await MemberCrypto.makeKey('sign');
+      myKeys.read = myKeys.read || await MemberCrypto.makeKey('read');
+      const r = await call('/admin/keys/owner', { json: { sign: myKeys.sign.pub, replace: k === 'replaceOwner' } });
+      if(!r.ok) throw new Error(r.body.error || 'Could not save.');
+      for(const g of Object.keys(keysData.gyms || {})) localStorage.removeItem('sai:dev:' + g);
+      await loadKeys();
+      return;
+    }
+    if(k === 'approve'){
+      const r = await call(`/admin/keys/${encodeURIComponent(key)}/devices/${encodeURIComponent(id)}`);
+      if(!r.ok) throw new Error(r.body.error || 'That device is gone.');
+      // Worked out HERE from the device's own key, not taken from the website.
+      const fp = await MemberCrypto.fingerprint(r.body.pub), code = MemberCrypto.codeOf(fp);
+      if(!confirm(`Does their screen show the code ${code}?\n\nOnly approve if it matches exactly.`)) return;
+      const at = String(Date.now());
+      const sig = await MemberCrypto.sign(MemberCrypto.approvePayload(key, fp, at));
+      const a = await call(`/admin/keys/${encodeURIComponent(key)}/devices/${encodeURIComponent(id)}/approve`, { json: { at, sig } });
+      if(!a.ok) throw new Error(a.body.error || 'Could not approve.');
+      await loadKeys(); return;
+    }
+    if(k === 'remove'){
+      if(!confirm(b.dataset.approved ? 'Remove this device? It stops seeing member numbers straight away.' : 'Reject this request?')) return;
+      let body = {};
+      if(b.dataset.approved){
+        const r = await call(`/admin/keys/${encodeURIComponent(key)}/devices/${encodeURIComponent(id)}`);
+        if(!r.ok) throw new Error(r.body.error || 'That device is gone.');
+        const fp = await MemberCrypto.fingerprint(r.body.pub), at = String(Date.now());
+        body = { at, sig: await MemberCrypto.sign(MemberCrypto.revokePayload(key, fp, at)) };
+      }
+      const x = await call(`/admin/keys/${encodeURIComponent(key)}/devices/${encodeURIComponent(id)}/remove`, { json: body });
+      if(!x.ok) throw new Error(x.body.error || 'Could not remove.');
+      await loadKeys(); return;
+    }
+    if(k === 'readerCode'){
+      const r = await call('/admin/pair', { json: { gymCode: key, role: 'reader' } });
+      if(!r.ok) throw new Error(r.body.error || 'Could not make a code.');
+      show(`<strong>Front-desk reader code: <span class="mono" style="font-size:20px;">${esc(r.body.display)}</span></strong> (works once, for 15 minutes)<br>
+        On the Ashbourne PC, open <strong>Windows PowerShell</strong>, paste this, press Enter, and type the code when asked:
+        <div class="copyrow"><input type="text" readonly value="[Net.ServicePointManager]::SecurityProtocol='Tls12'; irm ${esc(SITE)}/securityai-reader.txt | iex" id="rdCmd-${esc(key)}"><button class="btn" type="button" data-copy="#rdCmd-${esc(key)}">Copy</button></div>
+        It will show an owner device code: check it says <span class="mono">${esc(keysData.owner ? keysData.owner.code : '—')}</span>.`, 'green');
+      return;
+    }
+    if(k === 'unpairReader'){
+      if(!confirm('Unpair the front-desk reader? It stops sending scans until it is set up again.')) return;
+      const r = await call(`/admin/gyms/${encodeURIComponent(key)}/unpair-reader`, { method: 'POST' });
+      if(!r.ok) throw new Error(r.body.error || 'Could not unpair.');
+      show('Unpaired. Set it up again with a new code when you’re ready.', 'green'); return;
+    }
+    if(k === 'scans'){
+      const dev = localStorage.getItem('sai:dev:' + key);
+      const r = await call(`/admin/keys/${encodeURIComponent(key)}/scans?hours=12&device=${encodeURIComponent(dev || '')}`);
+      if(!r.ok) throw new Error(r.body.error || 'Could not load scans.');
+      const rows = [];
+      for(const s of r.body.scans.slice().reverse()){
+        let m = '?'; try{ m = (await MemberCrypto.openScan(s)).m; }catch(e){ m = '(can’t open: ' + e.message + ')'; }
+        rows.push(`<div class="kline"><div class="kl"><b>Member #${esc(m)}</b><div class="ks">${esc(when(s.t))} · ${esc(s.zone)}</div></div></div>`);
+      }
+      if(out) out.innerHTML = rows.length ? `<div style="margin-top:8px;">${rows.join('')}</div>` : '<p class="empty">No scans in the last 12 hours.</p>';
+      return;
+    }
+  }catch(err){ show(esc(err.message), 'red'); }
+  finally{ b.disabled = false; }
+}
+document.addEventListener('click', e => { const b = e.target.closest('button[data-k]'); if(b && ($('keysCard').contains(b))) keysAction(b); });
 
 // Remembered for this tab (and, if ticked, on this phone).
 (function restore(){

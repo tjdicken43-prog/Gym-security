@@ -370,6 +370,7 @@ function startRtspZone(cfg, handlers) {
   let acc = Buffer.alloc(0);
   const zoneState = {};
   detect.resetZone(zoneState);
+  const tamperState = {};
   let prevCells = null;
 
   // rolling buffer of recent JPEGs, so when an event ends we can pick
@@ -408,6 +409,11 @@ function startRtspZone(cfg, handlers) {
         stats.motionHistory.push({ t: now, pct: stats.motionPct });
         if (stats.motionHistory.length > 400) stats.motionHistory.splice(0, stats.motionHistory.length - 400);
       }
+      // Covered, dark, frozen or turned away? (free, on the same grid)
+      const was = stats.tamper ? stats.tamper.kind : null;
+      stats.tamper = detect.tamperStep(tamperState, cells, prevCells, now);
+      const is = stats.tamper ? stats.tamper.kind : null;
+      if (is !== was && handlers.onTamper) handlers.onTamper(is, stats.tamper);
       prevCells = cells;
 
       const wasActive = !!zoneState.eventActive;

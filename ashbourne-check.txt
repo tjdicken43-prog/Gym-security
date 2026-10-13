@@ -1,0 +1,279 @@
+# SecurityAI - Ashbourne screen check (Windows PowerShell 5.1)
+#
+# READ-ONLY. Changes nothing in Ashbourne or on this computer, sends nothing
+# anywhere. It looks at how the Ashbourne window is built (the same way a
+# screen reader does) and writes a report to the Desktop:
+#     securityai-ashbourne-check.txt
+# Member names and numbers are blanked out in the report (Xxxxx / 9999):
+# only the layout and labels are kept.
+#
+# Run it on the front-desk PC with Ashbourne open on the Visit Log
+# (copy the line from the admin page > "Ashbourne screen check"):
+#     irm https://gym-security.onrender.com/ashbourne-check.txt | iex
+#
+# The blanked report is also sent to the admin page, so you can download it
+# on your phone. Nothing else is sent.
+
+function Invoke-SaiCheck {
+$ErrorActionPreference = 'Continue'
+try { [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12 } catch { }
+$Site = 'https://gym-security.onrender.com'
+if ($env:SECURITYAI_SITE) { $Site = $env:SECURITYAI_SITE.TrimEnd('/') }
+try {
+  Add-Type -AssemblyName UIAutomationClient
+  Add-Type -AssemblyName UIAutomationTypes
+} catch {
+  Write-Host ''
+  Write-Host 'This needs "Windows PowerShell" (the blue one), not PowerShell 7.' -ForegroundColor Yellow
+  Write-Host 'Click Start, type: Windows PowerShell, open it, and paste the line again.' -ForegroundColor Yellow
+  return
+}
+
+$AE = [System.Windows.Automation.AutomationElement]
+$walker = [System.Windows.Automation.TreeWalker]::ControlViewWalker
+
+# Words kept as they are in the report (Ashbourne's own labels). Anything
+# else - names, numbers, dates - is blanked to its shape only.
+$keep = @('visit','log','mem','no','name','status','entry','date','time','zone','zones','msg','message',
+  'admission','live','card','membership','ash','ref','known','as','payment','last','review','retention',
+  'view','member','members','manual','home','bookings','epos','bi','dashboard','exports','settings','all',
+  'paid','in','full','new','records','frozen','expired','cancelled','search','messages','subject','inbox',
+  'days','update','available','click','to','apply','rolling','contract','month','visits','the','past',
+  'two','months','am','pm','ok','cancel','close','refresh','export','filter','from','date','today')
+
+function Mask([string]$s) {
+  if ([string]::IsNullOrEmpty($s)) { return '' }
+  $parts = [regex]::Split($s, '(\s+)')
+  $out = New-Object System.Text.StringBuilder
+  foreach ($t in $parts) {
+    if ($t -match '^\s+$') { [void]$out.Append(' '); continue }
+    $core = $t.Trim('.', ',', ':', ';', '(', ')', '[', ']').ToLower()
+    if ($keep -contains $core) { [void]$out.Append($t); continue }
+    $m = $t -creplace '[A-Z]', 'X'
+    $m = $m -creplace '[a-z]', 'x'
+    $m = $m -replace '[0-9]', '9'
+    [void]$out.Append($m)
+  }
+  return $out.ToString()
+}
+
+function Snapshot($windows) {
+  $raw = New-Object System.Collections.Generic.List[string]
+  $masked = New-Object System.Collections.Generic.List[string]
+  $script:nodes = 0
+  foreach ($w in $windows) { Walk $w 0 $raw $masked }
+  return @{ raw = $raw; masked = $masked }
+}
+
+function Walk($el, [int]$depth, $raw, $masked) {
+  if ($script:nodes -ge 5000 -or $depth -gt 16) { return }
+  $script:nodes++
+  try { $c = $el.Current } catch { return }
+  $val = ''
+  try {
+    $vp = $el.GetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern)
+    if ($vp) { $val = [string]$vp.Current.Value }
+  } catch { }
+  $type = ($c.ControlType.ProgrammaticName -replace '^ControlType\.', '')
+  $pad = '  ' * $depth
+  $r = $pad + $type + ' | name="' + $c.Name + '" | id="' + $c.AutomationId + '" | class="' + $c.ClassName + '"'
+  $m = $pad + $type + ' | name="' + (Mask $c.Name) + '" | id="' + $c.AutomationId + '" | class="' + $c.ClassName + '"'
+  if ($val) { $r += ' | value="' + $val + '"'; $m += ' | value="' + (Mask $val) + '"' }
+  $raw.Add($r); $masked.Add($m)
+  try { $child = $walker.GetFirstChild($el) } catch { $child = $null }
+  $kids = 0
+  while ($child -ne $null) {
+    $kids++
+    if ($kids -gt 40) { $raw.Add($pad + '  ... (more rows not read)'); $masked.Add($pad + '  ... (more rows not read)'); break }
+    Walk $child ($depth + 1) $raw $masked
+    try { $child = $walker.GetNextSibling($child) } catch { $child = $null }
+  }
+}
+
+# --- Find Ashbourne's windows ---------------------------------------------
+$tops = $AE::RootElement.FindAll([System.Windows.Automation.TreeScope]::Children, [System.Windows.Automation.Condition]::TrueCondition)
+$procIds = @{}
+$allTitles = @()
+foreach ($t in $tops) {
+  $c = $t.Current
+  $pn = ''
+  try { $pn = (Get-Process -Id $c.ProcessId -ErrorAction Stop).ProcessName } catch { }
+  $allTitles += ('  ' + $pn + ' : ' + (Mask $c.Name))
+  if ($pn -match 'ashbourne' -or $c.Name -match 'ashbourne|visit log|live entry') { $procIds[$c.ProcessId] = $pn }
+}
+if ($procIds.Count -eq 0) {
+  # Not obvious from the names: let the person pick it from a list.
+  $choices = @()
+  foreach ($t in $tops) {
+    $c = $t.Current
+    if (-not $c.Name) { continue }
+    $pn = ''
+    try { $pn = (Get-Process -Id $c.ProcessId -ErrorAction Stop).ProcessName } catch { }
+    if ($pn -match '^(explorer|powershell|pwsh|WindowsTerminal|conhost|ShellExperienceHost|SearchHost|StartMenuExperienceHost|TextInputHost)$') { continue }
+    $choices += [pscustomobject]@{ t = $t; pn = $pn; title = $c.Name }
+  }
+  Write-Host ''
+  Write-Host 'Which of these is Ashbourne? (window title - program)' -ForegroundColor Cyan
+  for ($i = 0; $i -lt $choices.Count; $i++) { Write-Host ('  ' + ($i + 1) + '. ' + $choices[$i].title + '  -  ' + $choices[$i].pn) }
+  $pick = Read-Host 'Type its number (Enter = none of these)'
+  $n = 0
+  if ([int]::TryParse($pick, [ref]$n) -and $n -ge 1 -and $n -le $choices.Count) { $procIds[$choices[$n - 1].t.Current.ProcessId] = $choices[$n - 1].pn }
+}
+$wins = @()
+foreach ($t in $tops) { if ($procIds.ContainsKey($t.Current.ProcessId)) { $wins += $t } }
+
+$report = New-Object System.Collections.Generic.List[string]
+$report.Add('SecurityAI - Ashbourne screen check')
+$report.Add('PC time: ' + (Get-Date).ToString('yyyy-MM-dd HH:mm:ss.fff') + '  zone: ' + [TimeZoneInfo]::Local.Id + '  utc: ' + (Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ss.fffZ'))
+$report.Add('PowerShell: ' + $PSVersionTable.PSVersion.ToString() + '  Windows: ' + [Environment]::OSVersion.VersionString)
+$report.Add('')
+
+$desk = [Environment]::GetFolderPath('Desktop')
+$file = Join-Path $desk 'securityai-ashbourne-check.txt'
+
+if ($wins.Count -eq 0) {
+  $report.Add('No Ashbourne window found. Open windows were:')
+  foreach ($x in $allTitles) { $report.Add($x) }
+  $report | Set-Content -Path $file -Encoding UTF8
+  try { Invoke-RestMethod -Method POST -Uri ($Site + '/ashbourne-check/report') -ContentType 'text/plain; charset=utf-8' -Body ([Text.Encoding]::UTF8.GetBytes(($report -join "`r`n"))) -Headers @{ 'X-Check-Host' = $env:COMPUTERNAME } -TimeoutSec 60 | Out-Null } catch { }
+  Write-Host ''
+  Write-Host 'Could not find Ashbourne. Open Ashbourne, then paste the line again.' -ForegroundColor Yellow
+  Write-Host ('(A list of open windows was saved to ' + $file + ')')
+  return
+}
+
+$report.Add('Ashbourne windows: ' + $wins.Count + ' (process: ' + (($procIds.Values | Select-Object -Unique) -join ', ') + ')')
+Write-Host ''
+Write-Host 'Found Ashbourne. Reading the screen (this can take up to a minute)...' -ForegroundColor Cyan
+$sw = [Diagnostics.Stopwatch]::StartNew()
+$a = Snapshot $wins
+$readSecs = [math]::Round($sw.Elapsed.TotalSeconds, 1)
+$report.Add('First read: ' + $a.raw.Count + ' items in ' + $readSecs + ' s')
+
+# --- Watch while someone scans: catch the pop-up the moment it shows ------
+function QWalk($el, [int]$d, $sb) {
+  if ($script:qn -ge 800 -or $d -gt 8) { return }
+  $script:qn++
+  try { $c = $el.Current } catch { return }
+  [void]$sb.Append($c.Name).Append('|')
+  try { $vp = $el.GetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern); if ($vp) { [void]$sb.Append($vp.Current.Value).Append('|') } } catch { }
+  try { $ch = $walker.GetFirstChild($el) } catch { $ch = $null }
+  while ($ch -ne $null) { QWalk $ch ($d + 1) $sb; try { $ch = $walker.GetNextSibling($ch) } catch { $ch = $null } }
+}
+function QuickSig($el) { $script:qn = 0; $sb = New-Object System.Text.StringBuilder; QWalk $el 0 $sb; return $sb.ToString() }
+# The pop-up is found by its "Membership No" label (a menu item can also be
+# called "Live Entry"), then widened to the box that also holds "Entry Message".
+function SubtreeHas($el, [string]$text) { $script:qn = 0; $sb = New-Object System.Text.StringBuilder; QWalk $el 0 $sb; return ($sb.ToString() -match [regex]::Escape($text)) }
+function FindLive() {
+  $cond = New-Object System.Windows.Automation.PropertyCondition($AE::NameProperty, 'Membership No')
+  $all = @($AE::RootElement.FindAll([System.Windows.Automation.TreeScope]::Children, [System.Windows.Automation.Condition]::TrueCondition) | Where-Object { $procIds.ContainsKey($_.Current.ProcessId) })
+  foreach ($w in $all) {
+    try {
+      $f = $w.FindFirst([System.Windows.Automation.TreeScope]::Descendants, $cond)
+      if (-not $f) { continue }
+      $box = $walker.GetParent($f)
+      for ($i = 0; $i -lt 4 -and $box; $i++) { if (SubtreeHas $box 'Entry Message') { return $box }; $box = $walker.GetParent($box) }
+      return $walker.GetParent($f)
+    } catch { }
+  }
+  return $null
+}
+function TopKey($t) { try { $c = $t.Current; return ('' + $c.ProcessId + '|' + $c.NativeWindowHandle) } catch { return '' } }
+
+$known = @{}
+foreach ($t in $tops) { $known[(TopKey $t)] = 1 }
+$live = FindLive
+$liveSig = ''
+if ($live) { $liveSig = QuickSig $live }
+$report.Add('Live Entry panel found at start: ' + [bool]$live)
+$events = New-Object System.Collections.Generic.List[string]
+$popSnaps = 0
+
+Write-Host ''
+Write-Host 'Now: go SCAN IN at the front turnstile (Zone 1). Two or three scans is even better.' -ForegroundColor Green
+Write-Host 'Leave this window open. It watches for up to 3 minutes; press Enter here when you are back to finish early.'
+$scanAsked = Get-Date
+$until = (Get-Date).AddSeconds(180)
+$loop = 0
+$lastSay = Get-Date
+while ((Get-Date) -lt $until) {
+  try { if ([Console]::KeyAvailable) { $k = [Console]::ReadKey($true); if ($k.Key -eq 'Enter') { break } } } catch { }
+  if (((Get-Date) - $lastSay).TotalSeconds -ge 30) { $lastSay = Get-Date; Write-Host ('  still watching... ' + [int]($until - (Get-Date)).TotalSeconds + ' s left (' + @($events | Where-Object { $_ -match 'CHANGED|NEW WINDOW' }).Count + ' change(s) seen so far)') }
+  $loop++
+  $now = (Get-Date).ToString('HH:mm:ss.fff')
+  # New windows (any program): the pop-up may be its own window.
+  $cur = $AE::RootElement.FindAll([System.Windows.Automation.TreeScope]::Children, [System.Windows.Automation.Condition]::TrueCondition)
+  foreach ($t in $cur) {
+    $k = TopKey $t
+    if ($k -eq '' -or $known.ContainsKey($k)) { continue }
+    $known[$k] = 1
+    $c = $t.Current; $pn = ''
+    try { $pn = (Get-Process -Id $c.ProcessId -ErrorAction Stop).ProcessName } catch { }
+    $events.Add($now + '  NEW WINDOW  process=' + $pn + '  title="' + (Mask $c.Name) + '"')
+    if (($procIds.ContainsKey($c.ProcessId) -or $c.Name -match 'live entry') -and $popSnaps -lt 4) {
+      $popSnaps++
+      $rr = New-Object System.Collections.Generic.List[string]; $mm = New-Object System.Collections.Generic.List[string]
+      $script:nodes = 0; Walk $t 0 $rr $mm
+      $events.Add('    --- that window (blanked) ---'); foreach ($x in $mm) { $events.Add('    ' + $x) }
+    }
+  }
+  # The Live Entry panel inside Ashbourne: did its contents change?
+  if (-not $live -and ($loop % 5 -eq 0)) { $live = FindLive; if ($live) { $liveSig = QuickSig $live; $events.Add($now + '  Live Entry panel appeared') } }
+  if ($live) {
+    $sig = ''
+    try { $sig = QuickSig $live } catch { $live = $null }
+    if ($live -and $sig -ne $liveSig) {
+      $liveSig = $sig
+      $events.Add($now + '  LIVE ENTRY CHANGED')
+      if ($popSnaps -lt 4) {
+        $popSnaps++
+        $rr = New-Object System.Collections.Generic.List[string]; $mm = New-Object System.Collections.Generic.List[string]
+        $script:nodes = 0; Walk $live 0 $rr $mm
+        $events.Add('    --- Live Entry now (blanked) ---'); foreach ($x in $mm) { $events.Add('    ' + $x) }
+      }
+    }
+  }
+  Start-Sleep -Milliseconds 400
+}
+$report.Add('Watch loops: ' + $loop + ' in ' + [int]((Get-Date) - $scanAsked).TotalSeconds + ' s')
+$report.Add('')
+$report.Add('===== WHAT HAPPENED DURING THE SCANS =====')
+if ($events.Count -eq 0) { $report.Add('(nothing changed)') }
+foreach ($x in $events) { $report.Add($x) }
+$report.Add('')
+
+Write-Host 'Reading again...'
+$b = Snapshot (@($AE::RootElement.FindAll([System.Windows.Automation.TreeScope]::Children, [System.Windows.Automation.Condition]::TrueCondition) | Where-Object { $procIds.ContainsKey($_.Current.ProcessId) }))
+$report.Add('Second read: ' + $b.raw.Count + ' items (scans asked for from ' + $scanAsked.ToString('HH:mm:ss') + ')')
+
+# What changed between the two reads (shown blanked).
+$seen = @{}
+foreach ($x in $a.raw) { if ($seen.ContainsKey($x)) { $seen[$x]++ } else { $seen[$x] = 1 } }
+$changed = New-Object System.Collections.Generic.List[string]
+for ($i = 0; $i -lt $b.raw.Count; $i++) {
+  $x = $b.raw[$i]
+  if ($seen.ContainsKey($x) -and $seen[$x] -gt 0) { $seen[$x]-- } else { $changed.Add($b.masked[$i]) }
+}
+$report.Add('Changed or new items between the two reads: ' + $changed.Count)
+$report.Add('')
+$report.Add('===== CHANGED (first 80) =====')
+foreach ($x in ($changed | Select-Object -First 80)) { $report.Add($x) }
+$report.Add('')
+$report.Add('===== LAYOUT (second read, first 1500 lines) =====')
+foreach ($x in ($b.masked | Select-Object -First 1500)) { $report.Add($x) }
+
+$report | Set-Content -Path $file -Encoding UTF8
+# Send the blanked report to the admin page (so TJ can get it on his phone).
+$sent = $false
+try {
+  $body = [Text.Encoding]::UTF8.GetBytes(($report -join "`r`n"))
+  $r = Invoke-RestMethod -Method POST -Uri ($Site + '/ashbourne-check/report') -ContentType 'text/plain; charset=utf-8' -Body $body -Headers @{ 'X-Check-Host' = $env:COMPUTERNAME } -TimeoutSec 60
+  $sent = [bool]$r.ok
+} catch { $sent = $false }
+Write-Host ''
+Write-Host 'Done.' -ForegroundColor Green
+if ($sent) { Write-Host 'The report was sent to your admin page (Ashbourne screen check > Download). Send that file to Claude.' -ForegroundColor Green }
+else { Write-Host 'Could not send the report to the website. It is saved on the Desktop: securityai-ashbourne-check.txt. Send that file to Claude.' -ForegroundColor Yellow }
+Write-Host 'Names and numbers in it are blanked out.'
+}
+Invoke-SaiCheck

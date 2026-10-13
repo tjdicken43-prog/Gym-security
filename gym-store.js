@@ -367,6 +367,24 @@ function normalizeSettings(input, current, opts) {
       if (t) out.cameraClockNote = t; else delete out.cameraClockNote;
     }
   }
+  // The gym's check-in software and the zone its front entrance logs as
+  // (e.g. "Ashbourne", "Zone 1"), so the page can say exactly where to look.
+  for (const [k, max] of [['checkinSystem', 40], ['checkinZone', 30]]) {
+    if (!has(k)) continue;
+    const t = clear(input[k]) ? '' : String(input[k]).replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim();
+    if (t.length > max) throw new Error(`Keep that to ${max} characters or fewer.`);
+    if (t) out[k] = t; else delete out[k];
+  }
+  // How far the check-in system's clock is off real time, in seconds
+  // (+ = its times are ahead). Found with two test scans (AT-THE-GYM.md).
+  if (has('checkinClockOffsetSec')) {
+    if (clear(input.checkinClockOffsetSec)) delete out.checkinClockOffsetSec;
+    else {
+      const n = Math.round(Number(input.checkinClockOffsetSec));
+      if (!Number.isFinite(n) || Math.abs(n) > 3600) throw new Error('Check-in clock correction must be a number of seconds between -3600 and 3600.');
+      if (n) out.checkinClockOffsetSec = n; else delete out.checkinClockOffsetSec;
+    }
+  }
   return out;
 }
 function getSettings(key) { return Object.assign({}, loadMeta(key).settings); }
@@ -379,6 +397,15 @@ function saveSettings(key, settings) {
 
 // Pairing generation. Tokens handed out before any unpair are generation
 // 0 and keep working until the operator presses Unpair for that gym.
+// The front-desk scan reader's own generation (Unpair it without touching
+// the camera computer, and the other way round).
+function readerGen(key) { const n = Number(loadMeta(key).readerGen); return Number.isInteger(n) && n > 0 ? n : 0; }
+function bumpReaderGen(key) {
+  const m = loadMeta(key);
+  m.readerGen = readerGen(key) + 1;
+  if (!saveMeta(key, m)) throw new Error('Could not save — is the disk writable?');
+  return m.readerGen;
+}
 function runnerGen(key) { const n = Number(loadMeta(key).runnerGen); return Number.isInteger(n) && n > 0 ? n : 0; }
 function bumpRunnerGen(key) {
   const m = loadMeta(key);
@@ -593,7 +620,7 @@ module.exports = {
   eventId, newEventId,
   VERDICTS, isConfirmed, loadReviews, setReview, REVIEW_NOTE_MAX,
   loadTally, tallyReview, tallySummary, tallyRows,
-  normalizeSettings, getSettings, saveSettings, runnerGen, bumpRunnerGen,
+  normalizeSettings, getSettings, saveSettings, runnerGen, bumpRunnerGen, readerGen, bumpReaderGen,
   isPaused, setPaused, noteRunnerSeen, runnerSeen, markOfflineAlerted, knownMetaKeys,
   recordDelivery, deliveryStatus, loadNights, noteNight, flushNights,
   MAX_SUBSCRIBERS, loadSubscribers, addSubscriber, removeSubscriber, normalizeEmail, normalizePhone,
