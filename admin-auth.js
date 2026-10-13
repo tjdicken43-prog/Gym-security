@@ -17,7 +17,20 @@ const crypto = require('crypto');
 
 const SESSION_DAYS = 30;
 const LINK_MINUTES = 15;
-const pending = new Map();      // id -> { approveToken, expires, approved, ua, ip, at, session }
+// id -> { approveHash, expires, approved, ua, ip, at }. Kept on the disk
+// too, so a website restart (every deploy or Render setting change) while
+// TJ is opening the email doesn't lose the sign-in. Only a HASH of the
+// email link is kept, and the session is made when it's handed out.
+const path = require('path'), fs = require('fs');
+const PENDING_FILE = process.env.DATA_DIR ? path.join(process.env.DATA_DIR, 'admin-pending.json') : null;
+const pending = new Map();
+try { if (PENDING_FILE) for (const [k, v] of Object.entries(JSON.parse(fs.readFileSync(PENDING_FILE, 'utf8')))) if (v && v.approveHash) pending.set(k, v); } catch (e) { /* none yet */ }
+function savePending() {
+  if (!PENDING_FILE) return;
+  try { fs.writeFileSync(PENDING_FILE + '.tmp', JSON.stringify(Object.fromEntries(pending))); fs.renameSync(PENDING_FILE + '.tmp', PENDING_FILE); } catch (e) { /* best effort */ }
+}
+const hashLink = t => crypto.createHash('sha256').update('admin-approve|' + String(t || '')).digest('hex');
+function findByLink(t) { const h = hashLink(t); for (const p of pending.values()) if (sameSecret(h, p.approveHash)) return p; return null; }
 
 function sameSecret(given, expected) {
   if (!given || !expected) return false;
@@ -65,7 +78,9 @@ function isAdmin(req) { return check(req).ok; }
 
 function prune() {
   const now = Date.now();
-  for (const [id, p] of pending) if (p.expires < now - 5 * 60e3) pending.delete(id);
+  let changed = false;
+  for (const [id, p] of pending) if (p.expires < now - 5 * 60e3) { pending.delete(id); changed = true; }
+  if (changed) savePending();
 }
 function maskEmail(e) {
   const [u, d] = String(e).split('@');
@@ -101,8 +116,8 @@ function mount(app, deps) {
     prune();
     const id = crypto.randomBytes(16).toString('hex');
     const approveToken = crypto.randomBytes(24).toString('base64url');
-    const p = { approveToken, expires: Date.now() + LINK_MINUTES * 60e3, approved: false, ua: req.get('User-Agent') || '', ip: String(req.get('X-Forwarded-For') || req.socket.remoteAddress || '').split(',').pop().trim(), at: new Date().toISOString() };
-    pending.set(id, p);
+    const p = { approveHash: hashLink(approveToken), expires: Date.now() + LINK_MINUTES * 60e3, approved: false, ua: req.get('User-Agent') || '', ip: String(req.get('X-Forwarded-For') || req.socket.remoteAddress || '').split(',').pop().trim(), at: new Date().toISOString() };
+    pending.set(id, p); savePending();
     const proto = String(req.get('X-Forwarded-Proto') || req.protocol || 'http').split(',')[0].trim();
     const base = (publicBaseUrl && publicBaseUrl()) || `${proto}://${req.get('host')}`;
     const link = `${base}/admin/approve?t=${encodeURIComponent(approveToken)}`;
@@ -116,7 +131,7 @@ function mount(app, deps) {
       });
       if (!r || !r.delivered) throw new Error((r && r.reason) || 'not sent');
     } catch (err) {
-      pending.delete(id);
+      pending.delete(id); savePending();
       return res.status(502).json({ error: `The approval email could not be sent (${err.message}). To get in anyway, set ADMIN_EMAIL_CONFIRM=off on Render.` });
     }
     res.json({ ok: true, id, sentTo: maskEmail(adminEmail()), minutes: LINK_MINUTES });
@@ -129,15 +144,15 @@ function mount(app, deps) {
     const p = pending.get(String(req.query.id || ''));
     if (!p || p.expires < Date.now() && !p.approved) return res.json({ ok: false, expired: true });
     if (!p.approved) return res.json({ ok: false, waiting: true });
-    pending.delete(String(req.query.id));     // the session is handed out once
-    res.set('Cache-Control', 'no-store').json({ ok: true, session: p.session });
+    pending.delete(String(req.query.id)); savePending();     // the session is handed out once
+    res.set('Cache-Control', 'no-store').json({ ok: true, session: signSession() });
   });
 
   // Step 3: the link in the email. GET only shows a button.
   app.get('/admin/approve', (req, res) => {
     res.set('Cache-Control', 'no-store');
     const t = String(req.query.t || '');
-    const p = [...pending.values()].find(x => sameSecret(t, x.approveToken));
+    const p = findByLink(t);
     if (!p || p.expires < Date.now()) return res.status(410).send(page('Link expired', '<h1>This link has expired</h1><p>Go back to the admin page and sign in again for a new one.</p>'));
     if (p.approved) return res.send(page('Approved', '<h1>Already approved ✓</h1><p>The admin page you were signing in on opens by itself.</p><a href="/admin.html" class="ok" style="display:block;text-align:center;text-decoration:none;line-height:52px;border-radius:10px;font-weight:700;margin-top:12px;">Open the admin page</a>'));
     res.send(page('Approve sign-in', `<h1>Approve admin sign-in?</h1>
@@ -156,9 +171,9 @@ function mount(app, deps) {
   app.post('/admin/approve', formBody, (req, res) => {
     res.set('Cache-Control', 'no-store');
     const t = String((req.body && req.body.t) || '');
-    const p = [...pending.values()].find(x => sameSecret(t, x.approveToken));
+    const p = findByLink(t);
     if (!p || p.expires < Date.now()) return res.status(410).send(page('Link expired', '<h1>This link has expired</h1><p>Sign in again on the admin page for a new one.</p>'));
-    if (!p.approved) { p.approved = true; p.session = signSession(); p.expires = Date.now() + 5 * 60e3; }
+    if (!p.approved) { p.approved = true; p.expires = Date.now() + 5 * 60e3; savePending(); }
     // Also approve THIS browser (the session is useless without the admin
     // token, so it's safe here), so "Open the admin page" works from this
     // tab too, not only from the tab that was waiting.
@@ -166,7 +181,7 @@ function mount(app, deps) {
       <p>The admin page you were signing in on opens by itself within a few seconds.</p>
       <p>Or open it here:</p>
       <a href="/admin.html" style="display:block;text-align:center;text-decoration:none;line-height:52px;border-radius:10px;font-weight:700;margin-top:12px;" class="ok">Open the admin page</a>
-      <script>try{localStorage.setItem('securityai:adminSession', ${JSON.stringify(p.session)});}catch(e){}</script>`));
+      <script>try{localStorage.setItem('securityai:adminSession', ${JSON.stringify(signSession())});}catch(e){}</script>`));
   });
 }
 

@@ -12,7 +12,7 @@
 # Everything it keeps is in %LOCALAPPDATA%\SecurityAI (the pairing key is
 # locked to this Windows user with Windows' own protection, DPAPI).
 
-$ReaderVersion = '1.1.0'
+$ReaderVersion = '1.1.1'
 $ErrorActionPreference = 'Stop'
 try { [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12 } catch { }
 
@@ -230,7 +230,7 @@ function FindLiveEntry() {
     if ($script:AshPids.Count -eq 0) {
       $pn = ''
       try { $pn = (Get-Process -Id $pid_ -ErrorAction Stop).ProcessName } catch { }
-      if ($pn -notmatch 'ashbourne' -and $w.Current.Name -notmatch 'ashbourne|live entry|visit log') { continue }
+      if ($pn -notmatch 'ashbourne|^mvs' -and $w.Current.Name -notmatch 'ashbourne|live entry|visit log|^\s*mvsv?\d') { continue }
     }
     $script:AshSeenAt = Get-Date
     try {
@@ -469,10 +469,25 @@ function Setup() {
     if ($c -ne '2') { return }
   }
   Say 'On the admin page: J Street > Front-desk reader > Get a code. Type the 6 numbers here.'
-  $code = (Read-Host 'Pairing code') -replace '\D', ''
-  try {
-    $r = Invoke-RestMethod -Method POST -Uri ($Site + '/monitor/runner/pair') -ContentType 'application/json' -Body (@{ code = $code; host = ('front desk: ' + $env:COMPUTERNAME) } | ConvertTo-Json -Compress) -TimeoutSec 60
-  } catch { Say ('That did not work: ' + $_.Exception.Message) Red; return }
+  # Up to 3 tries: a mistyped code, or the website busy restarting after an update.
+  $r = $null
+  for ($try = 1; $try -le 3 -and -not $r; $try++) {
+    $code = (Read-Host 'Pairing code') -replace '\D', ''
+    try {
+      $r = Invoke-RestMethod -Method POST -Uri ($Site + '/monitor/runner/pair') -ContentType 'application/json' -Body (@{ code = $code; host = ('front desk: ' + $env:COMPUTERNAME) } | ConvertTo-Json -Compress) -TimeoutSec 90
+    } catch {
+      $said = $null
+      try { $said = ($_.ErrorDetails.Message | ConvertFrom-Json).error } catch { }
+      if (-not $said) {
+        $st = 0; try { $st = [int]$_.Exception.Response.StatusCode } catch { }
+        if ($st -ge 500 -or $st -eq 0) { $said = 'The website is not answering right now (it may be restarting after an update). Wait a minute and type the same code again.' }
+        else { $said = $_.Exception.Message }
+      }
+      Say $said Red
+      if ($try -lt 3) { Say 'Try again:' Yellow }
+    }
+  }
+  if (-not $r) { Say 'Stopped. Make a new code on the admin page and paste the setup line again.' Yellow; return }
   if (-not $r.readerToken) { Say 'That code is for a camera computer, not the front-desk reader. Make a "Front-desk reader" code on the admin page.' Red; return }
   $token = $r.readerToken
   $t = Api 'GET' '/reader/trust' $null $token

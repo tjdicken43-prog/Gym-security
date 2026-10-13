@@ -666,6 +666,8 @@ function keptWords(e){
 let member = { state: 'off', id: null, code: null };
 let opened = [];            // [{ t, zone, m }] scans opened on this phone
 let memberBusy = false, memberPoll = null, lastScanFetch = 0;
+// Back from another app (e.g. TJ just approved): check straight away.
+document.addEventListener('visibilitychange', () => { if(!document.hidden && member.state === 'pending') initMember(true); });
 const devKey = () => 'sai:dev:' + gymCode;
 async function initMember(force){
   if(memberBusy || !gymCode) return;
@@ -676,7 +678,11 @@ async function initMember(force){
     const key = await MemberCrypto.getKey('read');
     if(!id || !key){ member = { state: 'none', id: null, code: null }; return; }
     const r = await api('/gym/keys/device/' + encodeURIComponent(id));
-    if(!r.ok || !r.body.ok){ member = { state: 'removed', id, code: key.code }; return; }
+    // Only "this phone isn't on the list" means removed. The website
+    // restarting or the signal dropping must never look like that (asking
+    // again would throw away an approved key).
+    if(r.ok && r.body && r.body.status === 'gone'){ member = { state: 'removed', id, code: key.code }; return; }
+    if(!r.ok || !r.body.ok){ setTimeout(() => initMember(true), 10000); return; }   // try again shortly, change nothing
     member = { state: r.body.status === 'approved' ? 'approved' : 'pending', id, code: r.body.code };
     if(member.state === 'approved' && (force || Date.now() - lastScanFetch > 60e3)){
       lastScanFetch = Date.now();

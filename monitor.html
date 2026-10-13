@@ -319,6 +319,8 @@ try{ adminToken = sessionStorage.getItem('securityai:admin') || localStorage.get
 function tokenHeaders(extra){
   const h = Object.assign({}, extra || {});
   if(adminToken) h['X-Admin-Token'] = adminToken;
+  // The email-approved sign-in from the admin page (same browser).
+  try{ const ses = localStorage.getItem('securityai:adminSession'); if(ses) h['X-Admin-Session'] = ses; }catch(e){}
   return h;
 }
 // fetch() with the token. A 403 means the token is missing or wrong:
@@ -332,6 +334,8 @@ async function opFetch(url, opts){
   o.headers = tokenHeaders(o.headers);
   const res = await fetch(url, o);
   if(res.status === 403){
+    let b = {}; try{ b = await res.clone().json(); }catch(e){}
+    if(b.needEmail){ needToken('This browser needs approving first: sign in on the admin page and tap Approve in the email.'); const err = new Error('Sign in on the admin page first (email approval).'); err.status = 403; throw err; }
     needToken(adminToken ? 'That admin token was not accepted. Copy ADMIN_TOKEN again from Render > Environment.' : 'Enter the admin token first.');
     const err = new Error(adminToken ? 'Admin token not accepted — enter it again at the top of this page.' : 'Enter the admin token at the top of this page first.');
     err.status = 403; throw err;
@@ -364,6 +368,8 @@ async function checkToken(){
     }
     const r = await fetch('/monitor/debug', { headers: tokenHeaders() });
     tokenAccepted = r.ok;
+    if(r.status === 403){ let b = {}; try{ b = await r.clone().json(); }catch(e){}
+      if(b.needEmail){ needToken('Right token, but this browser needs approving first: open the admin page here, sign in and tap Approve in the email. Then come back.'); return false; } }
     if(r.status === 403 || r.status === 404){ needToken(adminToken ? 'That admin token was not accepted. Copy ADMIN_TOKEN again from Render > Environment.' : 'Enter the admin token.'); return false; }
     tokenOk(); return true;
   }catch(e){ return false; }

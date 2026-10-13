@@ -72,7 +72,7 @@ function isPrivateStaticPath(p) {
   let s;
   try { s = decodeURIComponent(p); } catch (e) { return true; }
   s = path.posix.normalize('/' + s.replace(/\\/g, '/')).toLowerCase();   // Mac disks ignore case
-  return /^\/+(rtsp-zones|ingest-zones|gyms|report-sends|runner-pairings)\.json/.test(s)
+  return /^\/+(rtsp-zones|ingest-zones|gyms|report-sends|runner-pairings|pair-codes|admin-pending)\.json/.test(s)
     || /^\/+(alert-log-|summary-|mail-progress-|gym-reviews-|gym-alerts-|gym-settings-|gym-nights-|gym-tally-|gym-devices-|gym-scans-|gym-meta-|owner-key)[^/]*\.json/.test(s)
     || /^\/+(runner-queue|camera-check|ashbourne-reports|frames-[^/]*|tests-[^/]*|data|node_modules)(\/|$)/.test(s);
 }
@@ -1418,6 +1418,14 @@ const PAIR_TTL_MS = 15 * 60 * 1000;
 const PAIR_MAX_WRONG = 10;
 const PAIR_MAX_WRONG_PER_CALLER = 5;
 const pairCodes = new Map();      // sha256(code) -> { id, gymCode, gymName, createdAt, expiresAt, usedAt, usedBy, revoked }
+// Also kept on the disk (hashes only), so a website restart (a deploy or a
+// Render setting change) between making a code and typing it doesn't lose it.
+const PAIR_FILE = process.env.DATA_DIR ? path.join(process.env.DATA_DIR, 'pair-codes.json') : null;
+try { if (PAIR_FILE) for (const [k, v] of JSON.parse(require('fs').readFileSync(PAIR_FILE, 'utf8'))) if (v && v.id) pairCodes.set(k, v); } catch (e) { /* none yet */ }
+function savePairCodes() {
+  if (!PAIR_FILE) return;
+  try { const fsx = require('fs'); fsx.writeFileSync(PAIR_FILE + '.tmp', JSON.stringify([...pairCodes])); fsx.renameSync(PAIR_FILE + '.tmp', PAIR_FILE); } catch (e) { /* best effort */ }
+}
 const pairWrongByCaller = new Map();
 let pairWrongTotal = 0;
 const pairingHistory = [];        // recent successful pairings (no secrets)
@@ -1438,7 +1446,9 @@ function isHttpsOrLocal(req) {
 }
 function prunePairCodes() {
   const now = Date.now();
-  for (const [k, v] of pairCodes) if (now - v.expiresAt > 60 * 60 * 1000) pairCodes.delete(k);
+  let gone = 0;
+  for (const [k, v] of pairCodes) if (now - v.expiresAt > 60 * 60 * 1000) { pairCodes.delete(k); gone++; }
+  if (gone) savePairCodes();
   for (const [k, v] of pairWrongByCaller) {
     const keep = v.filter(t => now - t < PAIR_TTL_MS);
     if (keep.length) pairWrongByCaller.set(k, keep); else pairWrongByCaller.delete(k);
@@ -1470,6 +1480,7 @@ app.post('/admin/pair', (req, res) => {
   const now = Date.now();
   const rec = { id: crypto.randomBytes(9).toString('base64url'), gymCode: code, gymName, role, createdAt: now, expiresAt: now + PAIR_TTL_MS };
   pairCodes.set(sha(digits), rec);
+  savePairCodes();
   pairWrongTotal = 0;
   res.json({ ok: true, id: rec.id, code: digits, display: `${digits.slice(0, 3)} ${digits.slice(3)}`, gymCode: code, gymName, expiresAt: new Date(rec.expiresAt).toISOString() });
 });
@@ -1506,6 +1517,7 @@ app.post('/monitor/runner/pair', (req, res) => {
       pairWrongTotal++;
       if (pairWrongTotal >= PAIR_MAX_WRONG) {
         for (const x of pairCodes.values()) if (pairState(x) === 'waiting') x.revoked = true;
+        savePairCodes();
         console.warn(`Pairing: ${pairWrongTotal} wrong codes — all open pairing codes cancelled.`);
         return res.status(401).json({ ok: false, error: 'Too many wrong codes, so every open code was cancelled. Do this: make a new code on the admin page.' });
       }
@@ -1516,6 +1528,7 @@ app.post('/monitor/runner/pair', (req, res) => {
     }
     p.usedAt = Date.now();
     p.usedBy = cleanText(req.body.host, 80) || 'unknown computer';
+    savePairCodes();
     pairingHistory.unshift({ gymCode: p.gymCode, gymName: p.gymName, host: p.usedBy, at: new Date(p.usedAt).toISOString() });
     pairingHistory.length = Math.min(pairingHistory.length, 20);
     try { if (PAIRING_LOG) require('fs').writeFileSync(PAIRING_LOG, JSON.stringify(pairingHistory, null, 2)); } catch (e) { /* history is a convenience */ }

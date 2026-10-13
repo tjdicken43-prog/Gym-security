@@ -99,7 +99,7 @@ foreach ($t in $tops) {
   $pn = ''
   try { $pn = (Get-Process -Id $c.ProcessId -ErrorAction Stop).ProcessName } catch { }
   $allTitles += ('  ' + $pn + ' : ' + (Mask $c.Name))
-  if ($pn -match 'ashbourne' -or $c.Name -match 'ashbourne|visit log|live entry') { $procIds[$c.ProcessId] = $pn }
+  if ($pn -match 'ashbourne|^mvs' -or $c.Name -match 'ashbourne|visit log|live entry|^\s*mvsv?\d') { $procIds[$c.ProcessId] = $pn }
 }
 if ($procIds.Count -eq 0) {
   # Not obvious from the names: let the person pick it from a list.
@@ -128,7 +128,7 @@ $report.Add('PC time: ' + (Get-Date).ToString('yyyy-MM-dd HH:mm:ss.fff') + '  zo
 $report.Add('PowerShell: ' + $PSVersionTable.PSVersion.ToString() + '  Windows: ' + [Environment]::OSVersion.VersionString)
 $report.Add('')
 
-$desk = [Environment]::GetFolderPath('Desktop')
+$desk = [Environment]::GetFolderPath('Desktop'); if (-not $desk) { $desk = $env:USERPROFILE }; if (-not $desk) { $desk = [IO.Path]::GetTempPath() }
 $file = Join-Path $desk 'securityai-ashbourne-check.txt'
 
 if ($wins.Count -eq 0) {
