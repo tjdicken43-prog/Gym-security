@@ -66,18 +66,30 @@ services:
       # Unset = no site-wide limit.
       - key: MAX_TOTAL_DAILY_BURSTS
         sync: false
-      # The public webcam demo on the home page is anonymous and every
-      # try is a paid analysis, outside every gym's daily limit. Defaults:
-      # 10 tries per visitor per hour, 50 per day for the whole site (at
-      # most about $20 a month). 0 for the daily cap = demo off.
+      # The old public webcam demo (anonymous, every try a paid analysis).
+      # Off: the home page now links to the sample report instead.
       - key: DEMO_PER_IP_PER_HOUR
         value: "10"
       - key: DEMO_DAILY_CAP
-        value: "50"
+        value: "0"          # the home page has no webcam demo any more: keep it off
       # Default time zone for gyms that don't have one set on the admin
       # page (IANA name). Unset = America/Chicago (Central).
       - key: GYM_TIMEZONE
         value: America/Chicago
+      # ---- SELF-REPAIR (see SELF-REPAIR.md) ----
+      # Lets the website ship tested code changes through GitHub (pull
+      # requests you approve from the email). A fine-grained token for THIS
+      # repository only: Contents read/write + Pull requests read/write.
+      - key: GITHUB_TOKEN
+        sync: false
+      - key: GITHUB_REPO      # e.g. tjdicken/gym-security
+        sync: false
+      - key: GITHUB_DIR       # only if the code is in a folder of the repo
+        sync: false
+      # on = small, low-risk fixes for errors ship without waiting for you
+      # (you still get the email with Undo). Your own requests always wait.
+      - key: SELF_FIX_AUTO
+        value: "off"
       # Text-message alerts (only if you use Twilio).
       - key: TWILIO_SID
         sync: false

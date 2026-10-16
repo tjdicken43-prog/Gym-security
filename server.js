@@ -45,9 +45,53 @@ if (process.env.STRIPE_SECRET_KEY) {
   console.warn('STRIPE_SECRET_KEY not set — /create-checkout-session and /webhook will return an error until it is configured. Monitoring endpoints are unaffected.');
 }
 const app = express();
+// An async route that throws must not leave the request hanging (Express 4
+// doesn't catch promise rejections): pass the error on to the error
+// handler at the bottom, which answers plainly and records it for
+// self-repair. Error handlers (4 arguments) are left as they are.
+for (const m of ['get', 'post', 'put', 'patch', 'delete', 'all']) {
+  if (typeof app[m] !== 'function') continue;
+  const orig = app[m].bind(app);
+  app[m] = (...args) => {
+    if (args.length === 1 && typeof args[0] === 'string') return orig(...args);   // app.get('setting')
+    return orig(...args.map(fn => (typeof fn === 'function' && fn.length < 4)
+      ? function (req, res, next) { const r = fn.apply(this, arguments); if (r && typeof r.catch === 'function') r.catch(next); return r; }
+      : fn));
+  };
+}
 const DOMAIN = process.env.DOMAIN || process.env.RENDER_EXTERNAL_URL || 'http://localhost:4242';
 
 app.use(cors());
+// Big JSON answers (the gym's activity list refreshes every 30 s, often on
+// a phone's data) go out gzip-compressed: about 10x smaller. No extra
+// package needed.
+app.use((req, res, next) => {
+  const json = res.json.bind(res);
+  res.json = body => {
+    try {
+      const text = JSON.stringify(body);
+      // The pages that refresh by themselves: "nothing new" is a tiny 304
+      // instead of the whole list again (the browser keeps its copy).
+      if (req.method === 'GET' && (req.path === '/gym/activity' || req.path === '/gym/desk') && res.statusCode === 200 && text) {
+        const tag = '"' + require('crypto').createHash('sha1').update(text).digest('base64url').slice(0, 22) + '"';
+        res.setHeader('ETag', tag);
+        res.setHeader('Cache-Control', 'private, no-cache');
+        if (String(req.headers['if-none-match'] || '') === tag) { res.statusCode = 304; res.end(); return res; }
+      }
+      if (text && text.length > 8192 && /\bgzip\b/.test(String(req.headers['accept-encoding'] || '')) && !res.getHeader('Content-Encoding')) {
+        const z = require('zlib').gzipSync(text, { level: 6 });
+        res.setHeader('Content-Type', 'application/json; charset=utf-8');
+        res.setHeader('Content-Encoding', 'gzip');
+        res.setHeader('Vary', 'Accept-Encoding');
+        res.setHeader('Content-Length', z.length);
+        res.end(z);
+        return res;
+      }
+    } catch (e) { /* fall back to plain */ }
+    return json(body);
+  };
+  next();
+});
 // The /webhook route needs the exact raw, unparsed request body to verify
 // Stripe's signature — if the global JSON parser touches it first, the
 // raw bytes are gone by the time express.raw() runs on that route below,
@@ -72,9 +116,9 @@ function isPrivateStaticPath(p) {
   let s;
   try { s = decodeURIComponent(p); } catch (e) { return true; }
   s = path.posix.normalize('/' + s.replace(/\\/g, '/')).toLowerCase();   // Mac disks ignore case
-  return /^\/+(rtsp-zones|ingest-zones|gyms|report-sends|runner-pairings|pair-codes|admin-pending)\.json/.test(s)
-    || /^\/+(alert-log-|summary-|mail-progress-|gym-reviews-|gym-alerts-|gym-settings-|gym-nights-|gym-tally-|gym-devices-|gym-scans-|gym-meta-|owner-key)[^/]*\.json/.test(s)
-    || /^\/+(runner-queue|camera-check|ashbourne-reports|frames-[^/]*|tests-[^/]*|data|node_modules)(\/|$)/.test(s);
+  return /^\/+(rtsp-zones|ingest-zones|gyms|report-sends|self-review-sends|auto-update|incidents|self-repair|login-links-used|vapid|runner-pairings|pair-codes|admin-pending|handoffs)\.json/.test(s)
+    || /^\/+(alert-log-|summary-|mail-progress-|gym-reviews-|gym-alerts-|gym-settings-|gym-nights-|gym-tally-|gym-devices-|gym-scans-|gym-meta-|gym-people-|gym-push-|gym-[a-z]+-|owner-delegates|owner-key|screen-reader)[^/]*\.json/.test(s)
+    || /^\/+(runner-queue|camera-check|ashbourne-reports|frames-[^/]*|tests-[^/]*|selftest-[^/]*|logos|data|node_modules)(\/|$)/.test(s);
 }
 app.use((req, res, next) => {
   if ((req.method === 'GET' || req.method === 'HEAD') && isPrivateStaticPath(req.path)) return res.status(404).send('Not found');
@@ -107,6 +151,19 @@ app.use(express.static(__dirname)); // serves securityai.html / checkout.html / 
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'securityai.html'));
 });
+// Short addresses that are easy to say out loud and type on a phone:
+// gym-security.onrender.com/gym  -> the gym page (sign-in if needed)
+// gym-security.onrender.com/admin -> the admin page
+// Query strings (e.g. ?code=) are kept.
+for (const [short, page] of [['/gym', 'activity.html'], ['/signin', 'activity.html'], ['/sign-in', 'activity.html'], ['/admin', 'admin.html'], ['/demo', 'activity.html?demo=1'], ['/desk', 'desk.html'], ['/lobby', 'lobby.html'], ['/members', 'members.html']]) {
+  app.get(short, (req, res) => {
+    const u = String(req.originalUrl || req.url || ''), q = u.indexOf('?');
+    res.statusCode = 302;
+    res.setHeader('Location', '/' + page + (q >= 0 ? (page.includes('?') ? '&' : '') + u.slice(q + (page.includes('?') ? 1 : 0)) : ''));
+    res.setHeader('Cache-Control', 'no-store');
+    res.end();
+  });
+}
 
 // --- Persistent monitoring controls (see monitor.js for the actual loop) ---
 // These are the endpoints monitor.html's Start/Stop buttons call. Once
@@ -197,7 +254,7 @@ function keyHasData(key) {
   return monitor.getLog(key).length > 0 || monitor.loadSummary(key).length > 0;
 }
 function adminGymView(g) {
-  return { code: g.code, key: g.key, gymName: g.gymName, email: g.email, createdAt: g.createdAt, timeZone: g.timeZone || null, codeIssuedAt: g.codeIssuedAt || null };
+  return { code: g.code, key: g.key, gymName: g.gymName, email: g.email, createdAt: g.createdAt, timeZone: g.timeZone || null, codeIssuedAt: g.codeIssuedAt || null, billing: g.billing || null };
 }
 
 app.post('/admin/gyms', (req, res) => {
@@ -226,7 +283,7 @@ app.get('/admin/gyms', (req, res) => {
   const have = new Set(list.map(g => String(g.key || '').toLowerCase()));
   const fromEnv = gyms.envCodes().filter(c => !have.has(monitor.safeCode(c)))
     .map(c => ({ code: c, key: monitor.safeCode(c), gymName: c, email: null, createdAt: null, fromEnv: true }));
-  res.json({ gyms: list.concat(fromEnv), adoptable: adoptableRunners() });
+  res.json({ gyms: list.concat(fromEnv).map(g => Object.assign({}, g, { exits: (() => { try { return monitor.exitReadiness(g.key); } catch (e) { return null; } })() })), adoptable: adoptableRunners() });
 });
 
 // The gym named in /admin/gyms/:gym/... (its code or its key) -> key.
@@ -312,6 +369,19 @@ app.post('/admin/gyms/:gym/settings', (req, res) => {
 
 // J13: cut off this gym's paired camera computers (all of them). They get
 // 401 "This computer was unpaired" and need a new pairing code.
+// Skip clear exits (people leaving) to save AI checks: only after a long
+// clean run where the AI agreed with every one. Turning it off is always allowed.
+app.post('/admin/gyms/:gym/skip-exits', (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const key = adminGymKey(req, res);
+  if (!key) return;
+  const on = (req.body || {}).on === true;
+  const r = monitor.exitReadiness(key);
+  if (on && !r.ready) return res.status(400).json({ ok: false, error: `Not yet: ${r.agree} of ${r.need} clear exits checked with the AI agreeing every time${r.disagree ? ` (the run restarted after the AI disagreed on ${new Date(r.lastDisagreeAt).toLocaleDateString('en-US')})` : ''}.` });
+  const st = store.getSettings(key); st.skipExits = on; store.saveSettings(key, st);
+  res.json({ ok: true, exits: monitor.exitReadiness(key) });
+});
+
 app.post('/admin/gyms/:gym/unpair', (req, res) => {
   if (!requireAdmin(req, res)) return;
   const key = adminGymKey(req, res);
@@ -954,6 +1024,8 @@ function runnerOperatorView(rec) {
     monitorProblem: rec.monitorProblem || null,
     hostConflict: rec.hostConflict || null,
     usesLegacyToken: !!rec.legacyToken,
+    update: rec.update || null,
+    latestCode: (() => { try { return codeVersion(); } catch (e) { return null; } })(),
   });
 }
 
@@ -1024,6 +1096,16 @@ app.post('/monitor/runner/heartbeat', runnerAuth, runnerJson, (req, res) => {
   rec.heartbeats = (rec.heartbeats || 0) + 1;
   rec.host = cleanText(b.host, 80);
   rec.version = cleanText(b.version, 20);
+  // The camera computer's own update state (safe self-update).
+  if (b.update && typeof b.update === 'object') {
+    const u = b.update, t = v => (v && !isNaN(Date.parse(v)) ? new Date(v).toISOString() : null);
+    rec.update = {
+      installed: cleanText(u.installed, 20) || null,
+      pending: u.pending ? { version: cleanText(u.pending.version, 20), at: t(u.pending.at) } : null,
+      lastRollback: u.lastRollback ? { version: cleanText(u.lastRollback.version, 20), at: t(u.lastRollback.at), reason: cleanText(u.lastRollback.reason, 120) } : null,
+      lastUpdate: u.lastUpdate ? { version: cleanText(u.lastUpdate.version, 20), at: t(u.lastUpdate.at) } : null,
+    };
+  }
   rec.legacyToken = !!req.runnerLegacyToken;
   noteHost(rec, rec.host || 'unknown computer', now);
   const rawCfg = (b.config && typeof b.config === 'object' && !Array.isArray(b.config)) ? b.config : {};
@@ -1099,6 +1181,7 @@ app.post('/monitor/runner/heartbeat', runnerAuth, runnerJson, (req, res) => {
     problem: m.ok ? undefined : m.error,
     warning: rec.hostConflict ? rec.hostConflict.message : undefined,
     withinSchedule: st.withinSchedule,
+    codeVersion: (() => { try { return codeVersion(); } catch (e) { return undefined; } })(),
     dailyBurstCap: m.ok ? st.dailyBurstCap : undefined,
     pacingFactor: m.ok ? st.pacingFactor : undefined,
     // What the website is actually using (its own settings win over this
@@ -1596,7 +1679,7 @@ function gymRow(key, meta, site) {
       capMonthly: st.running ? st.costEstimate.capMonthlyWorstCase : null },
     runner: rec ? { online, host: rec.host || null, version: rec.version || null, lastSeen: rec.lastSeen ? new Date(rec.lastSeen).toISOString() : null,
       ageSec: rec.lastSeen ? Math.round((Date.now() - rec.lastSeen) / 1000) : null, picture, zones,
-      hostConflict: rec.hostConflict || null, usesLegacyToken: !!rec.legacyToken } : null,
+      hostConflict: rec.hostConflict || null, usesLegacyToken: !!rec.legacyToken, update: rec.update || null } : null,
     lastCrossing: last ? (last.capturedAt || last.timestamp) : null,
     today: { bursts: usage.bursts, estimatedCost: usage.estimatedCost, since: usage.since },
     last24h: { bursts: st.burstsLast24h, estimatedCost: st.costEstimate.last24h },
@@ -1617,12 +1700,66 @@ function siteWarnings() {
   if (gyms.isDamaged()) w.push({ id: 'gyms-file', level: 'red', message: 'The gym accounts file (gyms.json in DATA_DIR) is damaged. The site is using its backup and can\'t save gym changes. Do this: Render > Shell, type  cp "$DATA_DIR/gyms.json.bak" "$DATA_DIR/gyms.json"  then reload this page (SETUP.md, Part 4).' });
   if ((process.env.RUNNER_TOKEN || '').trim()) w.push({ id: 'runner-token', level: 'amber', message: 'RUNNER_TOKEN is set on Render. It unlocks every gym and can\'t be unpaired. Do this: pair each camera computer from the admin page, then delete RUNNER_TOKEN in Render > Environment.' });
   for (const r of runners.values()) if (r.hostConflict) w.push({ id: 'two-hosts', gym: r.gymCode, level: 'amber', message: r.hostConflict.message });
+  for (const r of runners.values()) {
+    const rb = r.update && r.update.lastRollback;
+    if (rb && rb.at && Date.now() - Date.parse(rb.at) < 3 * 864e5) w.push({ id: 'rollback', gym: r.gymCode, level: 'amber', message: `${gyms.gymNameFor(r.gymCode) || r.gymCode}: the camera computer tried the new program version ${rb.version} and went back to the previous one by itself (${rb.reason}). It keeps watching on the old version. Fix and deploy again; it updates by itself when the door is quiet.` });
+  }
   for (const r of recentRejected()) w.push({ id: 'unknown-gym', gym: r.code, level: 'red', message: r.problem });
   const disk = diskCheck();
   if (!disk.survivesDeploys) w.push({ id: 'disk', level: 'amber', message: diskFix(disk) });
+  // How full the data disk is (photos fill it): amber at 80%, red at 92%.
+  try {
+    const st = require('fs').statfsSync(process.env.DATA_DIR || __dirname);
+    const used = 1 - st.bavail / st.blocks, pct = Math.round(used * 100), freeMb = Math.round(st.bavail * st.bsize / 1048576);
+    if (pct >= 80) w.push({ id: 'disk-full', level: pct >= 92 ? 'red' : 'amber', message: `The data disk is ${pct}% full (${freeMb} MB free). Photos stop being saved when it's full. Do this: Render > Disks > raise the size (1 GB more is about $0.25 a month).` });
+  } catch (e) { /* older Node: no statfs */ }
   if (!mailer.isConfigured()) w.push({ id: 'email', level: 'red', message: `${mailer.notConfiguredReason()}. No alert, "camera offline" warning or report can be emailed.` });
+  // Self-healing note: the main AI model was busy and the backup answered.
+  const ai = vision.stats();
+  const recent = t => t && Date.now() - Date.parse(t) < 24 * 3600e3;
+  if (recent(ai.lastFailureAt)) w.push({ id: 'ai-failing', level: 'amber', message: `Some AI checks failed in the last 24 hours (last at ${new Date(ai.lastFailureAt).toLocaleString('en-US', { timeZone: 'America/Chicago' })}): Anthropic was busy or unreachable, even for the backup model. The camera computer re-sends what it can. If this keeps happening, check status.anthropic.com and your Anthropic credit balance.` });
+  else if (recent(ai.lastBackupAnswerAt)) w.push({ id: 'ai-backup', level: 'info', message: `Self-healed: the main AI model was busy ${ai.fallbacks} time(s) since the website started, and the backup model answered ${ai.backupAnswers} check(s), so nothing was missed. Nothing to do.` });
   return w;
 }
+
+// --- Self-review: a health score per gym and what to do (self-review.js) ---
+const selfReview = require('./self-review');
+function reviewFor(key, site) {
+  const row = gymRow(key, knownGymKeys().get(key) || {}, site);
+  let reader = null; try { reader = memberKeys.loadDevices(key).reader || null; } catch (e) { /* none */ }
+  if (reader && reader.problemCode && READER_FIX[reader.problemCode]) reader = Object.assign({}, reader, { fix: READER_FIX[reader.problemCode][1] });
+  let tally = {}; try { tally = store.tallySummary(key); } catch (e) { /* none */ }
+  let test = null; try { test = selfTest.summary(key); } catch (e) { /* none */ }
+  return selfReview.reviewGym({ name: row.name, row, log: monitor.getLog(key), reviews: store.loadReviews(key), tally, reader, ai: vision.stats(), selfTest: test, repair: (() => { try { return selfRepair.view(); } catch (e) { return null; } })(), eventId: e => store.eventId(e) });
+}
+app.get('/admin/self-review', (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const site = siteUrl(req);
+  res.set('Cache-Control', 'no-store').json({ ok: true, gyms: [...knownGymKeys().keys()].map(k => Object.assign({ key: k }, reviewFor(k, site))), nextEmail: nextWeeklyReview() });
+});
+// Weekly email to TJ (SUPPORT_EMAIL): Mondays 8 am Central, once.
+const REVIEW_MARK = () => path.join(process.env.DATA_DIR || __dirname, 'self-review-sends.json');
+function nextWeeklyReview() { return process.env.SUPPORT_EMAIL ? 'Mondays at 8 AM Central, to ' + process.env.SUPPORT_EMAIL : 'Off: set SUPPORT_EMAIL on Render'; }
+async function weeklyReviewTick(force) {
+  const to = String(process.env.SUPPORT_EMAIL || '').trim();
+  if (!to || !mailer.isConfigured()) return { sent: false, reason: 'no SUPPORT_EMAIL or email not set up' };
+  const p = new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', weekday: 'short', hour: 'numeric', hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date()).reduce((o, x) => (o[x.type] = x.value, o), {});
+  const week = `${p.year}-${p.month}-${p.day}`;
+  if (!force && !(p.weekday === 'Mon' && Number(p.hour) >= 8)) return { sent: false, reason: 'not time yet' };
+  let mark = {}; try { mark = JSON.parse(require('fs').readFileSync(REVIEW_MARK(), 'utf8')); } catch (e) { /* first */ }
+  if (!force && mark.last === week) return { sent: false, reason: 'already sent' };
+  const keys = [...knownGymKeys().keys()];
+  if (!keys.length) return { sent: false, reason: 'no gyms' };
+  const site = DOMAIN || '';
+  const mail = selfReview.weeklyEmail(keys.map(k => reviewFor(k, site)), site);
+  const r = await mailer.sendMail({ to, subject: mail.subject, text: mail.text, html: mail.html });
+  if (r && r.delivered !== false && !force) { try { require('fs').writeFileSync(REVIEW_MARK(), JSON.stringify({ last: week, at: new Date().toISOString() })); } catch (e) { /* next hour */ } }
+  return { sent: !!(r && r.delivered !== false), subject: mail.subject };
+}
+app.post('/admin/self-review/send', async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  try { res.json(Object.assign({ ok: true }, await weeklyReviewTick(true))); } catch (e) { res.status(500).json({ ok: false, error: e.message }); }
+});
 
 app.get('/admin/overview', (req, res) => {
   if (!requireAdmin(req, res)) return;
@@ -1706,9 +1843,20 @@ function updateFiles() {
   }
   return out;
 }
+// The program version this website serves (for the camera computers' safe
+// self-update). Files only change with a deploy (a restart), so it is
+// worked out once and kept for 10 minutes.
+let codeVersionCache = { at: 0, v: null };
+function codeVersion(files) {
+  if (!files && codeVersionCache.v && Date.now() - codeVersionCache.at < 600e3) return codeVersionCache.v;
+  const list = files || updateFiles();
+  const v = crypto.createHash('sha256').update(list.map(f => f.name + ':' + f.sha256).join('\n')).digest('hex').slice(0, 12);
+  codeVersionCache = { at: Date.now(), v };
+  return v;
+}
 app.get('/monitor/runner/files', runnerAuth, (req, res) => {
   const files = updateFiles();
-  const version = crypto.createHash('sha256').update(files.map(f => f.name + ':' + f.sha256).join('\n')).digest('hex').slice(0, 12);
+  const version = codeVersion(files);
   // ?gym=<code>: does that gym code exist here? (update.js warns if not.)
   const asked = req.runnerGymScope || (req.query.gym ? monitor.safeCode(req.query.gym) : null);
   const gymKnown = asked ? (!gyms.anyCodesConfigured() || !!gyms.resolveKey(asked)) : undefined;
@@ -1718,6 +1866,40 @@ app.get('/monitor/runner/files/:name', runnerAuth, (req, res) => {
   const f = updateFiles().find(x => x.name === req.params.name);
   if (!f) return res.status(404).json({ ok: false, error: 'No such file.' });
   res.set('Cache-Control', 'no-store').type('application/octet-stream').sendFile(path.join(__dirname, f.name));
+});
+
+// --- Moving a camera computer's settings to a new box (laptop -> Pi) ------
+// The old computer uploads its settings ENCRYPTED with a one-time code it
+// shows (AES-256-GCM, key from the code by scrypt); this website only ever
+// holds the scrambled copy, for 30 minutes, handed out once. move.js.
+const HANDOFF_FILE = process.env.DATA_DIR ? path.join(process.env.DATA_DIR, 'handoffs.json') : null;
+const handoffs = new Map();     // id -> { blob, gym, at, pickedUpAt }
+try { if (HANDOFF_FILE) for (const [k, v] of Object.entries(JSON.parse(require('fs').readFileSync(HANDOFF_FILE, 'utf8')))) handoffs.set(k, v); } catch (e) { /* none */ }
+function saveHandoffs() {
+  for (const [k, v] of handoffs) if (Date.now() - v.at > 2 * 3600e3) handoffs.delete(k);
+  if (!HANDOFF_FILE) return;
+  try { const fsx = require('fs'); fsx.writeFileSync(HANDOFF_FILE + '.tmp', JSON.stringify(Object.fromEntries(handoffs)), { mode: 0o600 }); fsx.renameSync(HANDOFF_FILE + '.tmp', HANDOFF_FILE); } catch (e) { /* best effort */ }
+}
+app.post('/monitor/runner/handoff', runnerAuth, express.json({ limit: '200kb' }), (req, res) => {
+  const b = req.body || {};
+  const id = String(b.id || ''), blob = String(b.blob || '');
+  if (!/^[a-f0-9]{32}$/.test(id) || !/^[A-Za-z0-9_-]{40,180000}$/.test(blob)) return res.status(400).json({ ok: false, error: 'Bad request.' });
+  if (store.limited('handoff-up:' + (req.runnerGymScope || 'legacy'), 10, 3600e3)) return res.status(429).json({ ok: false, error: 'Too many tries. Wait an hour.' });
+  handoffs.set(id, { blob, gym: req.runnerGymScope || null, at: Date.now(), pickedUpAt: null });
+  saveHandoffs();
+  res.json({ ok: true, minutes: 30 });
+});
+app.get('/monitor/runner/handoff/:id/status', runnerAuth, (req, res) => {
+  const h = handoffs.get(String(req.params.id));
+  res.set('Cache-Control', 'no-store').json({ ok: true, exists: !!h, pickedUp: !!(h && h.pickedUpAt) });
+});
+app.get('/monitor/handoff/:id', (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  if (store.limited('handoff-get:' + callerKey(req), 20, 3600e3)) return res.status(429).json({ ok: false, error: 'Too many tries from here. Wait an hour.' });
+  const h = handoffs.get(String(req.params.id));
+  if (!h || h.pickedUpAt || Date.now() - h.at > 30 * 60e3) return res.status(404).json({ ok: false, error: 'That move code is not right, was already used, or is more than 30 minutes old. Make a new one on the old computer.' });
+  h.pickedUpAt = Date.now(); const blob = h.blob; h.blob = null; saveHandoffs();
+  res.json({ ok: true, blob });
 });
 
 // --- Render settings checklist for the admin page ----------------------
@@ -1766,7 +1948,9 @@ app.get('/admin/keys', (req, res) => {
     if (v.reader && v.reader.version) v.reader = Object.assign({}, v.reader, { latest: READER_VERSION() });
     out[key] = v;
   }
-  res.set('Cache-Control', 'no-store').json({ ok: true, owner: owner ? { code: owner.code, fp: owner.fp, at: owner.at } : null, gyms: out });
+  const dl = memberKeys.loadDelegates();
+  res.set('Cache-Control', 'no-store').json({ ok: true, owner: owner ? { code: owner.code, fp: owner.fp, at: owner.at } : null, gyms: out,
+    delegates: dl.delegates.map(x => ({ fp: x.fp, code: x.code, name: x.name, status: x.status, sign: x.sign, createdAt: x.createdAt, approvedAt: x.approvedAt || null })) });
 });
 app.post('/admin/keys/owner', keysJson, (req, res) => {
   if (!requireAdmin(req, res)) return;
@@ -1775,23 +1959,39 @@ app.post('/admin/keys/owner', keysJson, (req, res) => {
   try { const o = memberKeys.setOwner(b.sign); res.json({ ok: true, code: o.code, fp: o.fp }); }
   catch (err) { res.status(400).json({ ok: false, error: err.message }); }
 });
+// Backup approvers: a second phone asks; the owner device signs it in.
+app.post('/admin/keys/delegates', keysJson, (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  try { const d = memberKeys.requestDelegate((req.body || {}).sign, (req.body || {}).name); res.json({ ok: true, fp: d.fp, code: d.code, status: d.status }); }
+  catch (err) { res.status(400).json({ ok: false, error: err.message }); }
+});
+app.post('/admin/keys/delegates/:fp/approve', keysJson, (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  try { const d = memberKeys.approveDelegate(String(req.params.fp), (req.body || {}).at, (req.body || {}).sig); res.json({ ok: true, fp: d.fp, status: d.status }); }
+  catch (err) { res.status(400).json({ ok: false, error: err.message }); }
+});
+app.post('/admin/keys/delegates/:fp/remove', keysJson, (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  try { res.json(Object.assign({ ok: true }, memberKeys.removeDelegate(String(req.params.fp), (req.body || {}).at, (req.body || {}).sig))); }
+  catch (err) { res.status(400).json({ ok: false, error: err.message }); }
+});
 app.post('/admin/keys/:gym/devices', keysJson, (req, res) => {
   if (!requireAdmin(req, res)) return;
   const key = adminGymKey(req, res); if (!key) return;
   const b = req.body || {};
-  try { const d = memberKeys.addApprovedDevice(key, b.pub, b.name, b.at, b.sig); res.json({ ok: true, id: d.id, code: d.code, status: d.status }); }
+  try { const d = memberKeys.addApprovedDevice(key, b.pub, b.name, b.at, b.sig, b.by); res.json({ ok: true, id: d.id, code: d.code, status: d.status }); }
   catch (err) { res.status(400).json({ ok: false, error: err.message }); }
 });
 app.post('/admin/keys/:gym/devices/:id/approve', keysJson, (req, res) => {
   if (!requireAdmin(req, res)) return;
   const key = adminGymKey(req, res); if (!key) return;
-  try { const d = memberKeys.approveDevice(key, req.params.id, (req.body || {}).at, (req.body || {}).sig); res.json({ ok: true, id: d.id, status: d.status }); }
+  try { const d = memberKeys.approveDevice(key, req.params.id, (req.body || {}).at, (req.body || {}).sig, { by: (req.body || {}).by }); res.json({ ok: true, id: d.id, status: d.status }); }
   catch (err) { res.status(400).json({ ok: false, error: err.message }); }
 });
 app.post('/admin/keys/:gym/devices/:id/remove', keysJson, (req, res) => {
   if (!requireAdmin(req, res)) return;
   const key = adminGymKey(req, res); if (!key) return;
-  try { res.json(Object.assign({ ok: true }, memberKeys.removeDevice(key, req.params.id, (req.body || {}).at, (req.body || {}).sig))); }
+  try { res.json(Object.assign({ ok: true }, memberKeys.removeDevice(key, req.params.id, (req.body || {}).at, (req.body || {}).sig, (req.body || {}).by))); }
   catch (err) { res.status(400).json({ ok: false, error: err.message }); }
 });
 // The pending device's key, so the owner device can sign over its fingerprint.
@@ -1834,6 +2034,8 @@ const READER_FIX = {
   'offline': ['the front-desk PC can\'t reach the website, so scans are waiting on that PC', 'Check that PC\'s internet / Wi-Fi. Nothing is lost: the waiting scans send by themselves when it\'s back.'],
   'owner-mismatch': ['the owner device on the website is not the one the reader was set up with', 'If you replaced your owner device on purpose, set the reader up again (admin page > Front-desk reader > Set up). If you did NOT, someone may have changed it: change ADMIN_TOKEN on Render and tell Claude.'],
   'no-devices': ['no devices are approved to read member numbers, so they aren\'t being kept', 'On your own phone: admin page > Protected member numbers > Make this my owner device.'],
+  'no-signal': ['the screen reader gets no picture from the front-desk screen', 'At the front desk: is the PC on, and the small HDMI splitter\'s power plugged in? Check the cable from the splitter to the capture stick, and that the capture stick is in the Raspberry Pi. On the PC, Windows must never turn the screen off (Settings > System > Power > Screen and sleep > turn off my screen after: Never). Turning just the monitor off is fine.'],
+  'popup-hidden': ['the screen reader can\'t see Ashbourne\'s Live Entry pop-up on the front-desk screen', 'On the front-desk PC, open Ashbourne (MVSv4) and leave its Live Entry pop-up showing (it can sit anywhere on the screen, just not covered or minimized). The reader finds it again by itself.'],
   'unpaired': ['the reader was unpaired on the website', 'Set it up again: admin page > Front-desk reader > Set up, and run the line on the Ashbourne PC.'],
 };
 const readerAlerted = new Map();   // gym|code -> time emailed
@@ -1851,11 +2053,11 @@ app.post('/reader/status', readerAuth, express.json({ limit: '8kb' }), (req, res
   const code = READER_FIX[b.problemCode] ? b.problemCode : null;
   const c = b.counts && typeof b.counts === 'object' ? b.counts : {};
   memberKeys.noteReader(key, { host: cleanText(b.host, 80), version: cleanText(b.version, 20), problem: cleanText(b.problem, 300), problemCode: code, watching: b.watching === true,
-    counts: { scans: Number(c.scans) || 0, otherZone: Number(c.otherZone) || 0, doubles: Number(c.doubles) || 0 }, queued: Number(b.queued) || 0 });
+    counts: { scans: Number(c.scans) || 0, otherZone: Number(c.otherZone) || 0, doubles: Number(c.doubles) || 0, fromList: Number(c.fromList) || 0, confirmed: Number(c.confirmed) || 0, conflicts: Number(c.conflicts) || 0 }, queued: Number(b.queued) || 0 });
   // Email TJ when a problem starts (again after 6 h if it lasts), and when it's fixed.
   // Ashbourne closed outside watch hours (the PC restarted overnight) is normal: no email.
   const k = key + '|' + code;
-  const quietHours = code === 'ashbourne-closed' && !monitor.watchingNow(key);
+  const quietHours = ['ashbourne-closed', 'popup-hidden', 'no-signal'].includes(code) && !monitor.watchingNow(key);
   if (code && !quietHours && (!readerAlerted.has(k) || Date.now() - readerAlerted.get(k) > 6 * 3600e3)) {
     readerAlerted.set(k, Date.now());
     const [what, fix] = READER_FIX[code];
@@ -1928,16 +2130,47 @@ setInterval(() => {
       if (quiet < 15 * 60e3) { readerQuietAlerted.delete(key); continue; }
       if (quiet > 24 * 3600e3 || readerQuietAlerted.get(key) === rd.lastSeen || !monitor.watchingNow(key)) continue;
       readerQuietAlerted.set(key, rd.lastSeen);
-      monitor.alertOperator(key, 'reader-offline', 'front-desk reader stopped', `the front-desk reader on the Ashbourne PC hasn't checked in for ${Math.round(quiet / 60000)} minutes, so member numbers aren't being matched (the camera still checks entries).\n\nHow to fix: make sure the Ashbourne PC is on, not asleep (Settings > System > Power > Sleep: Never) and signed in to Windows. If it was restarted, the reader starts by itself when Windows signs in. If it still doesn't come back, paste the reader line on that PC again and choose 1 (update/restart).`).catch(() => {});
+      monitor.alertOperator(key, 'reader-offline', 'front-desk reader stopped', `the front-desk reader on the Ashbourne PC hasn't checked in for ${Math.round(quiet / 60000)} minutes, so member numbers aren't being matched (the camera still checks entries).\n\nHow to fix: make sure the Ashbourne PC is on, not asleep (Settings > System > Power > Sleep: Never) and signed in to Windows. If it was restarted, the reader starts by itself when Windows signs in. If it still doesn't come back, paste the reader line on that PC again and choose 1 (update/restart).\n\nIf the PC is on and nothing else changed: its antivirus (ESET) or the network may have started blocking the website. Test it on that PC: open Edge and go to ${(gyms.publicBaseUrl && gyms.publicBaseUrl()) || 'the website'}/alive . A "Website blocked" page means whoever manages the antivirus must allow gym-security.onrender.com again.`).catch(() => {});
     }
   } catch (e) { /* next time */ }
 }, 60e3).unref();
 
 adminAuth.mount(app, { publicBaseUrl: () => { try { return require('./gyms').publicBaseUrl(); } catch (e) { return null; } } });
+// Nightly self-test: one staff-confirmed tailgate re-checked each day.
+const selfTest = require('./self-test').create({
+  dataDir: process.env.DATA_DIR || __dirname, framesDirFor: monitor.framesDirFor, vision,
+  timeZoneFor: k => gyms.timeZoneFor(k), scheduleFor: k => ({ watchingNow: monitor.watchingNow(k) }), keepMsFor: k => monitor.summaryMsFor(k), log: m => console.log(m),
+  onError: e => { try { incidents.record('self-test', e); } catch (x) { /* later */ } },
+});
+// Morning summary email, an hour after each gym's watch hours.
+const morning = require('./morning').create({ monitor, store, gyms, mailer, kindOf: e => selfReview.kindOf(e), send: (k, sub, m) => monitor.sendToSubscriber(k, sub, m), log: m => console.log(m), onError: e => { try { incidents.record('morning', e); } catch (x) { /* later */ } } });
 require('./gym-routes').mount(app, {
   runnerFor: code => runners.get(monitor.safeCode(code)) || null,
   zonePicture,
   runnerForStatus, runnerPublicView, runnerOperatorView, runnerIsOnline,
+  selfTest, morning,
+});
+app.post('/admin/gyms/:gym/morning', async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const key = gyms.resolveKey(req.params.gym) || monitor.safeCode(req.params.gym);
+  const m = morning.build(key, Date.now());
+  const to = String((req.body || {}).to || process.env.SUPPORT_EMAIL || '').trim();
+  if (!to) return res.json({ ok: true, preview: { subject: m.subject, text: m.text } });
+  const r = await mailer.sendMail({ to, subject: m.subject, text: m.text, html: m.html });
+  res.json({ ok: true, sent: !!(r && r.delivered !== false), to, subject: m.subject });
+});
+app.post('/admin/gyms/:gym/compare-model', async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const key = gyms.resolveKey(req.params.gym) || monitor.safeCode(req.params.gym);
+  const model = String((req.body || {}).model || 'claude-haiku-4-5-20251001');
+  if (!vision.ALLOWED_MODELS[model]) return res.status(400).json({ ok: false, error: 'Unknown model.' });
+  try { res.json({ ok: true, result: await selfTest.compare(key, model) }); } catch (e) { res.status(500).json({ ok: false, error: e.message }); }
+});
+app.post('/admin/gyms/:gym/self-test', async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const key = gyms.resolveKey(req.params.gym) || monitor.safeCode(req.params.gym);
+  try { const r = await selfTest.runOne(key); res.json({ ok: true, result: r, summary: selfTest.summary(key) }); }
+  catch (e) { res.status(500).json({ ok: false, error: e.message }); }
 });
 
 // Force the monthly report to run now, ignoring the schedule and the
@@ -2005,7 +2238,7 @@ app.post('/monitor/push-burst', async (req, res) => {
 // is a paid model call, so each visitor gets a few per hour and the whole
 // site a fixed number per day. Env (both optional):
 //   DEMO_PER_IP_PER_HOUR  default 10   (per visitor, rolling hour)
-//   DEMO_DAILY_CAP        default 50   (whole site, rolling 24 h; 0 = demo off)
+//   DEMO_DAILY_CAP        default 0    (whole site, rolling 24 h; 0 = demo off)
 // At 50 a day the demo can cost at most about $20 a month (usually far less).
 // It is not part of any gym's daily limit, so keep it small.
 // Counts live in memory: a restart resets them, which is fine for a cap
@@ -2016,7 +2249,9 @@ function demoEnvInt(name, def) {
   return raw && Number.isFinite(n) && n >= 0 ? n : def;
 }
 const DEMO_PER_IP_PER_HOUR = demoEnvInt('DEMO_PER_IP_PER_HOUR', 10);
-const DEMO_DAILY_CAP = demoEnvInt('DEMO_DAILY_CAP', 50);
+// Off by default: the home page no longer has the webcam demo (the sample
+// report shows the real thing at no cost). Set DEMO_DAILY_CAP to turn it on.
+const DEMO_DAILY_CAP = demoEnvInt('DEMO_DAILY_CAP', 0);
 const demoByCaller = new Map();   // caller -> [ms, ...] in the last hour
 let demoToday = [];               // ms of every demo call in the last 24 h
 // true = go ahead (and counted); false = a 429 has been sent.
@@ -2129,11 +2364,15 @@ app.post('/support/contact', async (req, res) => {
 // to send unitAmountCents from ?price= in its URL, so ?price=1 bought the
 // plan for $1. The browser names a plan; anything else it sends about
 // money is ignored.
+// $200 a month for the first entrance, $100 for each extra entrance or
+// location. 'gym' and 'multi' are the same plan (older links use either):
+// the quantity is the number of entrances, the first billed at the full
+// price and the rest at the extra price.
 const PLANS = {
-  'single-door': { name: 'One entrance', cents: 9900, maxQty: 1 },
-  gym: { name: 'Whole gym — every entrance', aliases: ['Whole gym — unlimited entrances'], cents: 19900, maxQty: 1 },
-  multi: { name: 'Multi-gym contract (per gym)', cents: 16900, minQty: 2, maxQty: 50 },
+  'single-door': { name: 'One entrance', cents: 20000, maxQty: 1 },
+  gym: { name: 'Several entrances or locations', aliases: ['Whole gym — every entrance', 'Whole gym — unlimited entrances', 'Multi-gym contract (per gym)'], cents: 20000, extraCents: 10000, minQty: 2, maxQty: 50 },
 };
+PLANS.multi = PLANS.gym;
 function planFrom(body) {
   const b = body || {};
   if (b.plan && Object.prototype.hasOwnProperty.call(PLANS, b.plan)) return String(b.plan);
@@ -2142,7 +2381,7 @@ function planFrom(body) {
   return byName || null;
 }
 app.get('/plans', (req, res) => {
-  res.json({ plans: Object.entries(PLANS).map(([id, p]) => ({ id, name: p.name, monthlyUsd: p.cents / 100, minGyms: p.minQty || 1, maxGyms: p.maxQty })) });
+  res.json({ plans: Object.entries(PLANS).filter(([id]) => id !== 'multi').map(([id, p]) => ({ id, name: p.name, monthlyUsd: p.cents / 100, extraUsd: p.extraCents ? p.extraCents / 100 : null, minEntrances: p.minQty || 1, maxEntrances: p.maxQty })) });
 });
 
 app.post('/create-checkout-session', async (req, res) => {
@@ -2150,7 +2389,7 @@ app.post('/create-checkout-session', async (req, res) => {
   const planId = planFrom(b);
   if (!planId) return res.status(400).json({ error: 'Unknown plan. Pick a plan on the pricing page.' });
   const plan = PLANS[planId];
-  let qty = parseInt(b.gyms, 10);
+  let qty = parseInt(b.entrances !== undefined ? b.entrances : b.gyms, 10);
   if (!Number.isFinite(qty) || qty < 1) qty = plan.minQty || 1;
   qty = Math.max(plan.minQty || 1, Math.min(plan.maxQty || 1, qty));
   const email = store.normalizeEmail(b.email);
@@ -2170,13 +2409,21 @@ app.post('/create-checkout-session', async (req, res) => {
         {
           price_data: {
             currency: 'usd',
-            product_data: { name: `SecurityAI — ${plan.name}` },
+            product_data: { name: plan.extraCents ? 'SecurityAI — first entrance' : `SecurityAI — ${plan.name}` },
             unit_amount: plan.cents,
             recurring: { interval: 'month' },
           },
-          quantity: qty,
+          quantity: plan.extraCents ? 1 : qty,
         },
-      ],
+      ].concat(plan.extraCents && qty > 1 ? [{
+        price_data: {
+          currency: 'usd',
+          product_data: { name: 'SecurityAI — each extra entrance or location' },
+          unit_amount: plan.extraCents,
+          recurring: { interval: 'month' },
+        },
+        quantity: qty - 1,
+      }] : []),
       ...(email ? { customer_email: email } : {}),
       // Consent facts, and who is buying for which gym, carried into
       // Stripe's own records for this subscription.
@@ -2193,7 +2440,7 @@ app.post('/create-checkout-session', async (req, res) => {
       cancel_url: `${DOMAIN}/checkout.html?plan=${encodeURIComponent(planId)}`,
     });
 
-    res.json({ url: session.url, plan: planId, monthlyUsd: plan.cents / 100, quantity: qty });
+    res.json({ url: session.url, plan: planId, monthlyUsd: (plan.cents + (plan.extraCents ? plan.extraCents * (qty - 1) : plan.cents * (qty - 1))) / 100, quantity: qty });
   } catch (err) {
     console.error('Stripe checkout failed:', err.message);
     res.status(500).json({ error: 'The payment page could not be opened just now. Please try again in a minute.' });
@@ -2213,20 +2460,49 @@ app.post('/webhook', express.raw({ type: 'application/json' }), (req, res) => {
     return res.status(400).send(`Webhook signature verification failed: ${err.message}`);
   }
 
-  switch (event.type) {
-    case 'checkout.session.completed':
-      console.log('New subscription started:', event.data.object.id);
-      break;
-    case 'invoice.payment_failed':
-      console.log('Payment failed for subscription:', event.data.object.subscription);
-      break;
-    case 'customer.subscription.deleted':
-      console.log('Subscription canceled:', event.data.object.id);
-      break;
-  }
-
+  // Answer Stripe at once (it retries slow answers); the work runs after.
   res.json({ received: true });
+  handleStripeEvent(event).catch(e => { try { incidents.record('stripe', e, { type: event.type }); } catch (x) { console.error('stripe:', e.message); } });
 });
+
+// Self-serve signup. A paid checkout creates the gym (once per checkout),
+// emails the owner how to sign in, and tells TJ. A failed payment or a
+// cancellation tells TJ and shows on the admin page; nothing is switched
+// off automatically (TJ decides).
+async function handleStripeEvent(event) {
+  const o = (event && event.data && event.data.object) || {};
+  const tell = (subject, text) => { const to = String(process.env.SUPPORT_EMAIL || '').trim(); return to && mailer.isConfigured() ? mailer.sendMail({ to, subject, text }) : null; };
+  if (event.type === 'checkout.session.completed') {
+    if (o.mode && o.mode !== 'subscription') return;
+    if (store.getMarker('_site', 'stripe-' + o.id)) return;                 // Stripe can send the same event twice
+    const md = o.metadata || {};
+    const email = store.normalizeEmail(o.customer_email || (o.customer_details && o.customer_details.email) || md.customer_email);
+    const gymName = cleanText(md.gym_name, 80) || (email ? email.split('@')[1].split('.')[0] : 'New gym');
+    if (!email) { await tell('SecurityAI: paid checkout with no email', `Checkout ${o.id} was paid but had no email address. Set the gym up by hand from the admin page.`); store.setMarker('_site', 'stripe-' + o.id, 'no-email'); return; }
+    const gym = gyms.createGym({ gymName, email });
+    gyms.setBilling(gym.key, { status: 'active', plan: md.plan || null, customer: o.customer || null, subscription: o.subscription || null, checkout: o.id });
+    store.setMarker('_site', 'stripe-' + o.id, gym.key);
+    const base = gyms.publicBaseUrl() || String(DOMAIN || '').replace(/\/+$/, '');
+    const name = cleanText(md.customer_name, 60);
+    await mailer.sendMail({ to: email, subject: `Welcome to SecurityAI, ${gym.gymName}`,
+      text: `Hi${name ? ' ' + name.split(' ')[0] : ''},\n\nThanks for signing up. Your gym's page is ready:\n${base}/gym\n\nSign in: tap "Email me a sign-in link" and use this email (${email}). You're the owner, so you can add your staff from there.\n\nYour gym code (share it only with your staff): ${gym.code}\n\nWhat happens next:\n1. TJ will call or email within one business day to book the install (about an hour at the gym, using the camera you already have).\n2. Put the entrance sign up (on the gym page under Getting started).\n3. Add yourself to alerts.\n\nQuestions: reply to this email.\n\nTJ, SecurityAI` });
+    await tell(`New SecurityAI signup: ${gym.gymName}`, `${gym.gymName} signed up (${md.plan || 'plan ?'}).\nOwner: ${name || '?'} <${email}>\nGym key: ${gym.key}\nStripe checkout: ${o.id}\n\nNext: call them to book the install. The gym is on the admin page.`);
+    return;
+  }
+  if (event.type === 'invoice.payment_failed' || event.type === 'customer.subscription.deleted') {
+    const subId = event.type === 'invoice.payment_failed' ? o.subscription : o.id;
+    const g = gyms.findBySubscription(subId) || gyms.findBySubscription(o.customer);
+    const status = event.type === 'invoice.payment_failed' ? 'payment-failed' : 'canceled';
+    if (g) gyms.setBilling(g.key || g.code, { status });
+    await tell(`SecurityAI billing: ${g ? g.gymName : 'unknown gym'} ${status === 'canceled' ? 'canceled' : 'payment failed'}`,
+      `${g ? g.gymName + ' (' + (g.key || g.code) + ')' : 'A subscription not matched to a gym'}: ${status === 'canceled' ? 'the subscription was canceled.' : 'a payment failed. Stripe retries by itself; check the Stripe dashboard.'}\nStripe ${event.type === 'invoice.payment_failed' ? 'invoice' : 'subscription'}: ${o.id}\n\nNothing was switched off. Decide on the admin page.`);
+    return;
+  }
+  if (event.type === 'invoice.paid' && o.subscription) {
+    const g = gyms.findBySubscription(o.subscription);
+    if (g && g.billing && g.billing.status !== 'active') gyms.setBilling(g.key || g.code, { status: 'active' });
+  }
+}
 
 // Render (and most hosting platforms) assign the port dynamically via
 // the PORT environment variable and expect the app to listen on
@@ -2234,6 +2510,91 @@ app.post('/webhook', express.raw({ type: 'application/json' }), (req, res) => {
 // anything answering and reports the deploy as failed. Falls back to
 // 4242 for local development, where PORT usually isn't set.
 const PORT = process.env.PORT || 4242;
+
+// --- Self-repair: failures are recorded, diagnosed and (when safe) fixed ---
+// incidents.js groups failures by cause; self-repair.js decides what to do
+// and emails TJ every time. Only the website does this (not a laptop in
+// local mode), so it is switched on in the "node server.js" block below.
+const incidents = require('./incidents').create({ dataDir: process.env.DATA_DIR || __dirname, log: m => console.warn(m) });
+const selfRepair = require('./self-repair').create({
+  dataDir: process.env.DATA_DIR || __dirname, codeDir: __dirname, incidents, mailer, store, monitor,
+  siteUrl: () => String(DOMAIN || '').replace(/\/+$/, ''), gymKeys: () => [...knownGymKeys().keys()], gymName: k => gyms.gymNameFor(k) || k, log: m => console.log(m),
+});
+// A route that threw: answer plainly, and record it.
+app.use((err, req, res, next) => {
+  if (err && (err.type === 'entity.too.large' || err.status === 413 || err.status === 400)) return next(err);
+  incidents.record('route', err, { path: req.path, method: req.method });
+  if (res.headersSent) return;
+  res.status(500).json({ error: 'Something went wrong on our side. It has been recorded and TJ has been told.' });
+});
+
+// --- Encrypted backup of the records (backup.js) ---------------------------
+const backup = require('./backup');
+const backupOpts = { keepMsFor: (kind, key) => kind === 'log' ? monitor.logMsFor(key) : monitor.summaryMsFor(key) };
+app.post('/admin/backup', (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  if (store.limited(`backup:${callerKey(req)}`, 10, 3600e3)) return res.status(429).json({ error: 'Too many backups — try again in an hour.' });
+  try {
+    const b = backup.seal(process.env.DATA_DIR || __dirname, (req.body || {}).password, backupOpts);
+    res.set('Cache-Control', 'no-store').set('Content-Type', 'application/octet-stream')
+      .set('Content-Disposition', `attachment; filename="securityai-backup-${new Date().toISOString().slice(0, 10)}.sabak"`).send(b.text);
+  } catch (e) { res.status(400).json({ error: e.message }); }
+});
+// Nightly copy by email (3 AM Central) when BACKUP_PASSWORD is set.
+async function nightlyBackupTick() {
+  const pw = String(process.env.BACKUP_PASSWORD || ''), to = String(process.env.SUPPORT_EMAIL || '').trim();
+  if (!pw || !to || !mailer.isConfigured()) return;
+  const p = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Chicago', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', hourCycle: 'h23' }).formatToParts(new Date()).reduce((o, x) => (o[x.type] = x.value, o), {});
+  const day = `${p.year}-${p.month}-${p.day}`;
+  if (Number(p.hour) < 3 || store.getMarker('_site', 'backup') === day) return;
+  const b = backup.seal(process.env.DATA_DIR || __dirname, pw, backupOpts);
+  const r = await mailer.sendMail({ to, subject: `SecurityAI backup ${day} (${b.count} files, locked)`, text: `The website's records from ${day}, locked with your BACKUP_PASSWORD. Photos are not included, and entries past each gym's keep time are left out.\n\nKeep only the last 30 days of these emails: delete older ones.\n\nTo open it: node backup.js restore <this file> <password> <folder>`, attachments: [{ filename: `securityai-backup-${day}.sabak`, content: b.text }] });
+  if (r && r.delivered !== false) store.setMarker('_site', 'backup', day);
+  else throw new Error('backup email not sent: ' + (r && r.reason));
+}
+
+// Email links and the admin page: approve, reject, keep, undo.
+const repairPage = (title, body) => `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><meta name="referrer" content="no-referrer"><title>${escHtmlS(title)}</title>
+<style>body{margin:0;background:#14171A;color:#EDEFF1;font:17px/1.5 -apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;padding:24px 16px;}
+.c{max-width:520px;margin:6vh auto;background:#1C2124;border:1px solid #353D43;border-radius:14px;padding:22px;}
+h1{font-size:21px;margin:0 0 8px;} p{color:#A3ABB3;margin:6px 0;} b{color:#EDEFF1;} pre{white-space:pre-wrap;background:#101315;border:1px solid #353D43;border-radius:8px;padding:10px;font-size:12px;color:#EDEFF1;max-height:50vh;overflow:auto;}
+button{width:100%;min-height:52px;margin-top:16px;border:0;border-radius:10px;font:inherit;font-weight:700;cursor:pointer;background:#3FCF8E;color:#0b1f15;}
+button.warn{background:#FF6B6B;color:#2a0b0b;} a{color:#EDEFF1;}</style></head><body><div class="c">${body}</div></body></html>`;
+function escHtmlS(v) { return String(v == null ? '' : v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+const REPAIR_WORDS = { approve: ['Approve and deploy this change?', 'It merges on GitHub, and Render deploys it in a few minutes. It is watched for 30 minutes and put back by itself if anything goes wrong.', 'Approve and deploy', ''],
+  reject: ['Reject this change?', 'Nothing on the website changes.', 'Reject', 'warn'],
+  undo: ['Undo this?', 'It goes back exactly to how it was before.', 'Undo', 'warn'],
+  keep: ['Keep it?', 'It stays as it is now.', 'Keep it', ''] };
+app.get('/self-repair/:id/:action', (req, res) => {
+  res.set('Cache-Control', 'no-store').set('Referrer-Policy', 'no-referrer');
+  const { id, action } = req.params, w = REPAIR_WORDS[action];
+  if (!w || !selfRepair.linkOk(id, action, req.query.e, req.query.t)) return res.status(403).send(repairPage('Link not valid', '<h1>This link doesn\'t work</h1><p>It has expired or isn\'t for this website. Use the admin page instead (Self-repair).</p>'));
+  const r = (selfRepair.view().repairs || []).find(x => x.id === id);
+  res.send(repairPage(w[0], `<h1>${escHtmlS(w[0])}</h1>${r ? `<p><b>${escHtmlS(r.fix || r.cause || r.what || '')}</b></p><p>Status now: ${escHtmlS(r.status)}</p>${r.diff && action === 'approve' ? `<pre>${escHtmlS(r.diff)}</pre>` : ''}` : ''}<p>${escHtmlS(w[1])}</p>
+    <form method="POST" action="/self-repair/${encodeURIComponent(id)}/${encodeURIComponent(action)}?e=${encodeURIComponent(req.query.e)}&t=${encodeURIComponent(req.query.t)}"><button type="submit" class="${w[3]}">${escHtmlS(w[2])}</button></form>`));
+});
+app.post('/self-repair/:id/:action', async (req, res) => {
+  res.set('Cache-Control', 'no-store').set('Referrer-Policy', 'no-referrer');
+  const { id, action } = req.params;
+  if (!REPAIR_WORDS[action] || !selfRepair.linkOk(id, action, req.query.e, req.query.t)) return res.status(403).send(repairPage('Link not valid', '<h1>This link doesn\'t work</h1><p>It has expired or isn\'t for this website.</p>'));
+  if (store.limited(`repair-link:${callerKey(req)}`, 20, 3600e3)) return res.status(429).send(repairPage('Slow down', '<h1>Too many tries</h1><p>Try again in an hour.</p>'));
+  try { const msg = await selfRepair.act(id, action, 'TJ (email link)'); res.send(repairPage('Done', `<h1>Done</h1><p>${escHtmlS(msg)}</p>`)); }
+  catch (e) { res.status(400).send(repairPage('Not done', `<h1>Not done</h1><p>${escHtmlS(e.message)}</p>`)); }
+});
+app.get('/admin/self-repair', (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  res.set('Cache-Control', 'no-store').json(Object.assign({ ok: true }, selfRepair.view(), { incidents: incidents.list().slice(0, 20).map(i => ({ fp: i.fp, area: i.area, message: i.message, count: i.count, lastAt: i.lastAt, where: (i.frames || [])[0] || null, status: i.status, diagnosis: i.diagnosis || null })) }));
+});
+app.post('/admin/self-repair/request', async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  try { res.json(Object.assign({ ok: true }, await selfRepair.request((req.body || {}).text, 'TJ (admin page)'))); }
+  catch (e) { res.status(400).json({ ok: false, error: e.message }); }
+});
+app.post('/admin/self-repair/:id/:action', async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  try { res.json({ ok: true, message: await selfRepair.act(req.params.id, req.params.action, 'TJ (admin page)') }); }
+  catch (e) { res.status(400).json({ ok: false, error: e.message }); }
+});
 
 // Listens and returns the http server. Exported so rtsp-run.js's local
 // mode can serve activity.html from the same monitor instance; that path
@@ -2249,13 +2610,30 @@ module.exports = { app, start };
 // `node server.js` (how Render runs it): everything, exactly as before.
 // require('./server'): nothing listens and nothing starts until start().
 if (require.main === module) {
+// Self-repair on (website only): record failures and act on them.
+incidents.onIncident(inc => selfRepair.onIncident(inc));
+try { selfRepair.onBoot(); } catch (e) { console.warn('Self-repair start:', e.message); }
+process.on('uncaughtException', err => { console.error('Crashed:', err && err.stack || err); try { incidents.record('crash', err); } catch (e) { /* exiting */ } setTimeout(() => process.exit(1), 300); });
+// Failures inside a 500 answer that a route caught itself (no stack, but
+// the message is enough for the known problems: key, credit, email...).
+vision.onFailure = err => incidents.record('ai', err);
+const sendMailOrig = mailer.sendMail;
+mailer.sendMail = async o => { const r = await sendMailOrig(o); if (r && r.delivered === false && /EAUTH|Invalid login|535|not accepted/i.test(String(r.reason || ''))) incidents.record('email', new Error(String(r.reason))); return r; };
 scheduler.start();
+// The extras: each can be paused by self-repair if it keeps failing (the
+// doors are watched either way), and every failure is recorded.
+const extra = (name, fn) => () => { if (!selfRepair.featureOn(name)) return; Promise.resolve().then(fn).catch(e => { console.warn(`${name}:`, e.message); incidents.record(name, e); }); };
+setInterval(extra('weekly', () => weeklyReviewTick(false)), 3600e3).unref();
+setInterval(extra('backup', () => nightlyBackupTick()), 3600e3).unref();
+setInterval(extra('self-test', () => selfTest.tick([...knownGymKeys().keys()])), 3600e3).unref();
+// The morning summary is checked every 15 minutes so it lands close to its time.
+setInterval(extra('morning', () => morning.tick([...knownGymKeys().keys()])), 15 * 60e3).unref();
 // A camera computer that is already off when the website restarts must
 // still trigger the "offline" alert.
 try { const re = monitor.rearmFromDisk(); if (re.length) console.log(`Watching for check-ins from: ${re.join(', ')} (offline alert armed).`); } catch (e) { console.warn('Could not re-arm offline alerts:', e.message); }
 // Last line of defence: one unexpected async failure must not take the
 // whole website (every gym) down. Logged loudly instead.
-process.on('unhandledRejection', err => console.error('Unexpected error (kept running):', err && err.stack || err));
+process.on('unhandledRejection', err => { console.error('Unexpected error (kept running):', err && err.stack || err); incidents.record('rejection', err); });
 // Render stops the old copy with SIGTERM on every deploy: save the log
 // first (it is written a second after each change).
 for (const sig of ['SIGTERM', 'SIGINT']) {

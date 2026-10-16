@@ -21,6 +21,9 @@
 // Settings live in ~/.securityai/rtsp-zones.json (an old one next to the
 // code is moved there automatically), so code updates never lose them.
 
+// Safe self-update: count starts after an update first of all, so a new
+// version that keeps crashing is put back by itself (auto-update.js).
+try { require('./auto-update').boot({ service: process.env.SECURITYAI_SERVICE === '1' }); } catch (e) { /* older copy */ }
 try { require('dotenv').config(); } catch (e) { /* .env support optional */ }
 const fs = require('fs');
 const os = require('os');
@@ -41,6 +44,7 @@ const FLAG = {
 };
 // Background (service) mode: started by launchd / systemd via install-service.js.
 const SERVICE = process.env.SECURITYAI_SERVICE === '1';
+const startedAtMs = Date.now();
 const LOG_FILE = process.env.RUNNER_LOG_FILE || (SERVICE ? statePath('runner.log') : null);
 const LOG_MAX_BYTES = 5 * 1024 * 1024;
 if (LOG_FILE) teeToLogFile(LOG_FILE);
@@ -426,9 +430,16 @@ function setupRemote(cfg, handles, warningsOf, testLink) {
         tamperSince: h.stats.tamper ? h.stats.tamper.since : null,
         warnings: (warningsOf.get(z) || []).concat(recentNotes()).slice(0, 10),
       }));
+      let AU = null; try { AU = require('./auto-update'); } catch (e) { /* older copy */ }
       return remote.heartbeat({
         gymCode: cfg.gymCode || null, host: os.hostname(), version: VERSION,
-        config: tzConfig(cfg), zones,
+        config: tzConfig(cfg), zones, update: AU ? AU.summary() : undefined,
+      }).then(r => {
+        // Behind the website's version? Update when the door is quiet.
+        if (AU) try {
+          AU.onHeartbeat(r, { service: SERVICE, enabled: cfg.autoUpdate !== false, quiet: ms => !remote.queued && handles.every(({ h }) => !h.stats.lastEventAt || Date.now() - h.stats.lastEventAt >= ms) && Date.now() - startedAtMs >= ms });
+        } catch (e) { /* never stops the heartbeat */ }
+        return r;
       });
     },
     get queued() { return remote.queued; },
@@ -599,7 +610,7 @@ function beingWatched() {
 // node update.js): in the background, restart to use them (the service
 // starts us again); in a window, say so once.
 function watchForChanges(onChange) {
-  const files = [CONFIG, ...['rtsp-run.js', 'rtsp.js', 'detect.js', 'runner-config.js', 'runner-remote.js', 'walk-test.js', 'accuracy.js'].map(f => path.join(__dirname, f))];
+  const files = [CONFIG, ...['rtsp-run.js', 'rtsp.js', 'detect.js', 'runner-config.js', 'runner-remote.js', 'walk-test.js', 'accuracy.js', 'screen-reader.js', 'checkin-feed.js', 'reader-core.js', 'member-keys.js', 'auto-update.js', 'camera-probe.js'].map(f => path.join(__dirname, f))];
   const sig = () => files.map(f => { try { const st = fs.statSync(f); return `${st.mtimeMs}:${st.size}`; } catch (e) { return '-'; } }).join('|');
   const first = sig();
   let told = false;
@@ -664,8 +675,31 @@ function setEntryDirection(val) {
   return 0;
 }
 
+// The front-desk screen reader (screen-reader.js) rides along with the
+// background monitor when it has been set up on this box: one service runs
+// both, and it is restarted if it ever stops.
+let screenChild = null;
+function startScreenReader() {
+  const cfg = path.join(process.env.SECURITYAI_HOME || path.join(os.homedir(), '.securityai'), 'screen-reader.json');
+  if (!fs.existsSync(path.join(__dirname, 'screen-reader.js'))) return;
+  // Not set up yet: start it as soon as it is (node screen-reader.js --setup).
+  if (!fs.existsSync(cfg)) { const t = setInterval(() => { if (fs.existsSync(cfg)) { clearInterval(t); startScreenReader(); } }, 60000); t.unref(); return; }
+  const { spawn } = require('child_process');
+  const go = () => {
+    // A check-in feed set up on this computer replaces reading the screen.
+    const feedCfg = path.join(process.env.SECURITYAI_HOME || path.join(os.homedir(), '.securityai'), 'checkin-feed.json');
+    const script = fs.existsSync(feedCfg) && fs.existsSync(path.join(__dirname, 'checkin-feed.js')) ? 'checkin-feed.js' : 'screen-reader.js';
+    screenChild = spawn(process.execPath, [path.join(__dirname, script)], { stdio: 'ignore', env: process.env });
+    screenChild.on('exit', () => { screenChild = null; setTimeout(go, 15000).unref(); });
+  };
+  go();
+  process.on('exit', () => { if (screenChild) try { screenChild.kill(); } catch (e) { /* gone */ } });
+}
+
 async function main() {
   if (FLAG.entry !== null) process.exit(setEntryDirection(FLAG.entry));
+  if (SERVICE) startScreenReader();
+  if (SERVICE) try { require('./auto-update').start({ log: m => sayAt(m), note: (t, ms) => addNote(t, ms) }); } catch (e) { /* older copy */ }
   // The accuracy test drives the monitor that is running (or starts one);
   // it never opens a camera connection itself.
   if (FLAG.test) {

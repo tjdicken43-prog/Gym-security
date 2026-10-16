@@ -125,7 +125,7 @@ async function updateFromWebsite(dest, cfgFile) {
   const changed = files.filter(f => {
     try { return sha256(fs.readFileSync(path.join(dest, f.name))) !== f.sha256; } catch (e) { return true; }
   });
-  if (!changed.length) { say(`Already up to date (version ${m.json.version}). Nothing changed.`); return { changed: 0 }; }
+  if (!changed.length) { say(`Already up to date (version ${m.json.version}). Nothing changed.`); return { changed: 0, version: m.json.version }; }
 
   const fresh = !fs.existsSync(path.join(dest, 'rtsp-run.js'));
   say(fresh ? `Downloading the program (${changed.length} files)...` : `Downloading ${changed.length} changed file(s)...`);
@@ -160,7 +160,7 @@ async function updateFromWebsite(dest, cfgFile) {
     }
   } finally { fs.rmSync(staging, { recursive: true, force: true }); }
   say(fresh ? `Downloaded the program (${changed.length} files).` : `Updated ${changed.length} file(s) to version ${m.json.version}. Your settings were not touched.`);
-  return { changed: changed.length };
+  return { changed: changed.length, version: m.json.version };
 }
 
 function undo(dest) {
@@ -430,6 +430,16 @@ async function main() {
   const cfgFile = RC.resolveConfigPath({ log: say, extraDirs: [here] });
 
   if (process.argv.includes('--undo')) { undo(dest); await afterwards(dest, cfgFile); return; }
+
+  // The background monitor's safe self-update (auto-update.js): no
+  // questions, no pairing, no clean-up. Exit 10 = files changed.
+  if (process.argv.includes('--auto')) {
+    const cfg = readConfig(cfgFile);
+    if (!cfg.serverUrl || !cfg.runnerToken) { say('Not paired with a website: not updating.'); process.exit(3); }
+    const r = await updateFromWebsite(dest, cfgFile);
+    try { require(path.join(dest, 'auto-update.js')).recordInstalled(r.version); } catch (e) { /* older copy */ }
+    process.exit(r.changed ? 10 : 0);
+  }
 
   // Run from a downloaded folder (not ~/securityai): install that folder.
   // (pairing-client.js marks a download of THIS version; an old folder

@@ -258,22 +258,40 @@ Open a clock with seconds on your phone (e.g. time.is).
    - Scan 1 shows the same minute as your phone, and scan 2 shows the next one: **Ashbourne is within 5 seconds. Nothing to do.**
    - Scan 1 already shows the NEXT minute: Ashbourne is fast. Repeat with :45, :35… to see by how much.
    - Scan 2 still shows the EARLIER minute: Ashbourne is slow. Repeat with :15, :25… to see by how much.
-4. If it's off, put the seconds in the admin page → J Street → settings →
-   "Check-in system's clock" (e.g. 20 if it's 20 s fast, -20 if 20 s slow).
+4. If it's off, set it on the admin page → J Street → Settings →
+   "Check-in system's clock": **Ahead** or **Behind**, then minutes and seconds
+   (J Street: Ahead, 4 min). The line under it shows what that means.
+   Scan matching from the reader corrects the PC's clock by itself; this
+   setting is for looking things up in the Visit Log by hand.
 
 ## Ashbourne screen check (once, before the reader)
 
+On the front-desk PC, Ashbourne is called **MVSv4**, and the Live Entry
+pop-up is its own window ("MVSv4 - Entry..."). Leave both open.
+
 1. Upload the latest zip to GitHub and wait for Render to say Live.
-2. On the Ashbourne PC: Ashbourne open on the **Visit Log**.
-3. On that PC, open the admin page in a browser → **Ashbourne screen check** →
-   **Copy**.
-4. Click Start, type **Windows PowerShell**, open it, right-click to paste,
-   press Enter.
-5. It says *Found Ashbourne* (or shows a numbered list: type the number of
-   Ashbourne). When it says **go SCAN IN**, scan in at the turnstile 2–3
-   times, come back and press **Enter**.
-6. On your phone: admin page → Ashbourne screen check → **Download** → send
+2. Press the **Windows key**, type **powershell**, press Enter.
+3. Type this line and press Enter (no `|` needed):
+
+       [Net.ServicePointManager]::SecurityProtocol='Tls12'; iex (irm https://gym-security.onrender.com/ashbourne-check.txt)
+
+4. It says *Found Ashbourne* (or shows a numbered list: type the number of
+   **MVSv4**). When it says **go SCAN IN**, have someone scan in 2–3 times,
+   then press **Enter**.
+5. On your phone: admin page → Ashbourne screen check → **Download** → send
    the file to Claude.
+
+**If it says "Website blocked" (ESET) or "Could not create SSL/TLS secure
+channel":** the PC's antivirus (ESET) blocks the website, and it's password
+protected. Ask whoever manages it (probably Ashbourne support; the owner must
+OK it) to allow **gym-security.onrender.com** only. Meanwhile, do the check
+by email: send yourself the file `ashbourne-check.txt`, save it to Downloads
+on that PC, and run:
+
+       iex (Get-Content $HOME\Downloads\ashbourne-check.txt -Raw)
+
+It then saves `securityai-ashbourne-check.txt` on the Desktop: email it to
+yourself and send it to Claude. The reader needs the ESET exception to run.
 
 ## Member numbers: the front-desk reader (once)
 
@@ -339,3 +357,10 @@ Emails you (subject starts with the gym name), each with what happened and how t
 - A "back to normal" email when a reader problem clears.
 
 Emails need SMTP and SUPPORT_EMAIL set on Render. The admin page shows the same problem and fix under Protected member numbers.
+
+## Member numbers without touching the front-desk PC (Raspberry Pi)
+
+If the reader can't run on the Ashbourne PC (ESET blocks the website), the Pi
+reads the Live Entry pop-up from the screen instead, through an HDMI splitter
+and a USB capture stick. It also takes over the camera from the laptop (a move
+code: no camera setup again). Step by step: **PI-SETUP.md**.

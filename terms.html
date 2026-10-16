@@ -63,6 +63,13 @@
       <li><strong>How long photos are kept.</strong> Photos of each crossing are deleted after <strong>48 hours</strong>. Entries flagged as tailgating are kept for <strong>35 days</strong> so they can appear in your monthly report, then deleted. No video is stored.</li>
       <li><strong>What we don't do.</strong> No facial recognition. SecurityAI does not identify anyone or match people to member records. We don't sell data or use it for advertising.</li>
       <li><strong>Who can see it.</strong> Anyone with your gym's code or a link you share, and SecurityAI for running and supporting the service. Shared photo links stop working when the photo is deleted.</li>
+      <li><strong>Other things we keep.</strong> Staff logins (name, email, role), phones signed up for notifications (a push address from the browser maker, no phone number), and a nightly locked backup emailed to SecurityAI (no photos, nothing past the keep times above; SecurityAI keeps 30 days of them). Questions typed into "Ask" are answered by Anthropic's Claude using your gym's entry counts, not photos or member numbers.</li>
+      <li><strong>When the site fixes itself.</strong> If part of the site breaks, the error text and the related code (never photos, member numbers or passwords) may be sent to Anthropic's Claude to suggest a fix. A person at SecurityAI approves every code change.</li>
+      <li><strong>Member numbers.</strong> Scrambled on the gym's own computer. Only phones the owner approves can read them; our server can't.</li>
+      <li><strong>Team chat alerts.</strong> If the gym adds a Slack, Teams, Google Chat or Discord channel, alert text (what happened, when, and a link to the gym page) is sent to that service. Photos are not.</li>
+      <li><strong>On staff phones.</strong> The gym page keeps its last list on the phone for up to 48 hours so it opens without signal (times, counts and answers; no photos or member numbers). Signing out wipes it.</li>
+      <li><strong>Who read member numbers.</strong> Each time an approved phone opens member numbers, the phone's name, who was signed in and the time are logged for the gym's owner (kept 90 days).</li>
+      <li><strong>Shorter keep times.</strong> A gym's owner can choose to keep photos for less time than above (24 hours; 14 days for kept entries). Never longer.</li>
       <li><strong>Payments.</strong> Card details are entered on Stripe's page and never reach our server.</li>
     </ul>
   </section>

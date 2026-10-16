@@ -12,7 +12,7 @@
 # Everything it keeps is in %LOCALAPPDATA%\SecurityAI (the pairing key is
 # locked to this Windows user with Windows' own protection, DPAPI).
 
-$ReaderVersion = '1.1.1'
+$ReaderVersion = '1.2.1'
 $ErrorActionPreference = 'Stop'
 try { [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12 } catch { }
 
@@ -56,10 +56,10 @@ function Sha256Hex([string]$s) {
 }
 function Fingerprint($jwk) { return Sha256Hex ($jwk.n + '.' + $jwk.e) }
 function CodeOf([string]$fp) {
-  [uint64]$v = [Convert]::ToUInt32($fp.Substring(0, 8), 16) -shr 2
+  # 12 letters (about 59 bits), the same as the website and the phones.
   $out = ''
-  for ($i = 0; $i -lt 6; $i++) { $out = $ALPHA[[int]($v % 31)] + $out; $v = [uint64][math]::Floor($v / 31) }
-  return $out.Substring(0, 3) + '-' + $out.Substring(3)
+  for ($i = 0; $i -lt 12; $i++) { $out += [string]$ALPHA[[Convert]::ToInt32($fp.Substring($i * 2, 2), 16) % 31] }
+  return $out.Substring(0, 4) + '-' + $out.Substring(4, 4) + '-' + $out.Substring(8, 4)
 }
 function NewRsa($jwk) {
   # Windows: RSACng (has OAEP-SHA256). Elsewhere (testing): the default RSA.
@@ -103,6 +103,15 @@ function SaveConfig($c) {
   ($c | ConvertTo-Json -Depth 8) | Set-Content -Path $ConfigFile -Encoding UTF8
 }
 
+# A failed connection in plain words (and what to do about it).
+function NetWords($err) {
+  $m = '' + $err.Exception.Message
+  try { if ($err.Exception.InnerException) { $m += ' ' + $err.Exception.InnerException.Message } } catch { }
+  if ($m -match 'SSL|TLS|secure channel|SEC_E|underlying connection was closed') { return 'This PC is blocking the website: its antivirus (ESET) or the network. Ask whoever manages the antivirus to allow  gym-security.onrender.com  (that address only), then try again.' }
+  if ($m -match 'remote name could not be resolved|No such host|Name or service not known') { return 'This PC cannot find the website: check its internet connection.' }
+  if ($m -match 'Unable to connect|timed out|refused') { return 'This PC cannot reach the website right now: check its internet connection, then try again.' }
+  return $m
+}
 function Api([string]$method, [string]$path, $body, [string]$token) {
   $h = @{ 'Authorization' = 'Bearer ' + $token; 'X-Runner-Time' = (Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ss.fffZ'); 'X-Reader-Host' = $env:COMPUTERNAME; 'X-Reader-Version' = $ReaderVersion }
   if ($null -ne $body) {
@@ -113,6 +122,20 @@ function Api([string]$method, [string]$path, $body, [string]$token) {
 
 # ------------------------------------------------------- trust (who reads)
 # Only devices whose approval was signed by the owner key pinned at setup.
+# The key that signed an approval: the pinned owner's, or a backup approver's
+# that the pinned owner signed in (and hasn't removed).
+function SignerOf($pinned, $by, $delegates, $undelegated) {
+  if (-not $by -or $by -eq $pinned.fp) { return $pinned.sign }
+  if ($undelegated.ContainsKey($by)) { return $null }
+  foreach ($d in @($delegates)) {
+    if ($d -and $d.fp -eq $by -and $d.sign) {
+      if ((Fingerprint $d.sign) -ne $d.fp) { return $null }
+      if (-not (VerifySig $pinned.sign ('securityai-delegate-v1|' + $d.fp + '|' + $d.at) $d.sig)) { return $null }
+      return $d.sign
+    }
+  }
+  return $null
+}
 $script:Trusted = @()     # @{ id; rsa }
 $script:TrustProblem = $null
 function RefreshTrust($cfg, $token) {
@@ -123,13 +146,32 @@ function RefreshTrust($cfg, $token) {
     Log 'owner key mismatch - keeping the last trusted devices'
     return
   }
+  # Approvals are checked against the gym this reader was set up for, never
+  # a gym name the website sends.
+  $gym = ([string]$cfg.gym).ToLower()
+  if (-not $gym -or -not $t.gym -or ([string]$t.gym).ToLower() -ne $gym) {
+    $script:TrustProblem = 'The website answered for a different gym than this reader was set up for. Member numbers are only scrambled for devices approved before. Set the reader up again if the gym changed.'
+    Log 'gym mismatch in trust answer - keeping the last trusted devices'
+    return
+  }
   $script:TrustProblem = $null
+  $undel = @{}
+  foreach ($fp in @($cfg.undelegated)) { if ($fp) { $undel[$fp] = 1 } }
+  $newUndel = $false
+  foreach ($u in @($t.undelegated)) {
+    if ($u -and $u.fp -and -not $undel.ContainsKey($u.fp)) {
+      if (VerifySig $pinned.sign ('securityai-undelegate-v1|' + $u.fp + '|' + $u.at) $u.sig) { $undel[$u.fp] = 1; $newUndel = $true }
+    }
+  }
+  if ($newUndel) { $cfg | Add-Member -NotePropertyName undelegated -NotePropertyValue @($undel.Keys) -Force; SaveConfig $cfg }
+  $dels = @($t.delegates)
   $revoked = @{}
   foreach ($fp in @($cfg.revoked)) { if ($fp) { $revoked[$fp] = 1 } }
   $newRevoked = $false
   foreach ($r in @($t.revoked)) {
     if ($r -and $r.fp -and -not $revoked.ContainsKey($r.fp)) {
-      if (VerifySig $pinned.sign ('securityai-revoke-v1|' + $t.gym + '|' + $r.fp + '|' + $r.at) $r.sig) { $revoked[$r.fp] = 1; $newRevoked = $true }
+      $rs = SignerOf $pinned $r.by $dels $undel
+      if ($rs -and (VerifySig $rs ('securityai-revoke-v1|' + $gym + '|' + $r.fp + '|' + $r.at) $r.sig)) { $revoked[$r.fp] = 1; $newRevoked = $true }
     }
   }
   if ($newRevoked) { $cfg.revoked = @($revoked.Keys); SaveConfig $cfg }
@@ -138,7 +180,8 @@ function RefreshTrust($cfg, $token) {
     if (-not $d -or -not $d.pub) { continue }
     $fp = Fingerprint $d.pub
     if ($revoked.ContainsKey($fp)) { continue }
-    if (-not (VerifySig $pinned.sign ('securityai-approve-v1|' + $t.gym + '|' + $fp + '|' + $d.approval.at) $d.approval.sig)) { Log ('ignored a device without a valid owner signature: ' + (CodeOf $fp)); continue }
+    $signer = SignerOf $pinned $d.approval.by $dels $undel
+    if (-not $signer -or -not (VerifySig $signer ('securityai-approve-v1|' + $gym + '|' + $fp + '|' + $d.approval.at) $d.approval.sig)) { Log ('ignored a device without a valid owner signature: ' + (CodeOf $fp)); continue }
     $list += @{ id = $d.id; rsa = (NewRsa $d.pub) }
   }
   $script:Trusted = $list
@@ -195,7 +238,7 @@ function Flush($token, $problem) {
     $r = Api 'POST' '/reader/scans' @{ scans = @($q | Select-Object -First 100); host = $env:COMPUTERNAME; version = $ReaderVersion; problem = $problem } $token
     SaveQueue (@($q | Select-Object -Skip 100))
     Log ('sent ' + [Math]::Min(100, $q.Count) + ' scan(s)')
-  } catch { Log ('send failed, will retry: ' + $_.Exception.Message) }
+  } catch { Log ('send failed, will retry: ' + (NetWords $_)) }
 }
 
 # ------------------------------------------------------- reading Ashbourne
@@ -364,7 +407,7 @@ function RunReader() {
       if (($now - $lastTrust).TotalSeconds -ge 60) {
         try { RefreshTrust $cfg $token; $lastTrust = $now; $script:TrustChecked = $true; $script:Unpaired = $false } catch {
           $msg = $_.Exception.Message
-          Log ('trust check failed: ' + $msg)
+          Log ('trust check failed: ' + (NetWords $_))
           if ($msg -match '401') { $script:Unpaired = $true }
           $lastTrust = $now.AddSeconds(-45)
         }
@@ -478,12 +521,16 @@ function Setup() {
     } catch {
       $said = $null
       try { $said = ($_.ErrorDetails.Message | ConvertFrom-Json).error } catch { }
+      $blocked = $false
       if (-not $said) {
         $st = 0; try { $st = [int]$_.Exception.Response.StatusCode } catch { }
-        if ($st -ge 500 -or $st -eq 0) { $said = 'The website is not answering right now (it may be restarting after an update). Wait a minute and type the same code again.' }
-        else { $said = $_.Exception.Message }
+        $words = NetWords $_
+        if ($words -match 'blocking') { $said = $words; $blocked = $true }
+        elseif ($st -ge 500) { $said = 'The website is not answering right now (it may be restarting after an update). Wait a minute and type the same code again.' }
+        else { $said = $words }
       }
       Say $said Red
+      if ($blocked) { break }                      # retrying won't help until it's allowed
       if ($try -lt 3) { Say 'Try again:' Yellow }
     }
   }
@@ -493,14 +540,15 @@ function Setup() {
   $t = Api 'GET' '/reader/trust' $null $token
   if (-not $t.owner) { Say 'Set up your owner device on the admin page first (Protected member numbers), then run this again.' Yellow; return }
   Say ''
-  Say ('Owner device code on the website: ' + $t.owner.code) Cyan
+  if ((Fingerprint $t.owner.sign) -ne $t.owner.fp) { Say 'The owner key did not check out. Stopped.' Red; return }
+  Say ('Owner device code (worked out here from its key): ' + (CodeOf $t.owner.fp)) Cyan
   Say 'Check it matches the owner device code on YOUR admin page. This stops anyone else from approving devices.'
   $ok = Read-Host 'Does it match? (y/n)'
   if ($ok -notmatch '^[yY]') { Say 'Stopped. Nothing was saved. Tell Claude what you saw.' Yellow; return }
   if ((Fingerprint $t.owner.sign) -ne $t.owner.fp) { Say 'The owner key did not check out. Stopped.' Red; return }
   $zone = Read-Host 'Which Ashbourne zone is the front turnstile? (Enter = Zone 1)'
   if (-not $zone) { $zone = 'Zone 1' }
-  $cfg = [pscustomobject]@{ gym = $r.gymCode; gymName = $r.gymName; token = (Lock $token); owner = [pscustomobject]@{ sign = $t.owner.sign; fp = $t.owner.fp; code = $t.owner.code }; zone = $zone; revoked = @(); salt = (ToB64u (RandomBytes 32)); setupAt = (Get-Date).ToString('o') }
+  $cfg = [pscustomobject]@{ gym = $r.gymCode; gymName = $r.gymName; token = (Lock $token); owner = [pscustomobject]@{ sign = $t.owner.sign; fp = $t.owner.fp; code = (CodeOf $t.owner.fp) }; zone = $zone; revoked = @(); salt = (ToB64u (RandomBytes 32)); setupAt = (Get-Date).ToString('o') }
   SaveConfig $cfg
   Invoke-WebRequest -Uri ($Site + '/securityai-reader.txt') -OutFile $ScriptFile -UseBasicParsing
   if ($OnWindows) { Install-Start }

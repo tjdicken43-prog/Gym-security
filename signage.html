@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Door sign and member notice — SecurityAI</title>
+<link rel="icon" type="image/svg+xml" href="logo.svg">
+<style>
+  :root{--text:#14171A;--muted:#5b636b;--line:#d8dbdf;}
+  *{box-sizing:border-box;}
+  body{margin:0;background:#f4f6f8;color:var(--text);font:16px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;padding:16px;}
+  .wrap{max-width:760px;margin:0 auto;}
+  .bar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;margin:0 0 14px;}
+  .bar a,.bar button{font:inherit;font-weight:600;min-height:44px;padding:8px 14px;border-radius:10px;border:1px solid var(--text);background:#fff;color:var(--text);text-decoration:none;cursor:pointer;}
+  .page{background:#fff;border:1px solid var(--line);border-radius:10px;padding:28px;margin-bottom:18px;}
+  .sign{text-align:center;border:6px solid var(--text);border-radius:14px;padding:36px 22px;}
+  .sign .eye{font-size:54px;line-height:1;}
+  .sign h1{font-size:40px;margin:12px 0 8px;letter-spacing:.5px;}
+  .sign p{font-size:21px;margin:8px auto;max-width:560px;}
+  .sign .small{font-size:15px;color:var(--muted);}
+  h2{font-size:20px;margin:0 0 8px;} .muted{color:var(--muted);}
+  [contenteditable]{outline:1px dashed transparent;} [contenteditable]:focus{outline-color:#3FCF8E;}
+  @media print{ body{background:#fff;padding:0;} .bar,.noprint{display:none;} .page{border:0;border-radius:0;page-break-after:always;margin:0;} }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="bar"><a href="/gym">← Back to the gym page</a><button type="button" id="printBtn">Print</button></div>
+  <p class="noprint muted">Tap any text to change it (your gym's name, the price) before printing. Check your state's rules on camera signs with your lawyer: this is a starting point, not legal advice.</p>
+
+  <div class="page"><div class="sign">
+    <div class="eye" aria-hidden="true">◉</div>
+    <h1 contenteditable="true">Everyone checks in</h1>
+    <p contenteditable="true">This entrance is watched by camera so every visitor scans in. Guests are welcome: ask at the front desk for a day pass.</p>
+    <p class="small" contenteditable="true">Photos of each entry are kept for 48 hours, longer only if needed for a membership issue. No facial recognition. Details: <b id="memUrl">gym-security.onrender.com/members</b></p>
+  </div></div>
+
+  <div class="page"><div class="sign" lang="es">
+    <div class="eye" aria-hidden="true">◉</div>
+    <h1 contenteditable="true">Todos registran su entrada</h1>
+    <p contenteditable="true">Esta entrada está vigilada por cámara para que cada visitante registre su entrada. Los invitados son bienvenidos: pida un pase de día en la recepción.</p>
+    <p class="small" contenteditable="true">Las fotos de cada entrada se guardan 48 horas, más tiempo solo si se necesitan para un asunto de membresía. Sin reconocimiento facial. Detalles: <b class="memUrl">gym-security.onrender.com/members?lang=es</b></p>
+  </div></div>
+
+  <div class="page">
+    <h2 contenteditable="true">A note for members</h2>
+    <div contenteditable="true">
+      <p>To keep the gym safe and fair for everyone who pays, our entrance camera checks that each person coming in has their own scan.</p>
+      <p><b>What it does:</b> it counts how many people come through the turnstile after each scan. If more people come in than scanned, our staff look at the photo.</p>
+      <p><b>What it doesn't do:</b> it doesn't recognise faces, and it doesn't record video. Photos are deleted after 48 hours unless an entry needs following up.</p>
+      <p><b>Bringing a guest?</b> Great: get them a day pass at the front desk first. Membership codes are for one person.</p>
+      <p>Questions? Ask at the front desk.</p>
+    </div>
+  </div>
+
+  <div class="page">
+    <h2 contenteditable="true">A line for the membership agreement</h2>
+    <div contenteditable="true">
+      <p>"The entrance is monitored by camera to confirm that each person entering has checked in. Photos of entries are kept for up to 48 hours (up to 35 days when needed to resolve a membership issue) and are not used for facial recognition. Membership codes and cards are for the member's use only; guests need a day pass."</p>
+      <p class="muted">Ask your lawyer to check this once for your state.</p>
+    </div>
+  </div>
+
+  <div class="page">
+    <h2 contenteditable="true">For staff: what to say</h2>
+    <div contenteditable="true">
+      <p><b>Always check the photo first.</b> A flag means "worth a look", not "caught". Be friendly: most people simply didn't know.</p>
+      <p><b>Opening:</b> "Hi! Our entrance camera shows a guest came in with you earlier without checking in. No problem: a day pass is $10. Want me to add it now?"</p>
+      <p><b>If they say it wasn't them:</b> "Thanks, I'll double-check the photo." Then mark it on the gym page.</p>
+      <p><b>Shared code:</b> "Membership codes are for one person. I'll need to set up a day pass for your friend."</p>
+      <p>Then tap what happened next on the gym page, so the owner sees it.</p>
+    </div>
+  </div>
+</div>
+<script>document.getElementById('memUrl').textContent = location.host + '/members'; document.querySelectorAll('.memUrl').forEach(function(el){ el.textContent = location.host + '/members?lang=es'; });</script>
+<script>document.getElementById('printBtn').addEventListener('click', () => window.print());</script>
+</body>
+</html>

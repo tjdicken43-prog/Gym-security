@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<title>Front desk — SecurityAI</title>
+<link rel="icon" type="image/svg+xml" href="logo.svg">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#14171A">
+<style>
+  :root{--bg:#14171A;--panel:#1C2124;--panel-2:#242B30;--line:#353D43;--text:#EDEFF1;--muted:#A3ABB3;--green:#3FCF8E;--red:#FF6B6B;--amber:#FFB54A;}
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  body{margin:0;background:var(--bg);color:var(--text);font:18px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+       display:flex;flex-direction:column;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);}
+  [hidden]{display:none !important;}
+  header{display:flex;align-items:center;gap:12px;padding:14px 18px;border-bottom:1px solid var(--line);}
+  header h1{font-size:20px;margin:0;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .dot{width:14px;height:14px;border-radius:50%;background:#6d767e;flex-shrink:0;}
+  .dot.ok{background:var(--green);box-shadow:0 0 0 5px rgba(63,207,142,.15);}
+  .dot.warn{background:var(--amber);}
+  .btn{min-height:52px;padding:10px 18px;border-radius:12px;border:1px solid var(--line);background:var(--panel-2);color:var(--text);font:inherit;font-weight:700;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;}
+  .btn.primary{background:var(--green);border-color:var(--green);color:#0b1f15;}
+  main{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:18px;gap:16px;text-align:center;}
+  .calm .big{font-size:30px;font-weight:700;}
+  .calm .s{color:var(--muted);font-size:17px;max-width:520px;}
+  .alert{width:100%;max-width:900px;background:var(--panel);border:2px solid var(--red);border-radius:18px;overflow:hidden;text-align:left;display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);}
+  @media (max-width:760px){ .alert{grid-template-columns:1fr;} }
+  .alert img{width:100%;height:100%;max-height:62vh;object-fit:contain;background:#0c0e10;display:block;}
+  .alert .body{padding:18px;display:flex;flex-direction:column;gap:10px;}
+  .alert .h{font-size:26px;font-weight:800;color:#FFB3B3;line-height:1.2;}
+  .alert .t{font-size:20px;font-weight:700;font-variant-numeric:tabular-nums;}
+  .alert .n{color:var(--muted);font-size:16px;}
+  .alert .acts{display:grid;gap:10px;margin-top:auto;}
+  .more{color:var(--muted);font-size:15px;}
+  .flash{animation:flash 1s ease-in-out 3;}
+  @keyframes flash{50%{background:rgba(255,107,107,.25);}}
+  @media (prefers-reduced-motion:reduce){ .flash{animation:none;} }
+  .gate{max-width:440px;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px;}
+</style>
+</head>
+<body>
+<header>
+  <span class="dot" id="dot"></span>
+  <h1 style="display:flex;align-items:center;gap:10px;"><img id="logo" alt="" hidden style="height:36px;max-width:120px;object-fit:contain;"><span id="title">Front desk</span></h1>
+  <button class="btn" type="button" id="soundBtn">Turn sound on</button>
+</header>
+<main id="main">
+  <div class="calm" id="calm">
+    <div class="big" id="calmBig">Connecting…</div>
+    <div class="s" id="calmS">Leave this screen open at the front desk. When someone gets in without their own scan, it shows here within seconds of the AI check, with a sound.</div>
+  </div>
+  <div id="alerts"></div>
+  <div class="gate" id="gate" hidden>
+    <h2 style="margin:0 0 8px;">Sign in first</h2>
+    <p style="color:var(--muted);margin:0 0 14px;">Open the gym page on this screen once, sign in, then come back to this address.</p>
+    <a class="btn primary" href="/gym">Open the gym page</a>
+  </div>
+</main>
+<script>
+// The front-desk screen. Asks for new flags every 5 seconds while it is on
+// screen (a small answer, no photos until there is something to show), and
+// keeps the screen awake. Nothing is saved on this device but which alerts
+// were dismissed here.
+const $ = id => document.getElementById(id);
+const esc = v => String(v == null ? '' : v).replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+const store = (k, v) => { try { if(v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch(e){ return null; } };
+let seen = new Set(JSON.parse(store('sai:deskSeen') || '[]'));
+let shown = new Set(), sound = store('sai:deskSound') === '1', ctx = null, gymCode = null, failures = 0;
+function beep(){
+  if(!sound) return;
+  try{
+    ctx = ctx || new (window.AudioContext || window.webkitAudioContext)();
+    [0, 0.25, 0.5].forEach(t => { const o = ctx.createOscillator(), g = ctx.createGain(); o.frequency.value = 880; o.connect(g); g.connect(ctx.destination);
+      g.gain.setValueAtTime(0.0001, ctx.currentTime + t); g.gain.exponentialRampToValueAtTime(0.35, ctx.currentTime + t + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + t + 0.2);
+      o.start(ctx.currentTime + t); o.stop(ctx.currentTime + t + 0.22); });
+  }catch(e){}
+}
+function soundLabel(){ $('soundBtn').textContent = sound ? 'Sound on' : 'Turn sound on'; $('soundBtn').setAttribute('aria-pressed', String(sound)); }
+$('soundBtn').onclick = () => { sound = !sound; store('sai:deskSound', sound ? '1' : '0'); soundLabel(); if(sound) beep(); };
+soundLabel();
+const timeOf = iso => new Date(iso).toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit', second:'2-digit' });
+function words(f){
+  if(f.phoneHandoff) return 'Someone may have scanned in on another member’s phone';
+  if(f.scans != null && f.people != null && f.scans < f.people) return f.scans === 0 ? `${f.people} came in, no scan` : `${f.people} people came in, only ${f.scans} scan${f.scans === 1 ? '' : 's'}`;
+  if(f.kind === 'possible') return 'Maybe someone followed a member in';
+  return f.people ? `${f.people} people came in, ${f.expected || 1} expected` : 'Someone may have followed a member in';
+}
+async function tick(){
+  if(document.hidden) return;
+  let r;
+  try{ r = await fetch('/gym/desk', { credentials:'same-origin' }); }catch(e){ r = null; }
+  if(r && r.status === 401){ $('gate').hidden = false; $('calm').hidden = true; $('alerts').innerHTML = ''; return; }
+  if(!r || !r.ok){ if(++failures >= 3){ $('dot').className = 'dot warn'; $('calmBig').textContent = 'Can’t reach SecurityAI'; $('calmS').textContent = 'Check this screen’s Wi-Fi. It keeps trying by itself.'; } return; }
+  failures = 0;
+  const d = await r.json();
+  gymCode = d.gymCode; $('gate').hidden = true;
+  if(d.hasLogo && $('logo').hidden){ $('logo').src = '/gym/logo'; $('logo').hidden = false; }
+  $('title').textContent = (d.gymName || 'Front desk') + ' · front desk';
+  $('dot').className = 'dot ' + (d.state === 'watching' ? 'ok' : d.state === 'offline' || d.state === 'no-picture' || d.state === 'tamper' ? 'warn' : '');
+  const list = d.flags.filter(f => !seen.has(f.id));
+  const fresh = list.filter(f => !shown.has(f.id));
+  if(fresh.length) beep();
+  list.forEach(f => shown.add(f.id));
+  $('calm').hidden = !!list.length;
+  $('calmBig').textContent = d.state === 'watching' ? 'All good' : d.state === 'off-hours' ? 'Not watching right now' : d.state === 'offline' ? 'Camera computer offline' : d.state === 'no-picture' ? 'No camera picture' : 'Watching';
+  $('calmS').textContent = d.state === 'watching' ? 'Watching the entrance. Anything odd shows here with a sound.' : 'The gym page has the details.';
+  const f = list[0];
+  $('alerts').innerHTML = f ? `<div class="alert${fresh.length ? ' flash' : ''}" role="alert">
+      ${f.photo ? `<img src="/monitor/frame/${encodeURIComponent(gymCode)}/${encodeURIComponent(f.photo)}" alt="Entrance photo">` : '<div style="background:#0c0e10;min-height:200px;"></div>'}
+      <div class="body"><div class="h">${esc(words(f))}</div><div class="t">${esc(timeOf(f.at))}${f.zone ? ' · ' + esc(f.zone) : ''}</div>
+        ${f.note ? `<div class="n">${esc(f.note)}</div>` : ''}
+        <div class="acts"><a class="btn primary" href="/activity.html#ev-${encodeURIComponent(f.id)}">Check it on the gym page</a><button class="btn" type="button" data-seen="${esc(f.id)}">Seen: hide here</button></div>
+        ${list.length > 1 ? `<div class="more">${list.length - 1} more waiting</div>` : ''}</div></div>` : '';
+}
+document.addEventListener('click', ev => {
+  const b = ev.target.closest('button[data-seen]'); if(!b) return;
+  seen.add(b.dataset.seen); store('sai:deskSeen', JSON.stringify([...seen].slice(-200))); tick();
+});
+// Keep the screen on while this page is open (where the browser allows it).
+let lock = null;
+async function wake(){ try{ if('wakeLock' in navigator && !document.hidden) lock = await navigator.wakeLock.request('screen'); }catch(e){} }
+document.addEventListener('visibilitychange', () => { if(!document.hidden){ wake(); tick(); } });
+wake(); tick(); setInterval(tick, 5000);
+</script>
+</body>
+</html>

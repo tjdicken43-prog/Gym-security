@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Entrance camera: what members should know — SecurityAI</title>
+<meta name="description" content="What the entrance camera at your gym keeps, for how long, who can see it, and how to raise a question.">
+<link rel="icon" type="image/svg+xml" href="logo.svg">
+<style>
+  :root{--bg:#14171A;--panel:#1C2124;--line:#353D43;--text:#EDEFF1;--muted:#A3ABB3;--green:#3FCF8E;}
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--text);font:17px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;padding:16px;}
+  main{max-width:640px;margin:0 auto;}
+  h1{font-size:26px;line-height:1.25;margin:18px 0 6px;}
+  h2{font-size:19px;margin:22px 0 6px;}
+  p,li{color:var(--muted);} b{color:var(--text);}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;margin:14px 0;}
+  a{color:var(--text);}
+</style>
+</head>
+<body>
+<main>
+  <p style="text-align:right;margin:0;"><button type="button" id="langBtn" style="background:none;border:1px solid var(--line);color:var(--text);border-radius:8px;padding:8px 12px;font:inherit;font-size:15px;cursor:pointer;"></button></p>
+  <div id="en" lang="en">
+  <h1>The entrance camera: what members should know</h1>
+  <p>Your gym uses SecurityAI to make sure every person coming in has checked in. Here is exactly what that means.</p>
+  <div class="card">
+    <h2 style="margin-top:0;">What it does</h2>
+    <p>When someone comes through the turnstile, a few photos of that moment are checked to count how many people came in, and that number is compared with the check-ins at the front desk. If more people came in than checked in, gym staff look at the photos.</p>
+    <h2>What it doesn't do</h2>
+    <ul><li><b>No facial recognition.</b> It counts people; it doesn't identify anyone.</li><li><b>No video recording</b> by SecurityAI. (The gym's own camera system may record separately, as before.)</li><li>It never contacts members. Only gym staff do.</li></ul>
+  </div>
+  <div class="card">
+    <h2 style="margin-top:0;">What is kept, and for how long</h2>
+    <ul>
+      <li><b>Photos of each entry:</b> deleted after <b>48 hours</b> (or sooner, if your gym chose a shorter time).</li>
+      <li><b>Entries staff confirm as someone getting in without checking in</b>, or keep because of a dispute: kept <b>35 days</b> (or less), then deleted.</li>
+      <li><b>Check-in numbers</b> from the front desk are scrambled before they leave the gym. Only phones the gym's owner approved can read them.</li>
+      <li>Photos are sent to an AI service (Anthropic) to count people. They are not used to identify anyone.</li>
+    </ul>
+    <h2>Who can see it</h2>
+    <p>Gym staff and the gym's owner, and SecurityAI's support person when fixing a problem.</p>
+  </div>
+  <div class="card">
+    <h2 style="margin-top:0;">Think there's a mistake?</h2>
+    <p>Talk to the front desk or the gym's manager. They can check the photos with you, and keep them past the normal delete time while it's sorted out.</p>
+  </div>
+  <p style="font-size:14px;">SecurityAI · <a href="terms.html#privacy">Full privacy policy</a></p>
+  </div>
+  <div id="es" lang="es" hidden>
+  <h1>La cámara de la entrada: lo que los socios deben saber</h1>
+  <p>Su gimnasio usa SecurityAI para comprobar que cada persona que entra haya registrado su entrada. Esto es exactamente lo que significa.</p>
+  <div class="card">
+    <h2 style="margin-top:0;">Qué hace</h2>
+    <p>Cuando alguien pasa por el torniquete, se revisan unas pocas fotos de ese momento para contar cuántas personas entraron, y ese número se compara con los registros de la recepción. Si entraron más personas que registros, el personal del gimnasio revisa las fotos.</p>
+    <h2>Qué no hace</h2>
+    <ul><li><b>No usa reconocimiento facial.</b> Cuenta personas; no identifica a nadie.</li><li><b>SecurityAI no graba video.</b> (El sistema de cámaras del propio gimnasio puede grabar por separado, como antes.)</li><li>Nunca contacta a los socios. Solo lo hace el personal del gimnasio.</li></ul>
+  </div>
+  <div class="card">
+    <h2 style="margin-top:0;">Qué se guarda y por cuánto tiempo</h2>
+    <ul>
+      <li><b>Fotos de cada entrada:</b> se borran después de <b>48 horas</b> (o antes, si su gimnasio eligió un tiempo más corto).</li>
+      <li><b>Entradas que el personal confirma como alguien que entró sin registrarse</b>, o que se guardan por una disputa: se guardan <b>35 días</b> (o menos) y luego se borran.</li>
+      <li><b>Los números de registro</b> de la recepción se cifran antes de salir del gimnasio. Solo los teléfonos que el dueño del gimnasio aprobó pueden leerlos.</li>
+      <li>Las fotos se envían a un servicio de IA (Anthropic) para contar personas. No se usan para identificar a nadie.</li>
+    </ul>
+    <h2>Quién puede verlo</h2>
+    <p>El personal y el dueño del gimnasio, y la persona de soporte de SecurityAI cuando corrige un problema.</p>
+  </div>
+  <div class="card">
+    <h2 style="margin-top:0;">¿Cree que hay un error?</h2>
+    <p>Hable con la recepción o con el gerente del gimnasio. Pueden revisar las fotos con usted y guardarlas más allá del tiempo normal de borrado mientras se resuelve.</p>
+  </div>
+  <p style="font-size:14px;">SecurityAI · <a href="terms.html#privacy">Política de privacidad completa (en inglés)</a></p>
+  </div>
+</main>
+<script>
+(function(){
+  var want = /[?&]lang=es/.test(location.search) || (!/[?&]lang=en/.test(location.search) && /^es\b/i.test(navigator.language || ''));
+  function set(es){ document.getElementById('en').hidden = es; document.getElementById('es').hidden = !es; document.documentElement.lang = es ? 'es' : 'en';
+    document.getElementById('langBtn').textContent = es ? 'English' : 'Español'; document.title = es ? 'La cámara de la entrada — SecurityAI' : 'Entrance camera: what members should know — SecurityAI'; }
+  set(want);
+  document.getElementById('langBtn').addEventListener('click', function(){ set(document.getElementById('es').hidden); });
+})();
+</script>
+</body>
+</html>

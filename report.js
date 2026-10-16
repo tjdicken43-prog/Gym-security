@@ -67,6 +67,12 @@ function reviewedLine(r) {
   return s.charAt(0).toUpperCase() + s.slice(1) + '.';
 }
 // The period in words: "August 2026" or "the last 30 days".
+// "$120 charged · 14 sneak-ins caught, worth about $140 at $10 each"
+function moneyLine(r) {
+  const m = r.money; if (!m || !m.caught) return '';
+  const usd = n => '$' + (Math.round(n * 100) / 100).toLocaleString('en-US', { minimumFractionDigits: n % 1 ? 2 : 0, maximumFractionDigits: 2 });
+  return `${m.charged ? usd(m.charged) + ' charged · ' : ''}${m.caught} ${m.caught === 1 ? 'sneak-in' : 'sneak-ins'} caught${m.price ? `, worth about ${usd(m.worth)} at ${usd(m.price)} each` : ''}`;
+}
 function periodWords(r) { return r.periodLabel ? r.periodLabel : `the last ${r.days} days`; }
 function plural(n, one, many) { return `${n} ${n === 1 ? one : many}`; }
 // Honest headline: flagged is not the same as confirmed.
@@ -113,6 +119,22 @@ function collectAttachments(gymCode, events, max) {
   return out;
 }
 
+// Flagged entries by hour of the day, as a plain table (works in email
+// clients and on paper, no images or scripts).
+function hourChart(r) {
+  const h = Array.isArray(r.flaggedByHour) ? r.flaggedByHour : null;
+  const total = h ? h.reduce((a, b) => a + b, 0) : 0;
+  if (!h || total < 3) return '';
+  const max = Math.max(...h);
+  const cells = h.map((v, i) => `<td valign="bottom" style="padding:0 1px;height:70px;" title="${esc(fmtHour(i))}: ${v}"><div style="background:${v ? '#C0392B' : '#E3E7EA'};height:${Math.max(2, Math.round(v / max * 66))}px;border-radius:2px 2px 0 0;"></div></td>`).join('');
+  const labels = h.map((_, i) => `<td style="font-size:9px;color:#8B939B;text-align:center;padding-top:3px;">${i % 6 === 0 ? esc(fmtHour(i).replace(':00', '')) : ''}</td>`).join('');
+  return `<tr><td style="padding:14px 28px 0;">
+    <div style="font-size:11px;color:#8B939B;letter-spacing:.5px;margin-bottom:6px;">FLAGGED ENTRIES BY HOUR</div>
+    <table width="100%" cellpadding="0" cellspacing="0" style="table-layout:fixed;border-bottom:1px solid #D5DBDF;"><tr>${cells}</tr></table>
+    <table width="100%" cellpadding="0" cellspacing="0" style="table-layout:fixed;"><tr>${labels}</tr></table>
+  </td></tr>`;
+}
+
 function renderHtml(report, gymName, opts) {
   const r = report;
   currentTz = r.timeZone || null;
@@ -146,7 +168,7 @@ function renderHtml(report, gymName, opts) {
   // The web view (the gym opening "monthly report" on a phone) gets a
   // viewport tag and a fluid width; the email keeps its fixed 600px table.
   return `<!DOCTYPE html>
-<html lang="en"><head><meta charset="UTF-8">${web ? '<meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex"><title>Monthly report — SecurityAI</title><style>img{max-width:100%;height:auto}</style>' : ''}</head><body style="margin:0;padding:0;background:#f4f6f8;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
+<html lang="en"><head><meta charset="UTF-8">${web ? '<meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex"><title>Monthly report — SecurityAI</title><style>img{max-width:100%;height:auto}.pbar{position:sticky;top:0;z-index:2;display:flex;gap:8px;justify-content:center;padding:10px 16px;background:#14171A;}.pbar a,.pbar button{font:600 14px -apple-system,Segoe UI,Roboto,sans-serif;color:#fff;background:#2B3237;border:0;border-radius:8px;padding:10px 14px;text-decoration:none;cursor:pointer;}@media print{.pbar{display:none}body{background:#fff!important}*{-webkit-print-color-adjust:exact;print-color-adjust:exact}tr{break-inside:avoid}}</style>' : ''}</head><body style="margin:0;padding:0;background:#f4f6f8;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;">${web ? '<div class="pbar"><a href="/activity.html">Back to the gym page</a><button type="button" id="printBtn">Print or save as PDF</button></div><script>document.getElementById("printBtn").addEventListener("click",function(){window.print();});</script>' : ''}
 ${web ? '<div style="max-width:600px;margin:0 auto;padding:14px 12px 0;"><a href="/activity.html" style="font-size:16px;color:#14171A;display:inline-block;padding:8px 0;">&larr; Back to activity</a></div>' : ''}
 <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f6f8;padding:${web ? '8px 8px 28px' : '28px 12px'};">
 <tr><td align="center">
@@ -161,12 +183,15 @@ ${web ? '<div style="max-width:600px;margin:0 auto;padding:14px 12px 0;"><a href
   <tr><td style="padding:26px 28px 8px;">
     <div style="font-size:26px;font-weight:700;color:#14171A;line-height:1.25;">${esc(headline)}</div>
     ${watchedLine(r) ? `<div style="font-size:15px;color:#14171A;margin-top:8px;">${esc(watchedLine(r))}</div>` : ''}
+    ${moneyLine(r) ? `<div style="font-size:17px;color:#1E8F5E;font-weight:700;margin-top:10px;">${esc(moneyLine(r))}</div>` : ''}
     ${r.totalFlagged > 0 ? (r.extraPeopleSeen ? `<div style="font-size:14px;color:#5b636b;margin-top:8px;">
       Up to ${esc(r.extraPeopleSeen)} more ${r.extraPeopleSeen === 1 ? 'person' : 'people'} than expected came through, across ${esc(r.daysWithActivity)} ${r.daysWithActivity === 1 ? 'day' : 'days'}.
     </div>` : '') : `<div style="font-size:14px;color:#5b636b;margin-top:8px;">Every entry during monitored hours matched what was expected.</div>`}
+    ${r.secondLook ? `<div style="font-size:14px;color:#C0392B;margin-top:6px;">${esc(plural(r.secondLook, 'answer', 'answers'))} of "It was fine" went against both the camera and the scans: waiting for the owner's second look on the gym page.</div>` : ''}
     ${r.markedFineByGym ? `<div style="font-size:14px;color:#5b636b;margin-top:6px;">${esc(plural(r.markedFineByGym, 'flag', 'flags'))} you marked as fine ${r.markedFineByGym === 1 ? 'is' : 'are'} left out.</div>` : ''}
   </td></tr>
 
+  ${hourChart(r)}
   ${r.totalFlagged > 0 ? `
   <tr><td style="padding:14px 28px 0;">
     <table width="100%" cellpadding="0" cellspacing="0" style="background:#f7f9fa;border-radius:6px;">
@@ -203,7 +228,7 @@ ${web ? '<div style="max-width:600px;margin:0 auto;padding:14px 12px 0;"><a href
 
   <tr><td style="padding:24px 28px 28px;">
     <div style="font-size:12px;color:#8b939b;line-height:1.6;border-top:1px solid #e6e8eb;padding-top:16px;">
-      These are entries where more people crossed than expected at that door. "Flagged" means the camera check thought so; "confirmed" means you marked it Tailgate on your activity page. SecurityAI counts people and describes what it saw — it does not identify anyone, so these aren't matched to member accounts. Anything you marked "It was fine" is left out. Photos of flagged entries (and anything you mark Tailgate) are kept for 35 days; all others are deleted after 48 hours.${r.timeZone ? ` Times are ${esc(tzWords(r.timeZone))}.` : ''}
+      These are entries where more people crossed than expected at that door. "Flagged" means the camera check thought so; "confirmed" means you marked it Tailgate on your activity page. SecurityAI counts people and describes what it saw — it does not identify anyone, so these aren't matched to member accounts. Anything you marked "It was fine" is left out. Photos of flagged entries (and anything you mark Tailgate) are kept for ${esc(r.keptDays || 35)} days; all others are deleted after ${esc(r.logHours || 48)} hours.${r.timeZone ? ` Times are ${esc(tzWords(r.timeZone))}.` : ''}
     </div>
   </td></tr>
 
@@ -223,8 +248,10 @@ function renderText(report, gymName) {
     headlineFor(r) + '.',
   ];
   if (watchedLine(r)) lines.push(watchedLine(r));
+  if (moneyLine(r)) lines.push(moneyLine(r));
   if (r.totalFlagged > 0 && r.extraPeopleSeen) lines.push(`Up to ${r.extraPeopleSeen} more people than expected came through, across ${plural(r.daysWithActivity, 'day', 'days')}.`);
   if (r.markedFineByGym) lines.push(`${plural(r.markedFineByGym, 'flag', 'flags')} you marked as fine ${r.markedFineByGym === 1 ? 'is' : 'are'} left out.`);
+  if (r.secondLook) lines.push(`${plural(r.secondLook, 'answer', 'answers')} of "It was fine" went against both the camera and the front-desk scans and ${r.secondLook === 1 ? 'is' : 'are'} waiting for the owner's second look on the gym page.`);
   if (r.busiestHour) lines.push(`Busiest hour: ${fmtHour(r.busiestHour.hour)} (${r.busiestHour.count})`);
   if (r.worstDay && r.totalFlagged > 0) lines.push(`Worst day: ${fmtDate(r.worstDay.date)} (${r.worstDay.count})`);
   if (Object.keys(r.byZone).length) {

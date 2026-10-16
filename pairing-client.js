@@ -59,6 +59,10 @@ async function exchangeCode(site, code, host) {
   if (r.status === 200 && r.json && r.json.ok && r.json.runnerToken) {
     return { ok: true, runnerToken: r.json.runnerToken, gymCode: r.json.gymCode, gymName: r.json.gymName || null };
   }
+  // A front-desk reader code (used by screen-reader.js; pair.js says it's the wrong kind).
+  if (r.status === 200 && r.json && r.json.ok && r.json.readerToken) {
+    return { ok: true, readerToken: r.json.readerToken, gymCode: r.json.gymCode, gymName: r.json.gymName || null, retry: true, msg: 'That code is for the front-desk reader, not a camera computer. On the admin page use "Connect a camera computer" > Get a code.' };
+  }
   if (r.status === 0 || (r.status === 404 && !r.json)) return { ok: false, retry: false, msg: explainNet(r, site) };
   const msg = (r.json && r.json.error) || `The website said ${r.status}.`;
   return { ok: false, retry: r.status === 401 || r.status === 400, stop: r.status === 429 || r.status === 503, msg };
@@ -122,6 +126,7 @@ async function pairInteractive(opts) {
     if (!code) { if (opts.allowSkip) return null; continue; }
     say('  Checking the code...');
     const r = await exchangeCode(site, code);
+    if (r.ok && !r.runnerToken) { say('  ' + r.msg); continue; }
     if (r.ok) {
       say(`  Paired ✓  This computer now sends to ${site} for ${r.gymName ? `"${r.gymName}" (gym code ${r.gymCode})` : `gym code "${r.gymCode}"`}.`);
       return { serverUrl: site, runnerToken: r.runnerToken, gymCode: r.gymCode, gymName: r.gymName };

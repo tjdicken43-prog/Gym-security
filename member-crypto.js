@@ -35,9 +35,10 @@
 
   async function fingerprint(pub) { return hex(await subtle.digest('SHA-256', new TextEncoder().encode(`${pub.n}.${pub.e}`))); }
   function codeOf(fp) {
-    let v = parseInt(String(fp).slice(0, 8), 16) >>> 2, out = '';
-    for (let i = 0; i < 6; i++) { out = ALPHA[v % 31] + out; v = Math.floor(v / 31); }
-    return out.slice(0, 3) + '-' + out.slice(3);
+    // 12 letters (about 59 bits), the same as member-keys.js on the website.
+    const f = String(fp || ''); let out = '';
+    for (let i = 0; i < 12; i++) out += ALPHA[parseInt(f.substr(i * 2, 2), 16) % 31];
+    return out.slice(0, 4) + '-' + out.slice(4, 8) + '-' + out.slice(8);
   }
   async function pubJwk(pair) { const j = await subtle.exportKey('jwk', pair.publicKey); return { kty: 'RSA', n: j.n, e: j.e }; }
 
@@ -68,6 +69,8 @@
   }
   const approvePayload = (gym, fp, at) => `securityai-approve-v1|${gym}|${fp}|${at}`;
   const revokePayload = (gym, fp, at) => `securityai-revoke-v1|${gym}|${fp}|${at}`;
+  const delegatePayload = (fp, at) => `securityai-delegate-v1|${fp}|${at}`;
+  const undelegatePayload = (fp, at) => `securityai-undelegate-v1|${fp}|${at}`;
 
   // One scan: { key (wrapped), iv, ct, mac } -> member number (string)
   async function openScan(scan) {
@@ -85,5 +88,5 @@
     return obj;
   }
 
-  global.MemberCrypto = { supported: !!(subtle && global.indexedDB), getKey, makeKey, getOrMakeKey, forget: del, sign, approvePayload, revokePayload, fingerprint, codeOf, openScan, b64uToBytes, bytesToB64u };
+  global.MemberCrypto = { supported: !!(subtle && global.indexedDB), getKey, makeKey, getOrMakeKey, forget: del, sign, approvePayload, revokePayload, delegatePayload, undelegatePayload, fingerprint, codeOf, openScan, b64uToBytes, bytesToB64u };
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -190,19 +190,83 @@ function cleanNote(v) {
   if (t.length > REVIEW_NOTE_MAX) throw new Error(`Keep the note to ${REVIEW_NOTE_MAX} characters or fewer.`);
   return t || null;
 }
-function setReview(code, id, verdict, note) {
+// Who answered (a first name typed once on that phone). Plain text, 30 chars.
+function cleanBy(v) {
+  if (v == null) return null;
+  const t = String(v).replace(/[\u0000-\u001f\u007f<>]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 30);
+  return t || null;
+}
+function setReview(code, id, verdict, note, by, opts) {
   const id_ = String(id || '').replace(/[^a-f0-9]/gi, '').slice(0, 24);
   if (!id_) throw new Error('Unknown event.');
+  const o = opts || {};
   const all = loadReviews(code);
   const prev = all[id_];
   if (verdict == null || verdict === '') delete all[id_];
   else if (VERDICTS[verdict]) {
     const n = note === undefined ? (prev && prev.note) || null : cleanNote(note);
-    all[id_] = Object.assign({ verdict, at: new Date().toISOString() }, n ? { note: n } : {});
+    // What happened next stays with a confirmed entry (Tailgate <-> Shared
+    // code), and goes when it's changed to "It was fine".
+    const follow = prev && prev.follow && isConfirmed(verdict) ? { follow: prev.follow } : {};
+    const who = cleanBy(by);
+    // "It was fine" when the camera AND the front-desk scans both showed an
+    // extra person: kept for the owner's second look (unless the owner said it).
+    const override = verdict === 'fine' && o.strong ? { override: true, ...(o.ownerSaid ? { ownerChecked: { by: who || 'owner', at: new Date().toISOString() } } : {}) } : {};
+    all[id_] = Object.assign({ verdict, at: new Date().toISOString() }, n ? { note: n } : {}, who ? { by: who } : {}, follow, override);
   }
   else throw new Error('Unknown choice.');
   if (!writeJson(reviewsFile(code), all)) throw new Error('Could not save that just now — please try again.');
+  noteAnswer(code, { id: id_, verdict: all[id_] ? all[id_].verdict : null, by: cleanBy(by), strong: !!o.strong });
   return all[id_] || null;
+}
+// Every answer and change, in order (who, what, when): nothing is changed
+// silently. Kept 35 days.
+function answersFile(code) { return path.join(DATA_DIR, `gym-answers-${safeCode(code)}.json`); }
+function loadAnswers(code) {
+  const a = readJson(answersFile(code), []);
+  const cut = Date.now() - 35 * 864e5;
+  return Array.isArray(a) ? a.filter(x => x && Date.parse(x.at) > cut) : [];
+}
+function noteAnswer(code, rec) {
+  try {
+    const list = loadAnswers(code);
+    list.push({ id: rec.id, verdict: rec.verdict || null, by: rec.by || null, strong: rec.strong || undefined, at: new Date().toISOString() });
+    writeJson(answersFile(code), list.slice(-5000));
+  } catch (e) { /* history is a nicety; the answer itself is saved */ }
+}
+// The owner looked at an override and agrees it was fine.
+function ownerAgrees(code, id, by) {
+  const id_ = String(id || '').replace(/[^a-f0-9]/gi, '').slice(0, 24);
+  const all = loadReviews(code);
+  const r = all[id_];
+  if (!r || r.verdict !== 'fine' || !r.override) throw new Error('That answer is no longer waiting for a second look.');
+  r.ownerChecked = { by: cleanBy(by) || 'owner', at: new Date().toISOString() };
+  if (!writeJson(reviewsFile(code), all)) throw new Error('Could not save that just now — please try again.');
+  noteAnswer(code, { id: id_, verdict: 'fine (owner agreed)', by: cleanBy(by) });
+  try { const t = loadTally(code); if (t.outcomes[id_]) { delete t.outcomes[id_].override; t.outcomes[id_].ownerAgreed = true; saveTallySoon(code); } } catch (e) { /* tally is a nicety */ }
+  return r;
+}
+
+// What happened after a confirmed tailgate: the outcome the owner sees as
+// "$ recovered". usd only for 'charged'.
+const FOLLOWS = { talked: 'Talked to them', charged: 'Charged', warned: 'Warning given', noreach: 'Couldn’t reach them', disputed: 'They disputed it' };
+function setFollow(code, id, what, usd) {
+  const id_ = String(id || '').replace(/[^a-f0-9]/gi, '').slice(0, 24);
+  const all = loadReviews(code);
+  const r = all[id_];
+  if (!r || !isConfirmed(r.verdict)) throw new Error('Mark it Tailgate or Shared code first.');
+  if (what == null || what === '') delete r.follow;
+  else {
+    if (!FOLLOWS[what]) throw new Error('Unknown choice.');
+    let amount = null;
+    if (what === 'charged') {
+      amount = Math.round(Number(String(usd == null ? '' : usd).replace(/[$,\s]/g, '')) * 100) / 100;
+      if (!Number.isFinite(amount) || amount <= 0 || amount > 10000) throw new Error('Enter the amount charged, like 10 or 49.99.');
+    }
+    r.follow = Object.assign({ what, at: new Date().toISOString() }, amount != null ? { usd: amount } : {});
+  }
+  if (!writeJson(reviewsFile(code), all)) throw new Error('Could not save that just now — please try again.');
+  return r.follow || null;
 }
 
 // --- Alert subscribers --------------------------------------------------
@@ -210,7 +274,7 @@ const MAX_SUBSCRIBERS = 10;
 function alertsFile(code) { return path.join(DATA_DIR, `gym-alerts-${safeCode(code)}.json`); }
 function loadSubscribers(code) {
   const raw = readJson(alertsFile(code), []);
-  return Array.isArray(raw) ? raw.filter(s => s && s.id && s.to && (s.kind === 'email' || s.kind === 'sms')) : [];
+  return Array.isArray(raw) ? raw.filter(s => s && s.id && s.to && (s.kind === 'email' || s.kind === 'sms' || (s.kind === 'chat' && normalizeChatHook(s.to)))) : [];
 }
 function saveSubscribers(code, list) { return writeJson(alertsFile(code), list); }
 
@@ -229,7 +293,37 @@ function normalizePhone(v) {
   if (digits.length === 11 && digits[0] === '1') return '+' + digits;
   return null;
 }
+// Team chat channels (incoming webhooks). Only these services' own
+// webhook addresses are accepted, over https on the normal port, so an
+// alert can never be pointed at the server's own network or anywhere else.
+const CHAT_HOOKS = [
+  { host: /^hooks\.slack\.com$/i, path: /^\/(services|triggers|workflows)\/[A-Za-z0-9/_-]+$/, service: 'Slack' },
+  { host: /^chat\.googleapis\.com$/i, path: /^\/v1\/spaces\/[A-Za-z0-9_-]+\/messages$/, service: 'Google Chat' },
+  { host: /^[a-z0-9-]+\.webhook\.office\.com$/i, path: /^\/webhookb2\//, service: 'Teams' },
+  { host: /^[a-z0-9-]+\.[a-z0-9-]+\.logic\.azure\.com$/i, path: /^\/workflows\/[A-Za-z0-9]+\/triggers\//, service: 'Teams' },
+  { host: /^(discord|discordapp)\.com$/i, path: /^\/api\/webhooks\/\d+\/[A-Za-z0-9_-]+$/, service: 'Discord' },
+];
+function normalizeChatHook(v) {
+  const s = String(v == null ? '' : v).trim();
+  if (!/^https:\/\//i.test(s) || s.length > 700) return null;
+  let u; try { u = new URL(s); } catch (e) { return null; }
+  if (u.protocol !== 'https:' || u.username || u.password || u.port || u.hash) return null;
+  const h = CHAT_HOOKS.find(x => x.host.test(u.hostname) && x.path.test(u.pathname));
+  return h ? { url: u.href, service: h.service } : null;
+}
 function addSubscriber(code, raw) {
+  const hook = normalizeChatHook(raw);
+  if (!hook && /^\s*https?:/i.test(String(raw || ''))) throw new Error('That link isn\'t a Slack, Teams, Google Chat or Discord webhook address.');
+  if (hook) {
+    const list = loadSubscribers(code);
+    const existing = list.find(x => x.to === hook.url);
+    if (existing) return { sub: existing, added: false };
+    if (list.length >= MAX_SUBSCRIBERS) throw new Error(`You can have up to ${MAX_SUBSCRIBERS} on the alert list. Remove one first.`);
+    const sub = { id: crypto.randomBytes(5).toString('hex'), kind: 'chat', service: hook.service, to: hook.url, addedAt: new Date().toISOString() };
+    list.push(sub);
+    if (!saveSubscribers(code, list)) throw new Error('Could not save that just now — please try again.');
+    return { sub, added: true };
+  }
   const email = normalizeEmail(raw);
   const phone = email ? null : normalizePhone(raw);
   if (!email && !phone) throw new Error('That doesn\'t look like an email address or a mobile number.');
@@ -359,6 +453,47 @@ function normalizeSettings(input, current, opts) {
       out.dailyBurstCap = n;
     }
   }
+  // Times staff or expected visitors come in ("05:00-06:00 Cleaners"), so
+  // flags then show "probably staff" (a hint only: nothing is hidden).
+  if (has('staffTimes')) {
+    const lines = (Array.isArray(input.staffTimes) ? input.staffTimes : String(input.staffTimes || '').split(/\n|;/)).map(x => String(x).trim()).filter(Boolean);
+    const list = [];
+    for (const l of lines.slice(0, 12)) {
+      const m = /^(\d{1,2}):(\d{2})\s*[-–]\s*(\d{1,2}):(\d{2})\s*(.*)$/.exec(l);
+      if (!m || +m[1] > 23 || +m[3] > 23 || +m[2] > 59 || +m[4] > 59) throw new Error(`"${l.slice(0, 40)}" should look like 05:00-06:00 Cleaners (24-hour clock).`);
+      list.push({ from: `${m[1].padStart(2, '0')}:${m[2]}`, to: `${m[3].padStart(2, '0')}:${m[4]}`, label: String(m[5] || 'Staff').replace(/[<>\u0000-\u001f]/g, '').trim().slice(0, 40) || 'Staff' });
+    }
+    if (list.length) out.staffTimes = list; else delete out.staffTimes;
+  }
+  // Night mode: unstaffed hours when alerts are stricter (less certain
+  // flags alert too). Adds alerts only; never makes detection looser.
+  if (has('nightHours')) {
+    const v = String(input.nightHours || '').trim();
+    if (!v) delete out.nightHours;
+    else {
+      const m = /^(\d{1,2}):(\d{2})\s*[-–]\s*(\d{1,2}):(\d{2})$/.exec(v);
+      if (!m || +m[1] > 23 || +m[3] > 23 || +m[2] > 59 || +m[4] > 59 || v.replace(/\s/g, '').split(/[-–]/)[0] === v.replace(/\s/g, '').split(/[-–]/)[1]) throw new Error('Night hours should look like 22:00-05:00 (24-hour clock).');
+      out.nightHours = { from: `${m[1].padStart(2, '0')}:${m[2]}`, to: `${m[3].padStart(2, '0')}:${m[4]}` };
+    }
+  }
+  // Event mode: no alerts until this time (entries still recorded).
+  // Shorter keep times only (privacy): photos 24 or 48 h, kept entries 14 or 35 days.
+  if (has('photoHours')) { const h = Number(input.photoHours); if (![24, 48].includes(h)) throw new Error('Photos can be kept 24 or 48 hours.'); if (h === 48) delete out.photoHours; else out.photoHours = h; }
+  if (has('keptDays')) { const d = Number(input.keptDays); if (![14, 35].includes(d)) throw new Error('Kept entries can stay 14 or 35 days.'); if (d === 35) delete out.keptDays; else out.keptDays = d; }
+  if (has('eventUntil')) {
+    if (clear(input.eventUntil)) delete out.eventUntil;
+    else { const t = Date.parse(input.eventUntil); if (isNaN(t) || t < Date.now() || t > Date.now() + 24 * 3600e3) throw new Error('An event can last up to 24 hours.'); out.eventUntil = new Date(t).toISOString(); }
+  }
+  // What one sneak-in costs the gym (a day pass or a month's dues), so the
+  // results can say what was caught in dollars. Whole dollars, 0-500.
+  if (has('sneakInUsd')) {
+    if (clear(input.sneakInUsd)) delete out.sneakInUsd;
+    else {
+      const n = Math.round(Number(String(input.sneakInUsd).replace(/[$,\s]/g, '')));
+      if (!Number.isFinite(n) || n < 0 || n > 500) throw new Error('The sneak-in price must be a whole number of dollars, 0 to 500.');
+      out.sneakInUsd = n;
+    }
+  }
   if (has('cameraClockNote')) {
     if (clear(input.cameraClockNote)) delete out.cameraClockNote;
     else {
@@ -416,6 +551,43 @@ function bumpRunnerGen(key) {
 
 // "Stopped from the website" must survive a restart or redeploy: otherwise
 // the camera computer's next check-in quietly switches it back on.
+// Small "already done today" markers (e.g. the morning summary's day).
+function getMarker(key, name) { const m = loadMeta(key); return (m.markers && m.markers[name]) || null; }
+function setMarker(key, name, value) { const m = loadMeta(key); m.markers = Object.assign({}, m.markers, { [name]: value }); return saveMeta(key, m); }
+// One alert-list person's choices: tailgate alerts, camera problems,
+// morning summary (emails only). Default on; off is stored as false.
+const SUB_CHOICES = ['tailgates', 'camera', 'morning'];
+function setSubscriberChoice(code, id, what, on) {
+  if (!SUB_CHOICES.includes(what)) throw new Error('Unknown choice.');
+  const list = loadSubscribers(code);
+  const sub = list.find(s => s.id === String(id));
+  if (!sub) throw new Error('That address is no longer on the list.');
+  if (what === 'morning' && sub.kind !== 'email') throw new Error('Morning summaries go by email only.');
+  if (!on && SUB_CHOICES.filter(c => c !== what && (c !== 'morning' || sub.kind === 'email')).every(c => sub[c] === false)) throw new Error('Keep at least one on, or remove the address instead.');
+  if (on) delete sub[what]; else sub[what] = false;
+  if (!saveSubscribers(code, list)) throw new Error('Could not save that just now — please try again.');
+  return sub;
+}
+function setSubscriberMorning(code, id, on) {
+  const list = loadSubscribers(code);
+  const sub = list.find(s => s.id === String(id));
+  if (!sub) throw new Error('That address is no longer on the list.');
+  if (sub.kind !== 'email') throw new Error('Morning summaries go by email only.');
+  if (on) delete sub.morning; else sub.morning = false;
+  if (!saveSubscribers(code, list)) throw new Error('Could not save that just now — please try again.');
+  return sub;
+}
+// Weekly spot-check: a few normal entries a person glances at, so misses
+// (someone the camera called normal who did get in without paying) can be
+// counted. { week, ids:[...], answers:{id:'right'|'missed'} } in the meta.
+function getSpot(key) { return loadMeta(key).spot || null; }
+function setSpot(key, spot) { const m = loadMeta(key); m.spot = spot; return saveMeta(key, m); }
+function tallySpot(key, answer, undo) {
+  const t = loadTally(key);
+  t.spotChecked = Math.max(0, (Number(t.spotChecked) || 0) + (undo ? -1 : 1));
+  if (answer === 'missed') t.spotMissed = Math.max(0, (Number(t.spotMissed) || 0) + (undo ? -1 : 1));
+  saveTallySoon(key);
+}
 function isPaused(key) { return loadMeta(key).paused === true; }
 function setPaused(key, on) {
   const m = loadMeta(key);
@@ -498,10 +670,16 @@ function saveNightsSoon(key) {
   if (t.unref) t.unref();
   nightsTimers.set(k, t);
 }
-function noteNight(key, day, what) {
+function noteNight(key, day, what, hour) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(String(day))) return;
   const n = loadNights(key);
   const rec = n[day] || (n[day] = { w: 0, c: 0, f: 0 });
+  // Entries and flags by hour of the day (gym time), for the busiest-hours chart.
+  if (Number.isInteger(hour) && hour >= 0 && hour < 24 && (what === 'checked' || what === 'flagged')) {
+    const f = what === 'checked' ? 'h' : 'hf';
+    if (!Array.isArray(rec[f]) || rec[f].length !== 24) rec[f] = new Array(24).fill(0);
+    rec[f][hour] += 1;
+  }
   if (what === 'watched') { if (rec.w) return; rec.w = 1; }
   else if (what === 'checked') { rec.w = 1; rec.c = (rec.c || 0) + 1; }
   else if (what === 'flagged') { rec.f = (rec.f || 0) + 1; }
@@ -516,6 +694,20 @@ function noteNight(key, day, what) {
 function flushNights() {
   for (const [k, t] of nightsTimers) { clearTimeout(t); nightsTimers.delete(k); writeJson(nightsFile(k), loadNights(k)); }
   for (const [k, t] of tallyTimers) { clearTimeout(t); tallyTimers.delete(k); writeJson(tallyFile(k), loadTally(k)); }
+}
+
+// Clear-exit record (see monitor.js): how often the AI agreed that a
+// crossing the camera computer saw as someone leaving was someone leaving.
+// A disagreement resets the clean run.
+function noteExit(key, what, audited) {
+  const st = getSettings(key);
+  const x = st.exitShadow || { agree: 0, disagree: 0, skipped: 0, audited: 0 };
+  if (what === 'agree') x.agree = (x.agree || 0) + 1;
+  else if (what === 'disagree') { x.disagree = (x.disagree || 0) + 1; x.agree = 0; x.lastDisagreeAt = new Date().toISOString(); }
+  else if (what === 'skipped') x.skipped = (x.skipped || 0) + 1;
+  if (audited) x.audited = (x.audited || 0) + 1;
+  st.exitShadow = x;
+  saveSettings(key, st);
 }
 
 // --- Results tally (kept for good) -------------------------------------
@@ -554,6 +746,7 @@ function tallyReview(key, id, verdict, ev) {
   const t = loadTally(key);
   const id_ = String(id || '');
   if (!id_) return;
+  const prevOutcome = t.outcomes[id_];
   if (!verdict || !VERDICTS[verdict]) delete t.outcomes[id_];
   else {
     const e = ev || {};
@@ -563,7 +756,12 @@ function tallyReview(key, id, verdict, ev) {
       expected: Number(e.expected) || 1,
       cameraSaid: e.kind || null,
       note: e.note ? String(e.note).slice(0, 200) : null,
+      by: e.reviewBy ? String(e.reviewBy).slice(0, 30) : null,
     };
+    // The scan that let them in, when the scans were certain (an id only; the member number stays sealed).
+    if (e.scanId && isConfirmed(verdict)) t.outcomes[id_].scanId = String(e.scanId).slice(0, 40);
+    if (e.override) t.outcomes[id_].override = true;
+    if (isConfirmed(verdict) && prevOutcome && prevOutcome.follow) t.outcomes[id_].follow = prevOutcome.follow;
     const ids = Object.keys(t.outcomes);
     if (ids.length > TALLY_MAX_OUTCOMES) {
       ids.sort((a, b) => String(t.outcomes[a].at).localeCompare(String(t.outcomes[b].at)));
@@ -574,6 +772,14 @@ function tallyReview(key, id, verdict, ev) {
   if (d && (!t.since || d < t.since)) t.since = d;
   saveTallySoon(key);
 }
+// The follow-up on one confirmed entry, kept with the lasting tally.
+function tallyFollow(key, id, follow) {
+  const t = loadTally(key);
+  const o = t.outcomes[String(id || '')];
+  if (!o) return;
+  if (follow) o.follow = follow; else delete o.follow;
+  saveTallySoon(key);
+}
 function tallySummary(key) {
   const t = loadTally(key);
   const out = Object.values(t.outcomes);
@@ -582,7 +788,7 @@ function tallySummary(key) {
   const fine = out.filter(o => o.verdict === 'fine');
   // Extra people who got in: on a tailgate, everyone past the one swipe.
   const extra = tailgates.reduce((a, o) => a + (o.people != null && o.people > o.expected ? o.people - o.expected : 1), 0) + shared.length;
-  const flaggedReviewed = out.filter(o => o.cameraSaid === 'flag');
+  const flaggedReviewed = out.filter(o => o.cameraSaid === 'flag' && !(o.override && o.verdict === 'fine'));   // disputed answers aren't counted as false alarms
   return {
     since: t.since || (t.nights.slice().sort()[0]) || null,
     nightsWatched: t.nights.length,
@@ -596,8 +802,117 @@ function tallySummary(key) {
     // Of the red flags someone checked, how many were real.
     flagsChecked: flaggedReviewed.length,
     flagsConfirmed: flaggedReviewed.filter(o => isConfirmed(o.verdict)).length,
+    // "It was fine" against both the camera and the scans: counted apart,
+    // so they can't make the camera look wrong.
+    overrides: out.filter(o => o.override && o.verdict === 'fine').length,
+    overridesByPerson30d: out.filter(o => o.override && o.verdict === 'fine' && Date.now() - Date.parse(o.at) < 30 * 864e5).reduce((m, o) => (m[o.by || 'unknown'] = (m[o.by || 'unknown'] || 0) + 1, m), {}),
+    // Thanks, not rankings: how many each person resolved in the last 7 days.
+    thanks7d: out.filter(o => o.by && Date.now() - Date.parse(o.at) < 7 * 864e5).reduce((m, o) => (m[o.by] = (m[o.by] || 0) + 1, m), {}),
+    spotChecked: Number(t.spotChecked) || 0,
+    spotMissed: Number(t.spotMissed) || 0,
+    // Money: what staff actually charged, and what the confirmed sneak-ins
+    // were worth at the gym's sneak-in price.
+    recoveredUsd: Math.round(out.reduce((a, o) => a + (o.follow && o.follow.what === 'charged' ? Number(o.follow.usd) || 0 : 0), 0) * 100) / 100,
+    followedUp: out.filter(o => isConfirmed(o.verdict) && o.follow).length,
+    toFollowUp: out.filter(o => isConfirmed(o.verdict) && !o.follow).length,
+    sneakInUsd: (() => { const v = Number(getSettings(key).sneakInUsd); return Number.isFinite(v) ? v : 10; })(),
+    // This calendar month (the gym's time zone), for the owner's line at the top.
+    ...(() => {
+      let ym; try { ym = new Intl.DateTimeFormat('en-CA', { timeZone: getSettings(key).timeZone || process.env.GYM_TIMEZONE || 'America/Chicago', year: 'numeric', month: '2-digit' }).format(new Date()).slice(0, 7); } catch (e) { ym = new Date().toISOString().slice(0, 7); }
+      const m = out.filter(o => isConfirmed(o.verdict) && String(o.at || '').slice(0, 7) === ym);
+      return { month: ym, monthConfirmed: m.length, monthRecoveredUsd: Math.round(m.reduce((a, o) => a + (o.follow && o.follow.what === 'charged' ? Number(o.follow.usd) || 0 : 0), 0) * 100) / 100 };
+    })(),
   };
 }
+// Trends for the gym page: last 8 weeks, busiest hours (last 28 nights),
+// and "since the camera started": the first 14 watched nights against the
+// latest 14. Only shown with enough entries to mean something.
+const TREND_MIN_ENTRIES = 50;
+function trends(key, today) {
+  const n = loadNights(key);
+  const t = loadTally(key);
+  const day = /^\d{4}-\d{2}-\d{2}$/.test(String(today)) ? today : new Date().toISOString().slice(0, 10);
+  const back = k => new Date(Date.parse(day + 'T00:00:00Z') - k * 864e5).toISOString().slice(0, 10);
+  const rows = tallyRows(key).filter(o => isConfirmed(o.verdict) && o.at);
+  const sum = (from, to) => {   // from inclusive, to exclusive (YYYY-MM-DD)
+    let checked = 0, flagged = 0, nights = 0;
+    for (const [d, r] of Object.entries(n)) if (d >= from && d < to && r) { checked += Number(r.c) || 0; flagged += Number(r.f) || 0; if (r.w) nights++; }
+    const confirmed = rows.filter(o => { const d = String(o.at).slice(0, 10); return d >= from && d < to; }).length;
+    return { from, to, nights, checked, flagged, confirmed };
+  };
+  const weeks = [];
+  for (let i = 7; i >= 0; i--) weeks.push(sum(back(7 * i + 6), back(7 * i - 1)));
+  const hours = new Array(24).fill(0), hoursFlagged = new Array(24).fill(0);
+  const from28 = back(27);
+  for (const [d, r] of Object.entries(n)) {
+    if (d < from28 || !r) continue;
+    if (Array.isArray(r.h)) r.h.forEach((v, i) => { hours[i] += Number(v) || 0; });
+    if (Array.isArray(r.hf)) r.hf.forEach((v, i) => { hoursFlagged[i] += Number(v) || 0; });
+  }
+  // Baseline: kept for good once the first 14 watched nights are in.
+  const watched = Object.keys(n).filter(d => n[d] && n[d].w).sort();
+  if (!t.baseline && watched.length >= 14 && (!t.since || watched[0] <= t.since)) {
+    const b = sum(watched[0], new Date(Date.parse(watched[13] + 'T00:00:00Z') + 864e5).toISOString().slice(0, 10));
+    if (b.checked >= TREND_MIN_ENTRIES) { t.baseline = b; saveTallySoon(key); }
+  }
+  const recent = sum(back(13), back(-1));
+  let change = null;
+  const b = t.baseline;
+  if (b && recent.checked >= TREND_MIN_ENTRIES && recent.from > b.to) {
+    const rate = x => x.checked ? x.confirmed / x.checked * 100 : 0;
+    const flagRate = x => x.checked ? x.flagged / x.checked * 100 : 0;
+    const useConfirmed = b.confirmed >= 3;
+    const before = useConfirmed ? rate(b) : flagRate(b), after = useConfirmed ? rate(recent) : flagRate(recent);
+    change = { measure: useConfirmed ? 'confirmed' : 'flagged', before: Math.round(before * 10) / 10, after: Math.round(after * 10) / 10,
+      pct: before > 0 ? Math.round((after - before) / before * 100) : null, baselineFrom: b.from, baselineTo: b.to };
+  }
+  return { weeks, hours, hoursFlagged, change, baseline: b || null, recent, minEntries: TREND_MIN_ENTRIES };
+}
+
+// Member-number access log: which approved phone fetched member numbers,
+// when, and who was signed in. One line per phone per 10 minutes, kept
+// 90 days. The owner sees it on the gym page.
+const ACCESS_KEEP_MS = 90 * 864e5;
+const accessSeen = new Map();
+function accessFile(key) { return path.join(DATA_DIR, `gym-access-${safeCode(key)}.json`); }
+function loadAccess(key) {
+  const a = readJson(accessFile(key), []);
+  const cut = Date.now() - ACCESS_KEEP_MS;
+  return Array.isArray(a) ? a.filter(x => x && Date.parse(x.at) > cut) : [];
+}
+function noteMemberAccess(key, rec) {
+  const k = `${safeCode(key)}|${rec.deviceId}|${rec.who || ''}`;   // a second person on a shared tablet is logged too
+  const last = accessSeen.get(k);
+  if (last && Date.now() - last < 10 * 60e3) return false;
+  accessSeen.set(k, Date.now());
+  const list = loadAccess(key);
+  list.push({ at: new Date().toISOString(), device: String(rec.device || 'A phone').slice(0, 60), who: rec.who ? String(rec.who).slice(0, 60) : null, scans: Number(rec.scans) || 0 });
+  writeJson(accessFile(key), list.slice(-2000));
+  return true;
+}
+
+// Camera problems inbox: each problem is open until it fixes itself (the
+// camera computer checks in again, the picture comes back). Kept 30 days.
+function problemsFile(key) { return path.join(DATA_DIR, `gym-problems-${safeCode(key)}.json`); }
+function loadProblems(key) {
+  const a = readJson(problemsFile(key), []);
+  const cut = Date.now() - 30 * 864e5;
+  return Array.isArray(a) ? a.filter(x => x && Date.parse(x.at) > cut) : [];
+}
+function openProblem(key, kind, label, text) {
+  const list = loadProblems(key);
+  const id = `${kind}|${label || ''}`;
+  if (list.some(x => x.id === id && !x.fixedAt)) return;
+  list.push({ id, kind, label: label ? String(label).slice(0, 60) : null, text: text ? String(text).slice(0, 300) : null, at: new Date().toISOString(), fixedAt: null });
+  writeJson(problemsFile(key), list.slice(-200));
+}
+function fixProblem(key, kind, label) {
+  const list = loadProblems(key);
+  let changed = false;
+  for (const x of list) if (!x.fixedAt && x.kind === kind && (label === undefined || x.label === (label || null))) { x.fixedAt = new Date().toISOString(); changed = true; }
+  if (changed) writeJson(problemsFile(key), list);
+}
+
 function tallyRows(key) {
   const t = loadTally(key);
   return Object.entries(t.outcomes).map(([id, o]) => Object.assign({ id }, o))
@@ -618,12 +933,12 @@ module.exports = {
   COOKIE, parseCookies, codeFromRequest, setSessionCookie, clearSessionCookie,
   limited, count,
   eventId, newEventId,
-  VERDICTS, isConfirmed, loadReviews, setReview, REVIEW_NOTE_MAX,
+  VERDICTS, isConfirmed, loadReviews, setReview, REVIEW_NOTE_MAX, FOLLOWS, setFollow, tallyFollow,
   loadTally, tallyReview, tallySummary, tallyRows,
   normalizeSettings, getSettings, saveSettings, runnerGen, bumpRunnerGen, readerGen, bumpReaderGen,
   isPaused, setPaused, noteRunnerSeen, runnerSeen, markOfflineAlerted, knownMetaKeys,
-  recordDelivery, deliveryStatus, loadNights, noteNight, flushNights,
-  MAX_SUBSCRIBERS, loadSubscribers, addSubscriber, removeSubscriber, normalizeEmail, normalizePhone,
+  recordDelivery, deliveryStatus, loadNights, noteNight, flushNights, trends, normalizeChatHook, loadAccess, noteMemberAccess, loadProblems, openProblem, fixProblem, loadAnswers, ownerAgrees, noteExit,
+  MAX_SUBSCRIBERS, loadSubscribers, addSubscriber, removeSubscriber, normalizeEmail, normalizePhone, getMarker, setMarker, setSubscriberMorning, setSubscriberChoice, getSpot, setSpot, tallySpot,
   unsubscribeToken, readUnsubscribeToken,
   shareToken, readShareToken, SHARE_TTL_MS,
   fmtLocal,

@@ -77,6 +77,10 @@
   .btns{display:flex;gap:8px;flex-wrap:wrap;}
   .ok-t{color:var(--green);} .bad-t{color:var(--red);} .warn-t{color:var(--amber);} .muted{color:var(--muted);}
   .grid2{display:grid;grid-template-columns:1fr 1fr;gap:0 12px;}
+  .grid3{display:grid;grid-template-columns:1.3fr 1fr 1fr;gap:0 8px;align-items:start;}
+  @media(max-width:560px){.grid3{grid-template-columns:1fr 1fr;} .grid3 select{grid-column:1 / -1;}}
+  .unit input::-webkit-outer-spin-button,.unit input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;} .unit input{-moz-appearance:textfield;}
+  .unit{position:relative;} .unit input{padding-right:40px;} .unit span{position:absolute;right:12px;top:calc(50% - 5px);transform:translateY(-50%);color:var(--muted);font-size:13px;pointer-events:none;}
   @media(max-width:560px){.grid2{grid-template-columns:1fr;}}
 
   /* headline */
@@ -171,11 +175,40 @@
 
   <div id="panel" style="display:none;">
 
+    <div class="card" id="selfCard" style="display:none;">
+      <h2>Self-check</h2>
+      <p class="sub" style="margin:0 0 8px;">What the website thinks needs doing, from its own numbers. It fixes what's safe by itself (restarts, retries, the backup AI model, camera-computer updates and roll-backs) and only suggests anything that could change what gets caught.</p>
+      <div id="selfBody"></div>
+      <div class="btns" style="margin-top:8px;"><button class="btn" type="button" id="selfSend">Email me this now</button></div>
+      <div class="sub" id="selfNext" style="margin-top:6px;"></div>
+    </div>
+
+    <div class="card" id="repairCard" style="display:none;">
+      <h2>Self-repair and changes</h2>
+      <p class="sub" style="margin:0 0 10px;">When something breaks, the website works out why, fixes what is safe to fix, and emails you every time. You can also ask it for a change in plain words. Every code change is tested on a full copy of the website and reviewed before it can ship, goes through GitHub so it can always be undone, and never touches detection, sign-in, encryption, prices or privacy.</p>
+      <label class="f" for="askIn">Ask for a change</label>
+      <textarea id="askIn" rows="3" maxlength="1500" placeholder="e.g. Add tomorrow's watch hours to the bottom of the morning email" style="width:100%;box-sizing:border-box;background:#101315;border:1px solid var(--line);border-radius:8px;color:var(--text);font:inherit;font-size:16px;padding:10px 12px;"></textarea>
+      <div class="btns" style="margin-top:8px;"><button class="btn primary" type="button" id="askBtn">Work on it</button></div>
+      <div class="sub" id="askOut" role="status" style="margin-top:6px;"></div>
+      <div class="sub" id="repairFacts" style="margin-top:10px;"></div>
+      <div id="repairList" style="margin-top:6px;"></div>
+    </div>
+
+    <div class="card" id="backupCard">
+      <h2>Backup</h2>
+      <p class="sub" style="margin:0 0 8px;">Every record (gyms, settings, alert lists, staff answers, results, logs; not photos) in one file, locked with a password you choose. Without the password nobody can open it, including us. Set <span class="mono">BACKUP_PASSWORD</span> on Render to also get one by email every night at 3 AM.</p>
+      <label class="f" for="bkPw">Password (at least 10 characters; write it down)</label>
+      <input type="password" id="bkPw" autocomplete="new-password" style="width:100%;box-sizing:border-box;">
+      <div class="btns" style="margin-top:8px;"><button class="btn" type="button" id="bkBtn">Download a backup now</button></div>
+      <div class="sub" id="bkOut" role="status"></div>
+    </div>
+
     <div class="card" id="nowCard">
       <h2>Right now</h2>
       <p class="verdict" id="verdict" aria-live="polite">Checking…</p>
       <div id="warnings"></div>
       <div class="sub" id="siteLine" style="margin:10px 0 0;"></div>
+      <details class="more" id="fleetBox"><summary>All camera computers (fleet)</summary><div id="fleet" style="margin-top:6px;"></div></details>
       <details class="more" id="uptimeBox">
         <summary>Get a text or email at 2 AM if anything breaks</summary>
         <div class="note blue" style="margin-top:6px;">
@@ -430,6 +463,8 @@ async function refresh(){
     (gl.body.gyms || []).forEach(g => { accounts[g.key || g.code] = g; });
     adoptable = gl.body.adoptable || [];
     renderNow();
+    loadSelf();
+    loadRepair();
     renderGyms();
     renderAdopt();
     fillGymSelects();
@@ -441,6 +476,120 @@ async function refresh(){
     $('verdict').textContent = err.status === 403 ? 'The admin token stopped working (was ADMIN_TOKEN changed on Render?). Reload and enter it again.' : 'Could not reach the website: ' + err.message;
   }
 }
+// ---------- backup ----------
+document.addEventListener('click', async ev => {
+  if(!ev.target || ev.target.id !== 'bkBtn') return;
+  const pw = $('bkPw').value;
+  if(pw.length < 10){ $('bkOut').textContent = 'Use at least 10 characters.'; return; }
+  ev.target.disabled = true; $('bkOut').textContent = 'Locking it…';
+  try{
+    const h = { 'Content-Type': 'application/json' }; if(token) h['X-Admin-Token'] = token; if(adminSession) h['X-Admin-Session'] = adminSession;
+    const r = await fetch('/admin/backup', { method:'POST', headers: h, body: JSON.stringify({ password: pw }) });
+    if(!r.ok){ const j = await r.json().catch(() => ({})); throw new Error(j.error || 'error ' + r.status); }
+    const blob = await r.blob(), a = document.createElement('a');
+    a.href = URL.createObjectURL(blob); a.download = `securityai-backup-${new Date().toISOString().slice(0, 10)}.sabak`; document.body.appendChild(a); a.click(); a.remove();
+    $('bkOut').textContent = 'Downloaded. Keep the password somewhere safe: the file is useless without it.'; $('bkPw').value = '';
+  }catch(e){ $('bkOut').textContent = 'Not done: ' + e.message; }
+  ev.target.disabled = false;
+});
+
+// ---------- self-repair ----------
+const REPAIR_STATUS = { thinking: ['Working on it…', ''], testing: ['Testing on a copy…', ''], proposed: ['Waiting for you', 'warn'], 'proposed-manual': ['Ready (GitHub not connected)', 'warn'],
+  approved: ['Shipped, deploying', 'ok'], live: ['Live, being watched', 'ok'], applied: ['Fixed by itself', 'ok'], done: ['Done', 'ok'], advice: ['Needs you', 'warn'],
+  refused: ['Not done (unsafe or unsure)', ''], 'failed-checks': ['Failed its checks', 'bad'], error: ['Could not finish', 'bad'], rejected: ['Rejected', ''], undone: ['Undone', ''] };
+let repairTimer = null;
+async function loadRepair(){
+  const r = await call('/admin/self-repair').catch(() => null);
+  if(!r || !r.body || !r.body.ok) return;
+  const v = r.body;
+  $('repairCard').style.display = 'block';
+  const facts = [v.github ? 'GitHub connected: changes ship through pull requests.' : 'GitHub not connected: tested changes are emailed to you instead of shipped (set GITHUB_TOKEN and GITHUB_REPO on Render).',
+    v.auto ? 'Small low-risk fixes ship by themselves (SELF_FIX_AUTO=on).' : 'Every code change waits for your approval.',
+    `${v.aiCallsToday || 0} AI calls for self-changes today.`].concat(v.paused.length ? [`Paused by self-repair: ${v.paused.join(', ')}.`] : []).concat(v.off ? ['Self-changes are OFF (SELF_FIX=off).'] : []);
+  $('repairFacts').textContent = facts.join(' ');
+  const btn = (x, a, label, cls) => `<button class="btn ${cls || ''}" type="button" data-repair="${esc(x.id)}" data-act="${a}">${esc(label)}</button>`;
+  $('repairList').innerHTML = (v.repairs || []).slice(0, 12).map(x => {
+    const st = REPAIR_STATUS[x.status] || [x.status, ''];
+    const acts = x.status === 'proposed' ? btn(x, 'approve', 'Approve and deploy', 'primary') + btn(x, 'reject', 'Reject')
+      : x.status === 'proposed-manual' ? btn(x, 'reject', 'Reject')
+      : ['applied', 'approved', 'live'].includes(x.status) ? btn(x, 'keep', 'Keep it') + btn(x, 'undo', 'Undo', 'danger') : '';
+    return `<div class="note ${st[1] === 'bad' ? 'red' : st[1] === 'ok' ? 'green' : ''}" style="margin:8px 0;">
+      <div><strong>${esc(st[0])}</strong> · <span class="sub">${esc(shortAgo(x.at))}</span>${x.risk ? ` · <span class="sub">risk ${esc(x.risk)}, confidence ${esc(x.confidence || '?')}</span>` : ''}</div>
+      <div style="margin-top:4px;">${esc(x.what || '')}</div>
+      ${x.cause ? `<div style="margin-top:4px;"><em>Why:</em> ${esc(x.cause)}</div>` : ''}
+      ${x.did ? `<div style="margin-top:4px;"><em>What it did:</em> ${esc(x.did)}</div>` : ''}
+      ${x.fix && x.kind !== 'code' ? `<div style="margin-top:4px;"><em>What to do:</em> ${esc(x.fix)}</div>` : ''}
+      ${x.diff ? `<details class="more" style="margin-top:6px;"><summary>See the exact change${x.checks ? ' and its checks' : ''}</summary><pre style="white-space:pre-wrap;font-size:12px;max-height:320px;overflow:auto;background:#101315;border:1px solid var(--line);border-radius:8px;padding:8px;">${esc(x.diff)}</pre>${(x.checks || []).map(c => `<div class="sub">${c.ok ? '✓' : '✗'} ${esc(c.name)}${c.detail ? ' — ' + esc(c.detail) : ''}</div>`).join('')}</details>` : ''}
+      ${x.pr && x.pr.url ? `<div class="sub" style="margin-top:4px;"><a href="${esc(x.pr.url)}" target="_blank" rel="noopener">On GitHub (#${esc(x.pr.number)})</a></div>` : ''}
+      ${acts ? `<div class="btns" style="margin-top:8px;">${acts}</div>` : ''}</div>`;
+  }).join('') || '<div class="sub">Nothing has needed fixing yet.</div>';
+  clearTimeout(repairTimer);
+  if((v.repairs || []).some(x => x.status === 'thinking' || x.status === 'testing')) repairTimer = setTimeout(loadRepair, 5000);
+}
+document.addEventListener('click', async ev => {
+  const b = ev.target && ev.target.closest && ev.target.closest('button[data-repair]'); if(!b) return;
+  const words = { approve: 'Approve and deploy this change?', reject: 'Reject this change?', undo: 'Undo this? It goes back exactly to how it was.', keep: null };
+  if(words[b.dataset.act] && !confirm(words[b.dataset.act])) return;
+  b.disabled = true;
+  const r = await call(`/admin/self-repair/${encodeURIComponent(b.dataset.repair)}/${b.dataset.act}`, { json: {} }).catch(() => null);
+  b.disabled = false;
+  $('askOut').textContent = r && r.body ? (r.body.message || r.body.error || '') : 'Could not reach the website.';
+  loadRepair();
+});
+document.addEventListener('click', async ev => {
+  if(!ev.target || ev.target.id !== 'askBtn') return;
+  const text = $('askIn').value.trim();
+  if(text.length < 8){ $('askOut').textContent = 'Say what you want changed, in a sentence or two.'; return; }
+  ev.target.disabled = true; $('askOut').textContent = 'Starting…';
+  const r = await call('/admin/self-repair/request', { json: { text } }).catch(() => null);
+  ev.target.disabled = false;
+  if(r && r.body && r.body.ok){ $('askIn').value = ''; $('askOut').textContent = 'Working on it. It reads the code, writes the change, has it reviewed and tests it on a copy: usually 1 to 3 minutes. You get an email when it is ready to approve.'; }
+  else $('askOut').textContent = (r && r.body && r.body.error) || 'Could not start it.';
+  loadRepair();
+});
+
+// ---------- self-check ----------
+let selfAt = 0;
+async function loadSelf(force){
+  if(!force && Date.now() - selfAt < 5 * 60e3) return;     // cheap, but no need every refresh
+  selfAt = Date.now();
+  const r = await call('/admin/self-review').catch(() => null);
+  if(!r || !r.body || !r.body.ok) return;
+  const gyms = r.body.gyms || [];
+  $('selfCard').style.display = gyms.length ? 'block' : 'none';
+  const col = l => l === 'red' ? 'red' : l === 'amber' ? '' : 'green';
+  $('selfBody').innerHTML = gyms.map(g => `<div style="margin:6px 0 10px;"><div style="font-size:17px;font-weight:700;">${esc(g.name || g.key)}: <span style="color:${g.score >= 90 ? 'var(--green)' : g.score >= 50 ? 'var(--amber)' : 'var(--red)'}">${esc(g.score)}/100</span> <span class="sub">${esc(g.grade)}</span></div>
+    ${g.items.length ? g.items.map(x => `<div class="note ${col(x.level)}" style="margin:6px 0;"><strong>${esc(x.title)}.</strong> ${esc(x.detail)}${x.fix ? `<br><em>What to do:</em> ${esc(x.fix)}` : ''}</div>`).join('') : '<div class="sub">Nothing to do.</div>'}
+    <div class="btns" style="margin-top:6px;"><button class="btn" type="button" data-selftest="${esc(g.key)}">Run the AI self-test now</button><button class="btn" type="button" data-morning="${esc(g.key)}">Email me the morning summary</button><button class="btn" type="button" data-compare="${esc(g.key)}">Would the cheaper AI still catch them?</button></div>
+    <div class="sub" data-selfout="${esc(g.key)}"></div></div>`).join('');
+  $('selfNext').textContent = 'Weekly email: ' + (r.body.nextEmail || '');
+}
+document.addEventListener('click', async ev => {
+  const b = ev.target && ev.target.closest && ev.target.closest('button[data-selftest],button[data-morning],button[data-compare]'); if(!b) return;
+  const key = b.dataset.selftest || b.dataset.morning || b.dataset.compare, out = document.querySelector(`[data-selfout="${CSS.escape(key)}"]`);
+  if(b.dataset.compare && !confirm('Check every kept, staff-confirmed tailgate with the cheaper Haiku model? About 1 cent each. Nothing is switched.')) return;
+  b.disabled = true; out.textContent = 'Working…';
+  if(b.dataset.compare){
+    const r = await call(`/admin/gyms/${encodeURIComponent(key)}/compare-model`, { json: { model: 'claude-haiku-4-5-20251001' } }).catch(() => null);
+    const x = r && r.body && r.body.result;
+    out.textContent = !x ? 'Could not run it.' : !x.total ? 'Nothing to compare yet: it needs tailgates staff have confirmed.' : `The cheaper model caught ${x.caught} of ${x.total} confirmed tailgates${x.failed ? ` (${x.failed} could not be checked)` : ''}. ${x.caught === x.total && x.total >= 5 ? 'It might be worth trying for a week (Settings > Model) while watching false alarms in the self-check.' : 'Keep the current model: missing a tailgater costs more than the savings.'}`;
+  } else if(b.dataset.selftest){
+    const r = await call(`/admin/gyms/${encodeURIComponent(key)}/self-test`, { json: {} }).catch(() => null);
+    const x = r && r.body && r.body.result;
+    out.textContent = !r || !r.body || !r.body.ok ? 'Could not run it.' : !x ? 'Nothing to test yet: the self-test starts once staff mark a flagged entry as Tailgate.' : x.error ? `Could not run: ${x.error}` : x.pass ? `Passed: the AI still calls a confirmed tailgate a tailgate (${x.people} people). Cost about 1 cent.` : `FAILED: the AI now says ${x.people} ${x.people === 1 ? 'person' : 'people'} for a confirmed tailgate. Tell Claude.`;
+  } else {
+    const r = await call(`/admin/gyms/${encodeURIComponent(key)}/morning`, { json: {} }).catch(() => null);
+    out.textContent = r && r.body && r.body.sent ? `Sent to ${r.body.to}: "${r.body.subject}"` : r && r.body && r.body.preview ? `Preview (set SUPPORT_EMAIL to get it by email): ${r.body.preview.subject}` : 'Not sent: is email set up on Render?';
+  }
+  b.disabled = false; selfAt = 0;
+});
+document.addEventListener('click', async ev => {
+  if(!ev.target || ev.target.id !== 'selfSend') return;
+  const b = ev.target; b.disabled = true;
+  const r = await call('/admin/self-review/send', { json: {} }).catch(() => null);
+  b.disabled = false;
+  $('selfNext').textContent = r && r.body && r.body.sent ? `Sent: "${r.body.subject}"` : `Not sent: ${(r && r.body && (r.body.reason || r.body.error)) || 'could not reach the website'}`;
+});
 function adminMissing(){
   const n = $('noAdmin');
   n.style.display = 'block';
@@ -486,11 +635,15 @@ function renderNow(){
   } else if(warn.length){ v.className = 'verdict warn'; v.textContent = `Worth a look: ${warn.map(g => `${g.name} (${gymState(g).label.toLowerCase()})`).join(', ')}.`; }
   else { v.className = 'verdict ok'; v.textContent = gyms.length === 1 ? 'All good.' : `All ${gyms.length} gyms good.`; }
   $('warnings').innerHTML = (o.warnings || []).map(w =>
-    `<div class="note ${w.level === 'red' ? 'red' : ''}">${esc(w.message)}</div>`).join('');
+    `<div class="note ${w.level === 'red' ? 'red' : w.level === 'info' ? 'green' : ''}">${esc(w.message)}</div>`).join('');
   const cap = o.siteWideDailyCap ? ` of ${o.siteWideDailyCap} allowed (MAX_TOTAL_DAILY_BURSTS)` : '';
   const cost = gyms.reduce((n, g) => n + ((g.last24h && g.last24h.estimatedCost) || 0), 0);
   $('siteLine').textContent = `All gyms, last 24 hours: ${o.siteWideLast24h || 0} analyses${cap} · about ${money(cost)} (~${money(cost * 30)} a month at this rate). Check console.anthropic.com for the real bill.`;
   $('aliveUrl').value = o.siteUptimeUrl || SITE + '/monitor/runner/alive';
+  // One line per camera computer: is it on, what version, updates.
+  $('fleet').innerHTML = gyms.map(g => { const r = g.runner, u = r && r.update;
+    const upd = !r ? '' : !u ? 'updates: automatic' : u.pending ? `updating to ${u.pending.version}` : (u.lastRollback && Date.now() - Date.parse(u.lastRollback.at) < 7 * 864e5) ? `went back from ${u.lastRollback.version}` : u.installed ? `program ${u.installed}` : 'updates: automatic';
+    return `<div class="row"><span class="k">${esc(g.name)}</span><span class="v ${!r ? '' : r.online ? 'ok' : 'bad'}">${r ? `${esc(r.host || 'camera computer')} · ${r.online ? 'online' : 'OFFLINE'} · v${esc(r.version || '?')} · ${esc(upd)}${r.lastSeen ? ' · ' + esc(shortAgo(r.lastSeen)) : ''}` : 'no camera computer yet'}</span></div>`; }).join('') || '<div class="empty">No gyms yet.</div>';
 }
 
 // ---------- one card per gym ----------
@@ -535,12 +688,32 @@ function renderGyms(){
   });
   if(!gyms.length){ $('newGymBox').open = true; }
 }
+document.addEventListener('click', async ev => {
+  const b = ev.target.closest && ev.target.closest('button[data-skipexits]'); if(!b) return;
+  const on = b.dataset.on === '1';
+  if(on && !confirm('Skip people leaving?\n\nCrossings the camera computer sees walking OUT will not be sent to the AI. 1 in 20 still are, and any disagreement switches this off by itself and emails you.')) return;
+  b.disabled = true;
+  const r = await call(`/admin/gyms/${encodeURIComponent(b.dataset.skipexits)}/skip-exits`, { json: { on } });
+  if(!r.ok) alert(r.body.error || 'Could not change it.'); else refresh();
+});
 function renderGymStatus(el, g){
   const st = gymState(g);
   el.className = 'gym ' + (st.cls ? 's-' + st.cls : '');
   const r = g.runner;
   const acct = accounts[g.key] || {};
   const lines = [];
+  // Clear exits: skipping people leaving saves AI checks, once proven.
+  const ex = acct.exits;
+  if(ex && (ex.agree || ex.disagree || ex.on)){
+    const state = ex.on ? `<span class="ok-t">skipping on</span> · ${esc(ex.skipped)} skipped, ${esc(ex.audited)} spot-checked by the AI` : ex.ready ? '<span class="ok-t">ready to turn on</span>' : `${esc(ex.agree)} of ${esc(ex.need)} clean${ex.disagree ? ` · <span class="bad-t">AI disagreed ${esc(ex.disagree)}×</span>` : ''}`;
+    lines.push(`<div><span class="l">Exits</span> ${state} <button class="btn" type="button" data-skipexits="${esc(g.key)}" data-on="${ex.on ? '0' : '1'}"${!ex.on && !ex.ready ? ' disabled' : ''} style="min-height:32px;padding:4px 10px;margin-left:6px;">${ex.on ? 'Stop skipping' : 'Skip clear exits'}</button></div>`);
+  }
+  // Billing (from Stripe; nothing is switched off automatically)
+  const bl = acct.billing;
+  if(bl && bl.status){
+    const words = { active: ['ok-t', 'paying'], 'payment-failed': ['bad-t', 'payment failed: Stripe is retrying'], canceled: ['bad-t', 'canceled: decide whether to switch off'] }[bl.status] || ['', bl.status];
+    lines.push(`<div><span class="l">Billing</span> <span class="${words[0]}">${esc(words[1])}</span>${bl.plan ? ' · ' + esc(bl.plan) : ''} · ${esc(shortAgo(bl.updatedAt))}</div>`);
+  }
   // Camera computer
   const u = g.unpaired || null;   // refused after its last accepted check-in
   if(u){
@@ -786,8 +959,13 @@ function drawSettings(el, v){
       <div><label class="f">Check-in system (named on the gym's page)</label><input type="text" data-f="cisys" maxlength="40" autocomplete="off" value="${esc(s.checkinSystem || '')}" placeholder="Ashbourne"></div>
       <div><label class="f">Front entrance zone in it</label><input type="text" data-f="cizone" maxlength="30" autocomplete="off" value="${esc(s.checkinZone || '')}" placeholder="Zone 1"></div>
     </div>
-    <label class="f">Check-in system's clock (seconds ahead of real time; minus if behind)</label>
-    <input type="number" data-f="cioff" min="-3600" max="3600" step="1" inputmode="numeric" value="${esc(s.checkinClockOffsetSec || '')}" placeholder="0 = right on time">
+    <label class="f">Check-in system's clock</label>
+    <div class="grid3">
+      <select data-f="ciway" aria-label="Ahead or behind"><option value="1">Ahead (fast)</option><option value="-1">Behind (slow)</option></select>
+      <div class="unit"><input type="number" data-f="cimin" min="0" max="60" step="1" inputmode="numeric" aria-label="Minutes" value="${esc(Math.floor(Math.abs(Number(s.checkinClockOffsetSec) || 0) / 60) || '')}" placeholder="0"><span>min</span></div>
+      <div class="unit"><input type="number" data-f="cisec" min="0" max="59" step="1" inputmode="numeric" aria-label="Seconds" value="${esc(Math.abs(Number(s.checkinClockOffsetSec) || 0) % 60 || '')}" placeholder="0"><span>sec</span></div>
+    </div>
+    <div class="src" data-f="cisay"></div>
     <button class="btn primary" type="button" data-act="save">Save settings</button>
     <div class="out" data-out="settings" role="status"></div>`;
   box.querySelector('[data-f="mode"]').value = mode;
@@ -796,6 +974,25 @@ function drawSettings(el, v){
   const hours = box.querySelector('[data-f="hours"]');
   const sync = () => { hours.style.display = box.querySelector('[data-f="mode"]').value === 'set' ? '' : 'none'; };
   box.querySelector('[data-f="mode"]').onchange = sync; sync();
+  // Ashbourne-style clock difference: ahead/behind, minutes and seconds.
+  const way = box.querySelector('[data-f="ciway"]');
+  way.value = (Number(s.checkinClockOffsetSec) || 0) < 0 ? '-1' : '1';
+  const say = () => {
+    const o = clockOffsetFrom(box), el = box.querySelector('[data-f="cisay"]');
+    if(o == null){ el.innerHTML = '<span class="bad-t">Minutes 0–60 and seconds 0–59.</span>'; return; }
+    if(!o){ el.textContent = 'Right on time.'; return; }
+    const now = new Date(), fmt = d => d.toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit', second:'2-digit' });
+    el.textContent = `When it's really ${fmt(now)}, it shows ${fmt(new Date(now.getTime() + o * 1000))}.`;
+  };
+  ['ciway','cimin','cisec'].forEach(n => box.querySelector(`[data-f="${n}"]`).addEventListener('input', say));
+  way.addEventListener('change', say); say();
+}
+// Seconds ahead (+) or behind (-) from the three boxes; null if not valid.
+function clockOffsetFrom(box){
+  const f = n => box.querySelector(`[data-f="${n}"]`);
+  const m = f('cimin').value.trim() === '' ? 0 : Number(f('cimin').value), sec = f('cisec').value.trim() === '' ? 0 : Number(f('cisec').value);
+  if(!Number.isInteger(m) || !Number.isInteger(sec) || m < 0 || m > 60 || sec < 0 || sec > 59 || m * 60 + sec > 3600) return null;
+  return Number(f('ciway').value) * (m * 60 + sec);
 }
 async function saveSettings(el, key, btn){
   const box = el.querySelector('.sform'), f = n => box.querySelector(`[data-f="${n}"]`);
@@ -810,8 +1007,9 @@ async function saveSettings(el, key, btn){
     cameraClockNote: f('clock').value.trim(),
     checkinSystem: f('cisys').value.trim(),
     checkinZone: f('cizone').value.trim(),
-    checkinClockOffsetSec: f('cioff').value.trim() === '' ? null : Number(f('cioff').value),
+    checkinClockOffsetSec: clockOffsetFrom(box),
   };
+  if(body.checkinClockOffsetSec == null){ out.innerHTML = '<span class="bad-t">Check-in clock: minutes 0–60 and seconds 0–59.</span>'; return; }
   if(mode === 'set') Object.assign(body, { scheduleStart: f('start').value, scheduleEnd: f('end').value });
   else if(mode === 'always') body.watchHours = 'always';
   else Object.assign(body, { scheduleStart: null, scheduleEnd: null });
@@ -1034,6 +1232,10 @@ function renderRunner(d, key){
     let html = row('Status', r.online ? 'online' : 'OFFLINE', r.online ? 'ok' : 'bad')
       + row('Last check-in', r.lastSeen ? `${shortAgo(r.lastSeen)} (${when(r.lastSeen)})` : 'never')
       + row('Host', r.host || '—') + row('Version', r.version || '—') + row('Gym', `${r.gymName || ''} (${r.gymCode || '—'})`)
+      + (() => { const u = r.update; if(!u) return row('Program updates', 'automatic (when the door is quiet)');
+          if(u.pending) return row('Program updates', `updating to ${u.pending.version} now (checks it works, or goes back by itself)`, 'warn');
+          if(u.lastRollback && Date.now() - Date.parse(u.lastRollback.at) < 7 * 864e5) return row('Program updates', `went back from ${u.lastRollback.version} by itself ${shortAgo(u.lastRollback.at)} (${u.lastRollback.reason}). Deploy a fix; it updates again by itself.`, 'bad');
+          return row('Program updates', u.installed && r.latestCode && u.installed === r.latestCode ? `up to date (${u.installed})` : `${u.installed || 'unknown'} here, ${r.latestCode || '?'} on the website: updates when the door is quiet`, u.installed === r.latestCode ? 'ok' : ''); })()
       + row('Check-ins since website start', r.heartbeats)
       + row('Hours on the camera computer', (raw.scheduleStart && raw.scheduleEnd) ? `${raw.scheduleStart}–${raw.scheduleEnd}` : 'always')
       + row('Daily limit asked / applied', `${raw.dailyBurstCap ?? '—'} / ${c.dailyBurstCap ?? '—'}`)
@@ -1128,16 +1330,21 @@ async function loadKeys(){
   }catch(err){ el.innerHTML = `<div class="note red">${esc(err.message)}</div>`; }
 }
 const isOwnerHere = () => !!(keysData && keysData.owner && myKeys.sign && myKeys.sign.fp === keysData.owner.fp);
+// A backup approver: another phone the owner device signed in. It can
+// approve and remove devices too (readers check the owner's signature on it).
+const myDelegate = () => (keysData && keysData.delegates || []).find(d => myKeys.sign && d.fp === myKeys.sign.fp) || null;
+const isApproverHere = () => isOwnerHere() || !!(myDelegate() && myDelegate().status === 'approved');
+const myBy = () => isOwnerHere() ? undefined : myKeys.sign && myKeys.sign.fp;
 // The owner device can read member numbers for every gym (to fix things).
 async function ensureOwnReadDevices(){
-  if(!isOwnerHere()) return;
+  if(!isApproverHere()) return;
   if(!myKeys.read) myKeys.read = await MemberCrypto.makeKey('read');
   for(const [key, g] of Object.entries(keysData.gyms || {})){
     const mine = localStorage.getItem('sai:dev:' + key);
     if(mine && g.devices.some(d => d.id === mine && d.status === 'approved')) continue;
     const at = String(Date.now());
     const sig = await MemberCrypto.sign(MemberCrypto.approvePayload(key, myKeys.read.fp, at));
-    const r = await call(`/admin/keys/${encodeURIComponent(key)}/devices`, { json: { pub: myKeys.read.pub, name: 'Owner device (admin)', at, sig } });
+    const r = await call(`/admin/keys/${encodeURIComponent(key)}/devices`, { json: { pub: myKeys.read.pub, name: isOwnerHere() ? 'Owner device (admin)' : 'Backup approver (admin)', at, sig, by: myBy() } });
     if(r.ok){ localStorage.setItem('sai:dev:' + key, r.body.id); }
   }
   const r = await call('/admin/keys'); if(r.ok) keysData = r.body;
@@ -1147,9 +1354,16 @@ function renderKeys(){
   let h = '';
   if(!o) h = `<div class="note">No owner device yet. Do this on <strong>your own phone</strong> (the one you’ll approve staff from):</div>
       <button class="btn primary" type="button" data-k="makeOwner" style="margin-top:10px;">Make this my owner device</button>`;
-  else if(isOwnerHere()) h = `<div class="note green"><strong>This is your owner device</strong> · code <span class="mono">${esc(o.code)}</span>. You can approve and remove devices here, and see member numbers for every gym.</div>`;
+  else if(isOwnerHere()) h = `<div class="note green"><strong>This is your owner device</strong> · code <span class="mono">${esc(MemberCrypto.codeOf(myKeys.sign.fp))}</span>. You can approve and remove devices here, and see member numbers for every gym.</div>`;
+  else if(myDelegate() && myDelegate().status === 'approved') h = `<div class="note green"><strong>This is a backup approver</strong> · code <span class="mono">${esc(MemberCrypto.codeOf(myKeys.sign.fp))}</span>. You can approve and remove devices here, like the owner device.</div>`;
+  else if(myDelegate()) h = `<div class="note">Waiting for the owner device to approve this phone as a backup approver. On the owner device, check it shows the code <span class="mono" style="font-size:18px;">${esc(MemberCrypto.codeOf(myKeys.sign.fp))}</span>.</div>`;
   else h = `<div class="note blue">Your owner device is another phone or computer (code <span class="mono">${esc(o.code)}</span>). Approve and remove devices from there.
-      <br><button class="btn" type="button" data-k="replaceOwner" style="margin-top:8px;">Lost it? Make this the owner device instead</button></div>`;
+      <br><button class="btn" type="button" data-k="makeDelegate" style="margin-top:8px;">Make this a backup approver</button> <span class="sub">If the owner phone is ever lost, this one can still approve staff. The front-desk reader keeps working: nothing to set up again.</span>
+      <br><button class="btn" type="button" data-k="replaceOwner" style="margin-top:8px;">Lost it and no backup? Make this the owner device instead</button></div>`;
+  // On the owner device: the backup approvers, and requests to approve.
+  const dels = keysData.delegates || [];
+  if(isOwnerHere()) h += `<div style="margin-top:10px;"><b>Backup approvers</b> <span class="sub">(up to 3: phones that can approve staff if this one is lost)</span>${dels.length ? dels.map(d => `<div class="kline"><div class="kl"><b>${esc(d.name)}</b><div class="ks">code ${esc(d.code)} · ${d.status === 'approved' ? 'approved' : 'waiting for you'}</div></div>
+      ${d.status === 'approved' ? `<button class="btn danger" type="button" data-k="undelegate" data-fp="${esc(d.fp)}">Remove</button>` : `<button class="btn primary" type="button" data-k="delegate" data-fp="${esc(d.fp)}">Approve</button><button class="btn" type="button" data-k="undelegate" data-fp="${esc(d.fp)}">Reject</button>`}</div>`).join('') : '<div class="sub">None yet. On a second phone you trust (a manager\'s, or your spare), open this admin page and tap "Make this a backup approver".</div>'}</div>`;
   $('keysOwner').innerHTML = h;
   const gyms = Object.entries(keysData.gyms || {});
   $('keysGyms').innerHTML = gyms.map(([key, g]) => {
@@ -1157,17 +1371,17 @@ function renderKeys(){
     const fresh = rd && rd.lastSeen && Date.now() - Date.parse(rd.lastSeen) < 15 * 60e3;
     const reader = !rd || !rd.lastSeen
       ? `<div class="kline"><div class="kl"><b>Front-desk reader</b><div class="ks">Not set up yet. Get a code below and run it on the Ashbourne PC.</div></div><span class="pill none">Not set up</span></div>`
-      : `<div class="kline"><div class="kl"><b>Front-desk reader</b> · ${esc(rd.host || 'Ashbourne PC')}
-           <div class="ks">Checked in ${esc(ago(rd.lastSeen))}${rd.lastScanAt ? ' · last scan ' + esc(ago(rd.lastScanAt)) : ' · no scans yet'}${rd.clockSkewSec ? ` · PC clock ${Math.abs(rd.clockSkewSec)} s ${rd.clockSkewSec > 0 ? 'slow' : 'fast'} (corrected)` : ''}</div></div>
+      : `<div class="kline"><div class="kl"><b>${/^screen/.test(rd.version || '') ? 'Front-desk screen reader' : 'Front-desk reader'}</b> · ${esc(rd.host || 'Ashbourne PC')}
+           <div class="ks">Checked in ${esc(ago(rd.lastSeen))}${rd.lastScanAt ? ' · last scan ' + esc(ago(rd.lastScanAt)) : ' · no scans yet'}${rd.counts && rd.counts.scans ? ` · since it started: ${esc(rd.counts.scans)} scans${rd.counts.confirmed ? `, ${esc(rd.counts.confirmed)} confirmed by the Visit Log` : ''}${rd.counts.fromList ? `, ${esc(rd.counts.fromList)} caught from the Visit Log` : ''}${rd.counts.conflicts ? `, ${esc(rd.counts.conflicts)} uncertain` : ''}` : ''}${rd.clockSkewSec ? ` · PC clock ${Math.abs(rd.clockSkewSec)} s ${rd.clockSkewSec > 0 ? 'slow' : 'fast'} (corrected)` : ''}</div></div>
          <span class="pill ${fresh && !rd.problem ? 'on' : 'off'}">${fresh ? (rd.problem ? 'Needs attention' : 'Online') : 'Offline'}</span></div>
          ${rd.problem ? `<div class="note red" style="margin:0 0 6px;"><strong>${esc(rd.problem)}</strong>${rd.fix ? `<br>How to fix: ${esc(rd.fix)}` : ''}</div>` : ''}
-         ${rd.version && rd.latest && rd.version !== rd.latest ? `<div class="note" style="margin:0 0 6px;">Reader ${esc(rd.version)} on the PC; ${esc(rd.latest)} is out. It updates itself within 6 hours (or on the PC: run the setup line and choose 1).</div>` : ''}`;
+         ${rd.version && rd.latest && !/^screen/.test(rd.version) && rd.version !== rd.latest ? `<div class="note" style="margin:0 0 6px;">Reader ${esc(rd.version)} on the PC; ${esc(rd.latest)} is out. It updates itself within 6 hours (or on the PC: run the setup line and choose 1).</div>` : ''}`;
     const staff = g.devices.filter(d => !d.owner);
     const devs = staff.map(d => `<div class="kline"><div class="kl"><b>${esc(d.name)}</b> <span class="chip">${esc(d.code)}</span>
           <div class="ks">${d.status === 'approved' ? 'Approved ' + esc(ago(d.approvedAt)) + (d.lastSeen ? ' · last used ' + esc(ago(d.lastSeen)) : '') : 'Asked ' + esc(ago(d.createdAt)) + ' · check their screen shows this code'}</div></div>
         <div class="ka">${d.status === 'pending'
-          ? (isOwnerHere() ? `<button class="btn primary" type="button" data-k="approve" data-g="${esc(key)}" data-dev="${esc(d.id)}">Approve</button>` : '') + `<button class="btn" type="button" data-k="remove" data-g="${esc(key)}" data-dev="${esc(d.id)}">Reject</button>`
-          : (isOwnerHere() ? `<button class="btn danger" type="button" data-k="remove" data-g="${esc(key)}" data-dev="${esc(d.id)}" data-approved="1">Remove</button>` : '<span class="pill on">Approved</span>')}</div></div>`).join('');
+          ? (isApproverHere()          ? `<button class="btn primary" type="button" data-k="approve" data-g="${esc(key)}" data-dev="${esc(d.id)}">Approve</button>` : '') + `<button class="btn" type="button" data-k="remove" data-g="${esc(key)}" data-dev="${esc(d.id)}">Reject</button>`
+          : (isApproverHere() ? `<button class="btn danger" type="button" data-k="remove" data-g="${esc(key)}" data-dev="${esc(d.id)}" data-approved="1">Remove</button>` : '<span class="pill on">Approved</span>')}</div></div>`).join('');
     const nApproved = staff.filter(d => d.status === 'approved').length;
     return `<div class="kgym"><h3>${esc(g.name)}</h3>
       ${reader}
@@ -1175,7 +1389,7 @@ function renderKeys(){
       ${devs}
       <div class="kbtns">
         <button class="btn" type="button" data-k="readerCode" data-g="${esc(key)}">${rd && rd.lastSeen ? 'Reader: new code' : 'Set up the front-desk reader'}</button>
-        ${isOwnerHere() ? `<button class="btn" type="button" data-k="scans" data-g="${esc(key)}">Recent scans</button>` : ''}
+        ${isApproverHere() ? `<button class="btn" type="button" data-k="scans" data-g="${esc(key)}">Recent scans</button>` : ''}
         ${rd && rd.lastSeen ? `<button class="btn danger" type="button" data-k="unpairReader" data-g="${esc(key)}">Unpair reader</button>` : ''}
       </div>
       <div id="keysOut-${esc(key)}"></div></div>`;
@@ -1204,6 +1418,31 @@ async function keysAction(b){
       await loadKeys();
       return;
     }
+    if(k === 'makeDelegate'){
+      const name = prompt('A name for this phone (e.g. "Sarah\'s phone" or "TJ spare")', 'Backup approver');
+      if(name === null) return;
+      myKeys.sign = await MemberCrypto.makeKey('sign');
+      const r = await call('/admin/keys/delegates', { json: { sign: myKeys.sign.pub, name } });
+      if(!r.ok) throw new Error(r.body.error || 'Could not ask.');
+      await loadKeys(); return;
+    }
+    if(k === 'delegate' || k === 'undelegate'){
+      const d = (keysData.delegates || []).find(x => x.fp === b.dataset.fp); if(!d) throw new Error('That request is gone.');
+      // The code is worked out HERE from that phone's own key.
+      const fp = await MemberCrypto.fingerprint(d.sign), code = MemberCrypto.codeOf(fp);
+      if(fp !== d.fp) throw new Error('That request does not check out. Do not approve it.');
+      const at = String(Date.now());
+      if(k === 'delegate'){
+        if(!confirm(`Does the other phone show the code ${code}?\n\nOnly approve if it matches exactly. That phone will be able to approve and remove devices.`)) return;
+        const x = await call(`/admin/keys/delegates/${encodeURIComponent(fp)}/approve`, { json: { at, sig: await MemberCrypto.sign(MemberCrypto.delegatePayload(fp, at)) } });
+        if(!x.ok) throw new Error(x.body.error || 'Could not approve.');
+      } else {
+        if(!confirm(d.status === 'approved' ? 'Remove this backup approver? It stops being able to approve devices, and devices it approved stop seeing member numbers until you approve them again.' : 'Reject this request?')) return;
+        const x = await call(`/admin/keys/delegates/${encodeURIComponent(fp)}/remove`, { json: d.status === 'approved' ? { at, sig: await MemberCrypto.sign(MemberCrypto.undelegatePayload(fp, at)) } : {} });
+        if(!x.ok) throw new Error(x.body.error || 'Could not remove.');
+      }
+      await loadKeys(); return;
+    }
     if(k === 'approve'){
       const r = await call(`/admin/keys/${encodeURIComponent(key)}/devices/${encodeURIComponent(id)}`);
       if(!r.ok) throw new Error(r.body.error || 'That device is gone.');
@@ -1212,7 +1451,7 @@ async function keysAction(b){
       if(!confirm(`Does their screen show the code ${code}?\n\nOnly approve if it matches exactly.`)) return;
       const at = String(Date.now());
       const sig = await MemberCrypto.sign(MemberCrypto.approvePayload(key, fp, at));
-      const a = await call(`/admin/keys/${encodeURIComponent(key)}/devices/${encodeURIComponent(id)}/approve`, { json: { at, sig } });
+      const a = await call(`/admin/keys/${encodeURIComponent(key)}/devices/${encodeURIComponent(id)}/approve`, { json: { at, sig, by: myBy() } });
       if(!a.ok) throw new Error(a.body.error || 'Could not approve.');
       await loadKeys(); return;
     }
@@ -1223,7 +1462,7 @@ async function keysAction(b){
         const r = await call(`/admin/keys/${encodeURIComponent(key)}/devices/${encodeURIComponent(id)}`);
         if(!r.ok) throw new Error(r.body.error || 'That device is gone.');
         const fp = await MemberCrypto.fingerprint(r.body.pub), at = String(Date.now());
-        body = { at, sig: await MemberCrypto.sign(MemberCrypto.revokePayload(key, fp, at)) };
+        body = { at, sig: await MemberCrypto.sign(MemberCrypto.revokePayload(key, fp, at)), by: myBy() };
       }
       const x = await call(`/admin/keys/${encodeURIComponent(key)}/devices/${encodeURIComponent(id)}/remove`, { json: body });
       if(!x.ok) throw new Error(x.body.error || 'Could not remove.');
@@ -1233,9 +1472,11 @@ async function keysAction(b){
       const r = await call('/admin/pair', { json: { gymCode: key, role: 'reader' } });
       if(!r.ok) throw new Error(r.body.error || 'Could not make a code.');
       show(`<strong>Front-desk reader code: <span class="mono" style="font-size:20px;">${esc(r.body.display)}</span></strong> (works once, for 15 minutes)<br>
-        On the Ashbourne PC, open <strong>Windows PowerShell</strong>, paste this, press Enter, and type the code when asked:
+        <b>Screen reader (Raspberry Pi + HDMI splitter):</b> on the Pi type the line below, and the code when asked:
+        <div class="copyrow"><input type="text" readonly value="cd ~/securityai && node screen-reader.js --setup" id="rdPi-${esc(key)}"><button class="btn" type="button" data-copy="#rdPi-${esc(key)}">Copy</button></div>
+        <b>Or the reader on the Ashbourne PC itself:</b> open <strong>Windows PowerShell</strong>, paste this, press Enter, and type the code when asked:
         <div class="copyrow"><input type="text" readonly value="[Net.ServicePointManager]::SecurityProtocol='Tls12'; irm ${esc(SITE)}/securityai-reader.txt | iex" id="rdCmd-${esc(key)}"><button class="btn" type="button" data-copy="#rdCmd-${esc(key)}">Copy</button></div>
-        It will show an owner device code: check it says <span class="mono">${esc(keysData.owner ? keysData.owner.code : '—')}</span>.`, 'green');
+        Either one shows an owner device code: check it says <span class="mono">${esc(keysData.owner ? keysData.owner.code : '—')}</span>.`, 'green');
       return;
     }
     if(k === 'unpairReader'){

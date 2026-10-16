@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Lobby screen — SecurityAI</title>
+<link rel="icon" type="image/svg+xml" href="logo.svg">
+<style>
+  :root{--bg:#0f1214;--text:#EDEFF1;--muted:#A3ABB3;--green:#3FCF8E;}
+  *{box-sizing:border-box;}
+  html,body{height:100%;margin:0;}
+  body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;display:flex;align-items:center;justify-content:center;text-align:center;padding:4vh 4vw;}
+  [hidden]{display:none !important;}
+  .eye{width:14vmin;height:14vmin;border-radius:50%;border:1.4vmin solid var(--green);display:flex;align-items:center;justify-content:center;margin:0 auto 4vh;}
+  .eye span{width:5vmin;height:5vmin;border-radius:50%;background:var(--green);animation:pulse 2.4s ease-in-out infinite;}
+  @keyframes pulse{50%{transform:scale(.7);opacity:.6;}}
+  @media (prefers-reduced-motion:reduce){ .eye span{animation:none;} }
+  h1{font-size:9vmin;margin:0 0 2vh;line-height:1.1;}
+  p{font-size:4vmin;color:var(--muted);margin:1vh auto;max-width:80vw;}
+  .n{font-size:5vmin;color:var(--text);margin-top:5vh;font-variant-numeric:tabular-nums;}
+  .gym{position:fixed;left:3vw;bottom:3vh;font-size:2.6vmin;color:var(--muted);}
+  .gate{font-size:20px;}
+  .gate a{display:inline-block;margin-top:14px;background:var(--green);color:#0b1f15;font-weight:700;padding:14px 22px;border-radius:12px;text-decoration:none;}
+</style>
+</head>
+<body>
+<main id="screen">
+  <div class="eye" aria-hidden="true"><span></span></div>
+  <h1>Everyone checks in.</h1>
+  <p>This entrance is watched by camera so every visitor scans. Guests are welcome: ask at the front desk for a day pass.</p>
+  <div class="n" id="count"></div>
+</main>
+<img id="logo" alt="" hidden style="max-height:90px;max-width:60vw;display:block;margin:0 auto 10px;"><div class="gym" id="gym"></div>
+<div class="gate" id="gate" hidden>Sign in once on this screen first.<br><a href="/gym">Open the gym page</a></div>
+<script>
+// A TV in the lobby: a calm reminder that every entry is checked. Shows a
+// count of entries, never photos or names. Asks for numbers every minute.
+const $ = id => document.getElementById(id);
+async function tick(){
+  let r; try{ r = await fetch('/gym/lobby', { credentials:'same-origin' }); }catch(e){ return; }
+  if(r.status === 401){ $('screen').hidden = true; $('gate').hidden = false; return; }
+  if(!r.ok) return;
+  const d = await r.json();
+  $('screen').hidden = false; $('gate').hidden = true;
+  if(d.hasLogo && $('logo').hidden){ $('logo').src = '/gym/logo'; $('logo').hidden = false; }
+  $('gym').textContent = d.gymName ? d.gymName + ' · entrance checked by SecurityAI' : '';
+  $('count').textContent = d.today ? `${d.today.toLocaleString('en-US')} ${d.today === 1 ? 'entry' : 'entries'} checked in the last 24 hours` : '';
+}
+async function wake(){ try{ if('wakeLock' in navigator && !document.hidden) await navigator.wakeLock.request('screen'); }catch(e){} }
+document.addEventListener('visibilitychange', () => { if(!document.hidden){ wake(); tick(); } });
+wake(); tick(); setInterval(tick, 60000);
+</script>
+</body>
+</html>

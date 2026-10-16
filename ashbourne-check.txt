@@ -264,16 +264,19 @@ foreach ($x in ($b.masked | Select-Object -First 1500)) { $report.Add($x) }
 
 $report | Set-Content -Path $file -Encoding UTF8
 # Send the blanked report to the admin page (so TJ can get it on his phone).
-$sent = $false
+$sent = $false; $why = ''
 try {
   $body = [Text.Encoding]::UTF8.GetBytes(($report -join "`r`n"))
   $r = Invoke-RestMethod -Method POST -Uri ($Site + '/ashbourne-check/report') -ContentType 'text/plain; charset=utf-8' -Body $body -Headers @{ 'X-Check-Host' = $env:COMPUTERNAME } -TimeoutSec 60
   $sent = [bool]$r.ok
-} catch { $sent = $false }
+} catch { $sent = $false; $why = '' + $_.Exception.Message }
 Write-Host ''
 Write-Host 'Done.' -ForegroundColor Green
 if ($sent) { Write-Host 'The report was sent to your admin page (Ashbourne screen check > Download). Send that file to Claude.' -ForegroundColor Green }
-else { Write-Host 'Could not send the report to the website. It is saved on the Desktop: securityai-ashbourne-check.txt. Send that file to Claude.' -ForegroundColor Yellow }
+else {
+  Write-Host ('Could not send the report to the website. It is saved here: ' + $file + '  Email that file to yourself and send it to Claude.') -ForegroundColor Yellow
+  if ($why -match 'SSL|TLS|secure channel|SEC_E|underlying connection') { Write-Host 'This PC is blocking the website (its antivirus, e.g. ESET, or the network). The reader will need  gym-security.onrender.com  allowed there.' -ForegroundColor Yellow }
+}
 Write-Host 'Names and numbers in it are blanked out.'
 }
 Invoke-SaiCheck

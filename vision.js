@@ -44,20 +44,27 @@ async function callClaudeMulti({ base64Images, promptText, maxTokens, model }) {
     source: { type: 'base64', media_type: 'image/jpeg', data: img },
   }));
 
-  const body = JSON.stringify({
-    model: resolveModel(model),
+  const bodyFor = m => JSON.stringify({
+    model: m,
     max_tokens: maxTokens,
     messages: [{
       role: 'user',
       content: [...imageBlocks, { type: 'text', text: promptText }],
     }],
   });
+  const primary = resolveModel(model);
+  const backup = backupFor(primary);
 
   // One retry, only for answers that mean "not processed" (rate limit,
   // overloaded, server error) — those are not billed, so a retry can't
-  // double-charge. A timeout is NOT retried: that call may have been billed.
-  let response;
-  for (let attempt = 1; ; attempt++) {
+  // double-charge. If the main model is still busy, ONE try on the backup
+  // model (same accuracy class), so checks don't stop while Anthropic has
+  // trouble with one model. A timeout is NOT retried: that call may have
+  // been billed.
+  let response, used = primary, firstError = null;
+  const plan = [primary, primary].concat(backup ? [backup] : []);
+  for (let attempt = 0; attempt < plan.length; attempt++) {
+    used = plan[attempt];
     try {
       response = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
@@ -66,31 +73,56 @@ async function callClaudeMulti({ base64Images, promptText, maxTokens, model }) {
           'x-api-key': process.env.ANTHROPIC_API_KEY,
           'anthropic-version': '2023-06-01',
         },
-        body,
+        body: bodyFor(used),
         signal: AbortSignal.timeout(CALL_TIMEOUT_MS),
       });
     } catch (err) {
       if (err && (err.name === 'TimeoutError' || err.name === 'AbortError')) throw new Error(`Anthropic did not answer within ${CALL_TIMEOUT_MS / 1000} s`);
       throw new Error(`Could not reach Anthropic: ${err && err.message}`);
     }
-    if (response.ok || attempt >= 2 || ![429, 500, 502, 503, 529].includes(response.status)) break;
+    if (response.ok || !RETRYABLE.includes(response.status) || attempt === plan.length - 1) break;
+    if (attempt === 1) {
+      // Main model failed twice: note it, then try the backup.
+      firstError = `${response.status}`;
+      stats.fallbacks++; stats.lastFallbackAt = new Date().toISOString(); stats.lastFallbackReason = firstError;
+      console.warn(`Main AI model ${primary} busy (${firstError}) twice: trying the backup ${backup}.`);
+      continue;
+    }
     const wait = Math.min(10, Math.max(1, parseInt(response.headers && response.headers.get && response.headers.get('retry-after'), 10) || 2));
     await new Promise(r => setTimeout(r, wait * 1000));
   }
 
   if (!response.ok) {
     const text = await response.text().catch(() => '');
-    throw new Error(`Anthropic API error ${response.status}: ${text.slice(0, 200)}`);
+    stats.failures++; stats.lastFailureAt = new Date().toISOString();
+    const failure = new Error(`Anthropic API error ${response.status}: ${text.slice(0, 200)}`);
+    try { if (module.exports.onFailure) module.exports.onFailure(failure); } catch (e) { /* never in the way */ }
+    throw new Error(`Anthropic API error ${response.status}${firstError ? ` (main model ${firstError}, backup ${response.status})` : ''}: ${text.slice(0, 200)}`);
   }
+  if (used !== primary) { stats.backupAnswers++; stats.lastBackupAnswerAt = new Date().toISOString(); }
 
   let data;
   try { data = await response.json(); } catch (e) { throw new Error('Anthropic sent back something that is not JSON'); }
   const textBlock = ((data && data.content) || []).find(b => b && b.type === 'text');
   const raw = textBlock ? String(textBlock.text || '').trim() : '';
-  return parseModelJson(raw);
+  const out = parseModelJson(raw);
+  Object.defineProperty(out, 'modelUsed', { value: used, enumerable: false });
+  return out;
 }
 
 const CALL_TIMEOUT_MS = 60 * 1000;
+const RETRYABLE = [429, 500, 502, 503, 529];
+// The backup when the main model is overloaded: another model of the same
+// accuracy class (never a smaller one for counting people). BACKUP_MODEL
+// can change it; BACKUP_MODEL=off turns it off.
+function backupFor(primary) {
+  const env = String(process.env.BACKUP_MODEL || '').trim();
+  if (/^(off|none|0)$/i.test(env)) return null;
+  const b = env || (primary === 'claude-sonnet-4-5' ? 'claude-sonnet-4-6' : 'claude-sonnet-4-5');
+  return b === primary ? null : b;
+}
+// How often the backup was needed (shown on the admin page).
+const stats = { fallbacks: 0, backupAnswers: 0, failures: 0, lastFallbackAt: null, lastFallbackReason: null, lastBackupAnswerAt: null, lastFailureAt: null, since: new Date().toISOString() };
 
 // The model is asked for bare JSON but sometimes wraps it in a sentence or
 // a ```json fence, or writes "false" as a string. A string "false" is
@@ -232,4 +264,4 @@ Set confidence "low" when no frame clearly shows the crossing, people overlap, o
   return callClaudeMulti({ base64Images: images, promptText, maxTokens: 400, model: cfg.model });
 }
 
-module.exports = { analyzeEntry, scanCameraWall, analyzeEntryBurst, ALLOWED_MODELS, DEFAULT_MODEL };
+module.exports = { analyzeEntry, scanCameraWall, analyzeEntryBurst, ALLOWED_MODELS, DEFAULT_MODEL, backupFor, stats: () => Object.assign({}, stats) };

@@ -46,6 +46,8 @@ const LOG_RETENTION_HOURS = (() => {
 const LOG_RETENTION_MS = LOG_RETENTION_HOURS * 60 * 60 * 1000;
 // Absolute: express's res.sendFile refuses a relative path (DATA_DIR=./data).
 const DATA_DIR = path.resolve(process.env.DATA_DIR || __dirname);
+// Phone notifications (push.js): tailgates and camera problems.
+const push = require('./push').create({ dataDir: DATA_DIR, store: gymStore, log: m => console.warn(m) });
 const DEFAULT_DAILY_BURST_CAP = 400;  // hard ceiling on analyses per rolling 24h
 
 function safeCode(code) {
@@ -163,7 +165,7 @@ function loadLogFromDisk(key) {
     const file = logFileFor(key);
     if (!fs.existsSync(file)) return [];
     const parsed = JSON.parse(fs.readFileSync(file, 'utf8'));
-    return Array.isArray(parsed) ? pruneLog(parsed) : [];
+    return Array.isArray(parsed) ? pruneLog(parsed, key) : [];
   } catch (err) {
     console.warn(`Could not read alert log for "${key}", starting fresh (the damaged file is kept beside it):`, err.message);
     try { const f = logFileFor(key); fs.renameSync(f, `${f}.damaged-${Date.now()}`); } catch (e) { /* none */ }
@@ -241,6 +243,16 @@ function writeFileAtomic(file, text) {
 // --- Long-term summary store (35 days) --------------------------------
 // Flagged events, plus anything the gym marked Tailgate, with their photos.
 const SUMMARY_RETENTION_MS = 35 * 24 * 60 * 60 * 1000;
+// A gym can choose to keep photos for LESS time than the defaults (never
+// more): photos 24 or 48 hours, kept entries 14 or 35 days.
+function logMsFor(code) {
+  try { const h = Number(gymStore.getSettings(code).photoHours); if (h > 0 && h * 3600e3 < LOG_RETENTION_MS) return h * 3600e3; } catch (e) { /* default */ }
+  return LOG_RETENTION_MS;
+}
+function summaryMsFor(code) {
+  try { const d = Number(gymStore.getSettings(code).keptDays); if (d > 0 && d * 864e5 < SUMMARY_RETENTION_MS) return d * 864e5; } catch (e) { /* default */ }
+  return SUMMARY_RETENTION_MS;
+}
 function summaryFileFor(code) {
   return path.join(DATA_DIR, `summary-${safeCode(code)}.json`);
 }
@@ -260,7 +272,7 @@ function readSummaryFile(code) {
 function loadSummary(code) {
   const parsed = readSummaryFile(code);
   if (!parsed) return [];
-  const cutoff = Date.now() - SUMMARY_RETENTION_MS;
+  const cutoff = Date.now() - summaryMsFor(code);
   return parsed.filter(e => {
     const t = Date.parse(e && e.timestamp);
     return !isNaN(t) && t >= cutoff;
@@ -289,7 +301,7 @@ function purgeAt(code, entry) {
   if (isNaN(t)) return Date.now();
   const id = gymStore.eventId(entry);
   const inSummary = loadSummary(code).some(e => gymStore.eventId(e) === id);
-  return t + (inSummary ? SUMMARY_RETENTION_MS : LOG_RETENTION_MS);
+  return t + (inSummary ? summaryMsFor(code) : logMsFor(code));
 }
 
 // The gym marked an event "Tailgate": copy it (and so its photos) into
@@ -322,9 +334,34 @@ function retainForReview(code, id, verdict) {
   return { kept: false };
 }
 
+// "Keep these photos" for a dispute: like a confirmed entry, the entry and
+// its photos go to the 35-day store, without saying it was a tailgate.
+function holdForDispute(code, id, on) {
+  const key = safeCode(code);
+  const want = String(id || '');
+  const list = loadSummary(key);
+  const idx = list.findIndex(e => gymStore.eventId(e) === want);
+  if (on) {
+    if (idx >= 0) { if (!list[idx].held) { list[idx].held = true; writeSummary(key, list); } return { held: true }; }
+    const e = getLogFor(key).find(x => x && !x.systemEvent && gymStore.eventId(x) === want);
+    if (!e) return { held: false };
+    list.unshift({ id: want, timestamp: e.timestamp, capturedAt: e.capturedAt || null, zoneLabel: e.zoneLabel || null,
+      people_count: e.people_count == null ? null : e.people_count, expectedCount: e.expectedCount || 1, note: e.note || null, confidence: e.confidence || null,
+      tailgate_flag: !!e.tailgate_flag, phone_handoff: e.phone_handoff || undefined, frame: e.frame || null, frames: e.frames || null, keptBecause: 'dispute-hold', held: true });
+    writeSummary(key, list);
+    return { held: true };
+  }
+  if (idx >= 0) {
+    if (list[idx].keptBecause === 'dispute-hold') list.splice(idx, 1); else delete list[idx].held;
+    writeSummary(key, list);
+  }
+  return { held: false };
+}
+function heldIds(code) { return new Set(loadSummary(safeCode(code)).filter(e => e.held).map(e => gymStore.eventId(e))); }
+
 // --- Log -------------------------------------------------------------------
-function pruneLog(list) {
-  const cutoff = Date.now() - LOG_RETENTION_MS;
+function pruneLog(list, key) {
+  const cutoff = Date.now() - (key ? logMsFor(key) : LOG_RETENTION_MS);
   const kept = (list || []).filter(e => {
     const t = Date.parse(e && e.timestamp);
     return !isNaN(t) && t >= cutoff;
@@ -367,12 +404,12 @@ function flushLogs() {
 }
 function pushLog(s, entry) {
   s.log.unshift(entry);
-  s.log = pruneLog(s.log);
+  s.log = pruneLog(s.log, s.key);
   saveLogToDisk(s);
 }
 function getLog(code) {
   const s = sOrPrimary(code);
-  s.log = pruneLog(s.log);
+  s.log = pruneLog(s.log, s.key);
   return s.log;
 }
 function getLogFor(code) { return getLog(safeCode(code)); }
@@ -383,7 +420,7 @@ function burstsLast24hOf(s) {
   const cutoff = Date.now() - 24 * 60 * 60 * 1000;
   return s.log.filter(e => {
     const t = Date.parse(e && e.timestamp);
-    return !isNaN(t) && t >= cutoff && !e.systemEvent && !e.capReached;
+    return !isNaN(t) && t >= cutoff && !e.systemEvent && !e.capReached && !e.skippedAI;   // skipped exits use no AI check
   }).length;
 }
 function burstsLast24h(code) { return burstsLast24hOf(sOrPrimary(code)); }
@@ -428,7 +465,7 @@ function estimateCost(entries, model) {
   const p = PRICE_PER_MTOK[model] || PRICE_PER_MTOK['claude-sonnet-4-6'];
   let cost = 0;
   for (const e of entries) {
-    if (!e || e.error || e.systemEvent || e.capReached) continue;
+    if (!e || e.error || e.systemEvent || e.capReached || e.skippedAI) continue;   // skipped exits cost nothing
     // Measured: ~1,000 tokens of instructions, ~147 per 384x288 photo, plus
     // the extra photos sent with some checks (just before / earlier entry on
     // the same code), and ~150 tokens of answer.
@@ -446,7 +483,7 @@ function todayUsage(code) {
   const since = zonedMidnightUtc(p.year, p.month, p.date, tz);
   const model = (s.config && s.config.model) || vision.DEFAULT_MODEL;
   const today = s.log.filter(e => e && !e.systemEvent && !e.capReached && Date.parse(e.timestamp) >= since);
-  return { since: new Date(since).toISOString(), bursts: today.length, estimatedCost: Number(estimateCost(today, model).toFixed(3)), model };
+  return { since: new Date(since).toISOString(), bursts: today.filter(e => !e.skippedAI).length, skippedExits: today.filter(e => e.skippedAI).length, estimatedCost: Number(estimateCost(today, model).toFixed(3)), model };
 }
 
 // --- Dead-man's switch ------------------------------------------------
@@ -475,6 +512,7 @@ function recordHeartbeat(code, info) {
       note: 'Monitoring reconnected — heartbeats are arriving again.',
     });
     if (s.config || s.rearmed) sendSystemAlert(s.key, 'back-online', {}).catch(() => {});
+    try { gymStore.fixProblem(s.key, 'offline'); } catch (e) { /* inbox is a nicety */ }
   }
 }
 
@@ -490,6 +528,7 @@ async function checkHeartbeatOf(s) {
   const mins = Math.round((Date.now() - s.lastHeartbeat) / 60000);
   const r = await sendSystemAlert(s.key, (s.startedBy === 'runner' || !s.running) ? 'offline' : 'tab-offline', { mins, lastSeen: s.lastHeartbeat, host: s.runnerHost });
   try { gymStore.markOfflineAlerted(s.key, s.lastHeartbeat); } catch (e) { /* nicety */ }
+  try { gymStore.openProblem(s.key, 'offline', s.runnerHost || null, `The camera computer stopped checking in (${mins} min).`); } catch (e) { /* nicety */ }
   pushLog(s, {
     timestamp: new Date().toISOString(),
     mode: 'entry',
@@ -532,7 +571,9 @@ function rearmFromDisk() {
 function sweepRetention() {
   try { for (const f of fs.readdirSync(DATA_DIR)) { const m = /^alert-log-([a-z0-9_-]+)\.json$/.exec(f); if (m) stateFor(m[1]); } } catch (e) { /* none */ }
   for (const s of states.values()) {
-    try { s.log = pruneLog(s.log); if (s.log.length || fs.existsSync(logFileFor(s.key))) saveLogToDisk(s); } catch (e) { /* next gym */ }
+    try { s.log = pruneLog(s.log, s.key); if (s.log.length || fs.existsSync(logFileFor(s.key))) saveLogToDisk(s); } catch (e) { /* next gym */ }
+    // Kept entries past the gym's keep time leave the file itself, not only the view.
+    try { const raw = readSummaryFile(s.key); if (raw && raw.length) { const keep = loadSummary(s.key); if (keep.length !== raw.length) writeSummary(s.key, keep); } } catch (e) { /* next gym */ }
   }
 }
 const sweepTimer = setInterval(sweepRetention, 60 * 60 * 1000);
@@ -804,11 +845,23 @@ function incidentLinks(key, entry) {
 }
 
 // --- Alerts to the gym's own list (managed on the activity page) ------
+// Is it inside the gym's night-mode hours right now (gym's own time)?
+function inNightHours(key, cfg) {
+  try {
+    const n = gymStore.getSettings(key).nightHours;
+    if (!n || !n.from || !n.to) return false;
+    const hm = v => { const [h, m] = String(v).split(':').map(Number); return h * 60 + m; };
+    const now = cfgLocal(cfg || { gymCode: key }, new Date()).minutes, a = hm(n.from), b = hm(n.to);
+    return a < b ? now >= a && now < b : now >= a || now < b;
+  } catch (e) { return false; }
+}
 function gymAlertText(code, entry) {
   const when = fmtWhen(code, entry.capturedAt && Date.parse(entry.capturedAt) <= Date.parse(entry.timestamp) + 120000 ? entry.capturedAt : entry.timestamp);
   const where = entry.zoneLabel || 'your entrance';
   const n = Number(entry.people_count), exp = Number(entry.expectedCount) || 1;
-  const what = entry.phone_handoff
+  const what = entry.nightAlert
+    ? 'maybe more people went through than expected (not certain: night mode sends these too)'
+    : entry.phone_handoff
     ? 'a phone looks handed through the turnstile so someone else could scan in on the same code'
     : Number.isFinite(n) && n > exp
     ? `${n} people went through when ${exp} ${exp === 1 ? 'was' : 'were'} expected`
@@ -816,19 +869,42 @@ function gymAlertText(code, entry) {
   return { when, where, what };
 }
 
-async function sendToSubscriber(code, sub, { subject, text, html, attachments, sms, kind }) {
+// Post to a team chat channel. No photos and no share links: the message
+// says what happened and links to the gym page, which needs a sign-in.
+async function postChat(sub, message) {
+  const hook = gymStore.normalizeChatHook(sub.to);
+  if (!hook) return { ok: false, reason: 'not an allowed webhook address' };
+  const text = String(message || '').slice(0, 1800);
+  let body;
+  if (hook.service === 'Slack') body = { text: text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') };
+  else if (hook.service === 'Discord') body = { content: text, allowed_mentions: { parse: [] } };
+  else if (hook.service === 'Teams' && /logic\.azure\.com$/i.test(new URL(hook.url).hostname)) body = { type: 'message', attachments: [{ contentType: 'application/vnd.microsoft.card.adaptive', content: { type: 'AdaptiveCard', version: '1.4', $schema: 'http://adaptivecards.io/schemas/adaptive-card.json', body: [{ type: 'TextBlock', text, wrap: true }] } }] };
+  else body = { text };
+  try {
+    const r = await fetch(hook.url, { method: 'POST', redirect: 'manual', signal: AbortSignal.timeout(10e3), headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    return r.status >= 200 && r.status < 300 ? { ok: true } : { ok: false, reason: `${hook.service} answered ${r.status}` };
+  } catch (e) { return { ok: false, reason: `${hook.service}: ${e.message}` }; }
+}
+async function sendToSubscriber(code, sub, { subject, text, html, attachments, sms, kind, chat }) {
   const base = gyms.publicBaseUrl();
-  const unsub = base ? `${base}/gym/unsubscribe?t=${encodeURIComponent(gymStore.unsubscribeToken(code, sub))}` : null;
+  const morning = kind === 'morning';
+  const unsub = base ? `${base}/gym/unsubscribe?t=${encodeURIComponent(gymStore.unsubscribeToken(code, sub))}${morning ? '&only=morning' : ''}` : null;
+  const stopWords = morning ? 'Stop morning summaries (alerts keep coming)' : 'Stop these alerts';
   if (sub.kind === 'email') {
     const r = await mailer.sendMail({
       to: sub.to,
       subject,
-      text: text + (unsub ? `\n\nStop these alerts: ${unsub}` : ''),
-      html: html ? html + (unsub ? `<p style="font-size:12px;color:#8b939b;margin-top:18px;"><a href="${escHtml(unsub)}" style="color:#8b939b;">Stop these alerts</a></p>` : '') : undefined,
+      text: text + (unsub ? `\n\n${stopWords}: ${unsub}` : ''),
+      html: html ? html + (unsub ? `<p style="font-size:12px;color:#8b939b;margin-top:18px;"><a href="${escHtml(unsub)}" style="color:#8b939b;">${escHtml(stopWords)}</a></p>` : '') : undefined,
       attachments,
     });
     noteDelivery(code, !!r.delivered, kind || 'gym-alert', 'email', sub.to, r.reason);
     return r.delivered ? { ok: true } : { ok: false, reason: 'email', detail: r.reason };
+  }
+  if (sub.kind === 'chat') {
+    const r = await postChat(sub, chat || [subject, text].filter(Boolean).join('\n'));
+    noteDelivery(code, r.ok, kind || 'gym-alert', 'chat', sub.service || 'chat', r.reason);
+    return r.ok ? { ok: true } : { ok: false, reason: 'chat', detail: r.reason };
   }
   const r = await sendSms(sub.to, sms + (unsub ? ` Stop: ${unsub}` : ''));
   if (r.off) { noteDelivery(code, false, kind || 'gym-alert', 'sms', sub.to, r.reason); return { ok: false, reason: 'sms-off', detail: r.reason }; }
@@ -843,10 +919,11 @@ function incidentMessage(code, entry) {
   const links = incidentLinks(code, entry);
   const photo = entry.frame ? path.join(framesDirFor(code), entry.frame) : null;
   const attachments = (photo && fs.existsSync(photo)) ? [{ filename: 'entrance.jpg', path: photo, cid: 'entrance@securityai' }] : undefined;
-  const subject = `${gymName}: ${entry.phone_handoff ? 'possible shared code' : 'possible tailgate'} at ${where}, ${when}`;
+  const subject = `${gymName}: ${entry.nightAlert ? 'worth a look (night mode)' : entry.phone_handoff ? 'possible shared code' : 'possible tailgate'} at ${where}, ${when}`;
   const text = `${what} at ${where} (${when}).\n\n"${entry.note || ''}"\n\n`
     + (links.share ? `See the photos: ${links.share}\n` : '')
     + (links.activity ? `Mark it on your activity page: ${links.activity}\n` : 'Mark it on your activity page once you\'ve checked the membership log.\n');
+  const chat = `${subject}.` + (links.activity ? `\nCheck it on the gym page: ${links.activity}` : '\nCheck it on the gym page.');
   const html = `<div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;max-width:520px;color:#14171A;">
     <p style="font-size:16px;font-weight:600;margin:0 0 6px;">${escHtml(what)}</p>
     <p style="font-size:14px;color:#5b636b;margin:0 0 12px;">${escHtml(where)} · ${escHtml(when)}</p>
@@ -856,11 +933,22 @@ function incidentMessage(code, entry) {
     ${links.activity ? `<p style="font-size:14px;"><a href="${escHtml(links.activity)}" style="color:#14171A;">Mark it on your activity page</a></p>` : ''}
   </div>`;
   const sms = `${gymName}: ${what} at ${where}, ${when}.${links.share ? ' Photos: ' + links.share : ''}${links.activity ? ' Mark it: ' + links.activity : ''}`;
-  return { subject, text, html, attachments, sms };
+  return { subject, text, html, attachments, sms, chat };
 }
 
 async function sendGymAlerts(code, entry) {
-  const subs = gymStore.loadSubscribers(code);
+  // Phones that turned notifications on (no photo, no member number).
+  try {
+    const evUntil = gymStore.getSettings(code).eventUntil;
+    if (evUntil && Date.parse(evUntil) > Date.now()) throw new Error('event mode');
+    const { when, where, what } = gymAlertText(code, entry);
+    push.sendGym(code, { title: `${gyms.gymNameFor(code) || 'Your gym'}: ${entry.nightAlert ? 'worth a look (night mode)' : entry.phone_handoff ? 'possible shared code' : 'possible tailgate'}`, body: `${what[0].toUpperCase() + what.slice(1)} at ${where}, ${when}. Tap to check the photo.`, url: `/activity.html#ev-${encodeURIComponent(entry.id || '')}`, tag: 'ev-' + (entry.id || '') }, 'tailgate')
+      .catch(e => console.warn('push:', e.message));
+  } catch (e) { /* push is extra */ }
+  // Event mode (open house, guest night): no alerts until it ends; the
+  // entries are still recorded and listed.
+  try { const ev = gymStore.getSettings(code).eventUntil; if (ev && Date.parse(ev) > Date.now()) return []; } catch (e) { /* no settings */ }
+  const subs = gymStore.loadSubscribers(code).filter(x => x.tailgates !== false);   // each person chooses
   if (!subs.length) return [];
   const msg = incidentMessage(code, entry);
   const out = [];
@@ -950,7 +1038,8 @@ async function sendSystemAlert(code, kind, info) {
   const phones = ops.phones.filter(p => !subAddrs.has(String(p).toLowerCase()));
   const html = `<div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;max-width:520px;color:#14171A;font-size:15px;white-space:pre-line;">${escHtml(msg.text)}</div>`;
   const result = await deliver(key, kind, { emails, phones }, { subject: msg.subject, text: msg.text, html, sms: msg.sms });
-  for (const sub of subs) {
+  try { push.sendGym(key, { title: msg.subject, body: String(msg.sms || msg.text || '').slice(0, 220), url: '/activity.html', tag: 'system-' + kind }, 'camera').catch(() => {}); } catch (e) { /* extra */ }
+  for (const sub of subs.filter(x => x.camera !== false)) {          // each person chooses: camera problems on/off
     const r = await sendToSubscriber(key, sub, { kind, subject: msg.subject, text: msg.text, html, sms: msg.sms });
     result.detail.push({ to: sub.to, channel: sub.kind, delivered: r.ok, reason: r.ok ? null : (r.detail || r.reason) });
   }
@@ -966,7 +1055,7 @@ function checkNoPicture(code, downSince) {
   s.noPicture = s.noPicture || {};
   const now = Date.now();
   // Picture came back: the incident is over.
-  for (const label of Object.keys(s.noPicture)) if (!(label in (downSince || {}))) delete s.noPicture[label];
+  for (const label of Object.keys(s.noPicture)) if (!(label in (downSince || {}))) { delete s.noPicture[label]; try { gymStore.fixProblem(s.key, 'no-picture', label); } catch (e) { /* nicety */ } }
   const sent = [];
   if (!s.running || !isWithinSchedule(s.config)) return sent;
   for (const [label, since] of Object.entries(downSince || {})) {
@@ -974,6 +1063,7 @@ function checkNoPicture(code, downSince) {
     s.noPicture[label] = now;
     sent.push(label);
     const mins = Math.round((now - since) / 60000);
+    try { gymStore.openProblem(s.key, 'no-picture', label, `No picture from camera "${label}" for ${mins} min.`); } catch (e) { /* nicety */ }
     sendSystemAlert(s.key, 'no-picture', { label, mins, since }).then(r => {
       pushLog(s, { timestamp: new Date().toISOString(), mode: 'entry', systemEvent: 'no-picture', zoneLabel: label, error: r.text, alertResult: r.result });
     }).catch(() => {});
@@ -1045,8 +1135,14 @@ async function handleEntryResult(s, result, cfg, extra) {
   // as a flag, so it is listed, kept and alerted like a tailgate.
   if (result.phone_handoff) result.tailgate_flag = true;
   if (result.went_out === true && !result.phone_handoff) result.tailgate_flag = false;
-  // A low-confidence flag goes in the log but does not wake anyone up.
-  const worthAlerting = result.tailgate_flag && result.confidence !== 'low';
+  // A low-confidence flag goes in the log but does not wake anyone up,
+  // except in the gym's night mode (unstaffed hours), when less certain
+  // flags and "maybe a second person" entries alert too. Night mode only
+  // ever adds alerts.
+  const night = inNightHours(s.key, cfg);
+  const sureFlag = result.tailgate_flag && result.confidence !== 'low';
+  const nightExtra = night && !sureFlag && !result.went_out && (result.tailgate_flag || result.second_person_possible === true);
+  const worthAlerting = sureFlag || nightExtra;
   const id = gymStore.newEventId();
   const ts = new Date().toISOString();
   const entry = {
@@ -1056,6 +1152,7 @@ async function handleEntryResult(s, result, cfg, extra) {
     people_count: result.people_count,
     confidence: result.confidence || null,
     alertSuppressed: (result.tailgate_flag && !worthAlerting) || false,
+    nightAlert: nightExtra || undefined,
     expectedCount: cfg.expectedCount,
     queued_count: result.queued_count,
     accessible_gate_used: result.accessible_gate_used,
@@ -1105,8 +1202,10 @@ async function handleEntryResult(s, result, cfg, extra) {
   }
   try {
     const night = nightKeyFor(cfg);
-    gymStore.noteNight(s.key, night, 'checked');
-    if (result.tailgate_flag) gymStore.noteNight(s.key, night, 'flagged');
+    let hr = null;
+    try { const t = Date.parse(entry.capturedAt || entry.timestamp); if (Number.isFinite(t)) hr = Math.floor(cfgLocal(cfg, new Date(t)).minutes / 60); } catch (e) { hr = null; }
+    gymStore.noteNight(s.key, night, 'checked', hr);
+    if (result.tailgate_flag) gymStore.noteNight(s.key, night, 'flagged', hr);
   } catch (e) { /* counters are a nicety */ }
   pushLog(s, entry);
   if (worthAlerting) {
@@ -1180,6 +1279,21 @@ function stampFor(key, label, when) {
 
 // Motion-triggered bursts from a camera computer, the ingest, or a
 // browser tab. force: a manual reprocess (skips schedule and cap).
+const EXIT_AUDIT_RATE = 0.05;          // 1 in 20 skipped exits still checked by the AI
+const EXIT_READY_MIN = 200;           // clean clear exits before skipping can be turned on
+const OPP_DIR = { up: 'down', down: 'up', left: 'right', right: 'left' };
+function isClearExit(cfg) {
+  const d = cfg && cfg.direction, ins = cfg && cfg.entryDirection;
+  return !!(d && Array.isArray(ins) && ins.length && !ins.includes(d) && ins.some(x => OPP_DIR[x] === d));
+}
+function scanNear(key, ms) {
+  try { const mk = require('./member-keys'); return mk.scanList(key, ms - 60e3, ms + 60e3).length > 0; } catch (e) { return false; }
+}
+function exitReadiness(key) {
+  const x = gymStore.getSettings(key).exitShadow || {};
+  const ready = (x.agree || 0) >= EXIT_READY_MIN && !(x.disagree || 0);
+  return { agree: x.agree || 0, disagree: x.disagree || 0, skipped: x.skipped || 0, audited: x.audited || 0, lastDisagreeAt: x.lastDisagreeAt || null, ready, need: EXIT_READY_MIN, on: gymStore.getSettings(key).skipExits === true };
+}
 async function pushBurstFor(code, frames, zoneCfg, evidence, force) {
   const s = stateFor(code);
   zoneCfg = zoneCfg || {};
@@ -1300,6 +1414,25 @@ async function pushBurstFor(code, frames, zoneCfg, evidence, force) {
     if (cmp) cfg.compare = cmp;
   } catch (e) { /* the comparison is extra */ }
 
+  // Clear exits (the camera computer saw the movement go only the OUT way).
+  // Measured against the AI on every one until the gym has a long clean
+  // record; skipped only after TJ turns it on, and even then 1 in 20 still
+  // goes to the AI. Any disagreement switches skipping off by itself.
+  const clearExit = !singleFrame && isClearExit(cfg) && !before && !cfg.compare;
+  let skipThis = false, audit = false;
+  if (clearExit && gymStore.getSettings(s.key).skipExits === true && !scanNear(s.key, when.getTime())) {
+    audit = Math.random() < EXIT_AUDIT_RATE;
+    skipThis = !audit;
+  }
+  if (skipThis) {
+    const entry = await handleEntryResult(s, { people_count: 0, went_out: true, tailgate_flag: false, confidence: 'local', note: 'Someone leaving: the camera computer saw them walk out, so this one was not sent to the AI.' }, cfg, {
+      burstFrames: frames.length, zoneLabel: zoneCfg.label || null, durationSec: zoneCfg.durationSec || null,
+      frame, frames: savedFrames, capturedAt: (parsed && !isNaN(parsed)) ? parsed.toISOString() : null, skippedAI: 'clear-exit',
+    });
+    try { gymStore.noteExit(s.key, 'skipped'); } catch (e) { /* counters are a nicety */ }
+    return { entry, skippedAI: true };
+  }
+
   s.inFlight = (s.inFlight || 0) + 1;
   let held = true;
   const release = () => { if (held) { held = false; s.inFlight = Math.max(0, s.inFlight - 1); } };
@@ -1307,6 +1440,19 @@ async function pushBurstFor(code, frames, zoneCfg, evidence, force) {
     const result = singleFrame
       ? await vision.analyzeEntry(frames[0], cfg)
       : await vision.analyzeEntryBurst(frames, cfg);
+    if (clearExit) {
+      // Did the AI agree nobody came in?
+      const cameIn = result.went_out !== true && Number(result.people_count) > 0;
+      const odd = !!(result.tailgate_flag || result.second_person_possible || result.phone_handoff);
+      try {
+        gymStore.noteExit(s.key, cameIn || odd ? 'disagree' : 'agree', audit);
+        if ((cameIn || odd) && gymStore.getSettings(s.key).skipExits === true) {
+          const st = gymStore.getSettings(s.key); st.skipExits = false; gymStore.saveSettings(s.key, st);
+          alertOperator(s.key, 'skip-exits-off', `Skipping clear exits switched OFF at ${gyms.gymNameFor(s.key) || s.key}`,
+            `A crossing the camera computer saw as someone leaving was ${cameIn ? 'judged by the AI as someone coming in' : 'flagged by the AI'}. Every crossing goes to the AI again until you turn skipping back on from the admin page (after another clean run).`).catch(() => {});
+        }
+      } catch (e) { /* counters are a nicety */ }
+    }
     if (cfg.compare && typeof result.same_person === 'boolean') result.same_person_checked = true;
     s.captureCount += 1;
     s.lastError = null;
@@ -1441,7 +1587,7 @@ function startState(s, cfg) {
   s.stoppedByOperator = false;
   s.rearmed = null;
   s.configSources = null;
-  s.log = pruneLog(s.log);
+  s.log = pruneLog(s.log, s.key);
   if (sourceType === 'browser-push') return;
   tick(s);
   s.timer = setInterval(() => tick(s), secs * 1000);
@@ -1644,7 +1790,17 @@ function buildReport(code, days, tzOffsetMinutes, opts) {
     }
   } catch (e) { /* none */ }
   const confirmed = events.filter(e => e.review && gymStore.isConfirmed(e.review.verdict)).length;
+  // Money: what staff charged in this period, and what the confirmed
+  // sneak-ins were worth at the gym's own price (from the lasting tally).
+  let money = null;
+  try {
+    const rows = gymStore.tallyRows(key).filter(o => gymStore.isConfirmed(o.verdict) && Date.parse(o.at) >= since && Date.parse(o.at) < until);
+    const price = gymStore.tallySummary(key).sneakInUsd;
+    const charged = Math.round(rows.reduce((a, o) => a + (o.follow && o.follow.what === 'charged' ? Number(o.follow.usd) || 0 : 0), 0) * 100) / 100;
+    if (rows.length) money = { caught: rows.length, charged, price, worth: rows.length * price };
+  } catch (e) { /* none */ }
   return {
+    money,
     gymCode: key,
     days: range ? Math.round((until - since) / 864e5) : (days || 30),
     month, periodLabel,
@@ -1653,6 +1809,8 @@ function buildReport(code, days, tzOffsetMinutes, opts) {
     totalFlagged: events.length,
     confirmedByGym: confirmed,
     markedFineByGym: all.length - events.length,
+    // "It was fine" against the camera AND the scans, not yet checked by the owner.
+    secondLook: all.filter(e => e.review && e.review.verdict === 'fine' && e.review.override && !e.review.ownerChecked).length,
     notReviewed: events.filter(e => !e.review).length,
     timeZone,
     extraPeopleSeen: events.reduce((n, e) => n + Math.max(0, (Number(e.people_count) || 0) - (e.expectedCount || 1)), 0),
@@ -1661,18 +1819,20 @@ function buildReport(code, days, tzOffsetMinutes, opts) {
     byZone,
     // Hidden under 3: "busiest hour: 2am (1)" is noise, not a pattern.
     busiestHour: (busiest && busiest[1] >= 3) ? { hour: Number(busiest[0]), count: busiest[1] } : null,
+    flaggedByHour: Array.from({ length: 24 }, (_, h) => byHour[h] || 0),
+    keptDays: Math.round(summaryMsFor(key) / 864e5), logHours: Math.round(logMsFor(key) / 3600e3),
     worstDay: worstDay ? { date: worstDay[0], count: worstDay[1] } : null,
     events: events.slice(0, 100),
   };
 }
 
 module.exports = {
-  getLogFor, sendGymTestAlert, sendGymAlerts, ensureRemoteMonitoring, normaliseRunnerConfig, RUNNER_MAX_DAILY_BURST_CAP, analysisConfigFor,
+  getLogFor, sendGymTestAlert, sendGymAlerts, sendToSubscriber, push, holdForDispute, heldIds, ensureRemoteMonitoring, normaliseRunnerConfig, RUNNER_MAX_DAILY_BURST_CAP, analysisConfigFor,
   start, stop, allowRemote, getStatus, getLog, listDevices, pushFrame, pushBurst, pushBurstFor, getActiveZoneNames,
   isWithinSchedule, burstsLast24h, totalBurstsLast24h, framesDirFor, safeCode, pacingFactor, scheduleWindowMinutes,
   localMinutes, buildReport, loadSummary, recordHeartbeat, sendTestAlert, sendSystemAlert, checkNoPicture,
   applySettings, effectiveRunnerConfig, retainForReview, purgeAt, todayUsage, listStates, defaultKey, checkHeartbeat,
   zonedAt, zonedMidnightUtc, monthRange, nightKeyFor, stampFor, fmtWhen, operatorTargets, rearmFromDisk, flushLogs, sweepRetention,
-  LOG_RETENTION_HOURS, SUMMARY_RETENTION_MS, ENV_MAX_TOTAL_DAILY_BURSTS, alertOperator, watchingNow,
+  LOG_RETENTION_HOURS, SUMMARY_RETENTION_MS, logMsFor, summaryMsFor, inNightHours, exitReadiness, isClearExit, ENV_MAX_TOTAL_DAILY_BURSTS, alertOperator, watchingNow,
   platform: os.platform(),
 };

@@ -145,7 +145,7 @@
             </div>
             <div class="consent">
               <input type="checkbox" id="c2" class="required-consent">
-              <p>I authorize SecurityAI to charge the card I enter on the next page <strong>$<span class="tot">99</span> per month</strong><span class="qtyWords"></span>, on a recurring basis, until I cancel.</p>
+              <p>I authorize SecurityAI to charge the card I enter on the next page <strong>$<span class="tot">200</span> per month</strong><span class="qtyWords"></span>, on a recurring basis, until I cancel.</p>
             </div>
             <div class="consent">
               <input type="checkbox" id="c3" class="required-consent">
@@ -160,15 +160,15 @@
 
         <div class="card" style="position:sticky;top:24px;">
           <h3>ORDER SUMMARY</h3>
-          <div class="summary-line"><span class="plan-name-line">One entrance</span><span>$<span class="pr">99</span>/month</span></div>
-          <div class="summary-line" id="qtyLine"><span>Gyms on this plan</span><span id="qtyFixed">1</span>
+          <div class="summary-line"><span class="plan-name-line">One entrance</span><span>$<span class="pr">200</span>/month</span></div>
+          <div class="summary-line" id="qtyLine"><span>Entrances (all locations)</span><span id="qtyFixed">1</span>
             <span id="qtyEdit" style="display:none;align-items:center;gap:8px;">
-              <label for="qty" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);">Number of gyms</label>
+              <label for="qty" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);">Number of entrances</label>
               <input type="number" id="qty" min="2" max="50" step="1" value="2" inputmode="numeric" style="width:76px;margin:0;padding:7px 9px;background:#0F1214;border:1px solid var(--line);border-radius:4px;color:var(--text);font-size:15px;">
             </span></div>
           <div class="summary-line"><span>Billing cycle</span><span>Monthly</span></div>
-          <div class="summary-total"><span>Due today</span><span>$<span class="tot">99</span></span></div>
-          <div class="fineprint" id="qtyNote" style="display:none;text-align:left;margin-top:6px;">Multi-gym plan: 2 to 50 gyms, $<span class="pr">169</span> each per month.</div>
+          <div class="summary-total"><span>Due today</span><span>$<span class="tot">200</span></span></div>
+          <div class="fineprint" id="qtyNote" style="display:none;text-align:left;margin-top:6px;">$200 for the first entrance, $100 a month for each extra entrance or location (2 to 50).</div>
           <button class="btn-primary" id="submitBtn" disabled onclick="submitCheckout()">Continue to payment</button>
           <div class="fineprint" id="checkoutStatus" style="display:none;color:var(--red);"></div>
           <div class="fineprint">You'll enter your card on Stripe's secure checkout page next. To cancel any time, email or call us.</div>
@@ -184,18 +184,18 @@
   // The server works out the real price from the plan name.
   const params = new URLSearchParams(window.location.search);
   const PLANS = {
-    'single-door': { name: 'One entrance', price: 99 },
-    'gym':         { name: 'Whole gym — every entrance', price: 199 },
-    'multi':       { name: 'Multi-gym contract (per gym)', price: 169 },
+    'single-door': { name: 'One entrance', price: 200, extra: 0 },
+    'gym':         { name: 'Several entrances or locations', price: 200, extra: 100 },
   };
+  PLANS.multi = PLANS.gym;   // older links
   const planKey = PLANS[params.get('plan')] ? params.get('plan') : 'single-door';
   const plan = PLANS[planKey];
   document.querySelectorAll('.pr').forEach(el => el.textContent = plan.price);
   document.querySelector('.plan-name-line').textContent = plan.name;
 
-  // Multi-gym is charged per gym (2 to 50, same limits as the server), so
-  // the page asks how many and shows the real total it will send.
-  const isMulti = planKey === 'multi';
+  // Several entrances: $200 for the first, $100 for each extra (2 to 50,
+  // same limits as the server). The page asks how many and shows the total.
+  const isMulti = !!plan.extra;
   const qtyIn = document.getElementById('qty');
   function quantity(){
     if(!isMulti) return 1;
@@ -204,8 +204,8 @@
   }
   function showTotal(){
     const q = quantity();
-    document.querySelectorAll('.tot').forEach(el => el.textContent = (plan.price * q).toLocaleString('en-US'));
-    document.querySelectorAll('.qtyWords').forEach(el => el.textContent = isMulti ? ` (${q} gyms × $${plan.price})` : '');
+    document.querySelectorAll('.tot').forEach(el => el.textContent = (plan.price + plan.extra * (q - 1)).toLocaleString('en-US'));
+    document.querySelectorAll('.qtyWords').forEach(el => el.textContent = isMulti ? ` ($${plan.price} + ${q - 1} × $${plan.extra})` : '');
   }
   if(isMulti){
     document.getElementById('qtyFixed').style.display = 'none';
@@ -244,7 +244,7 @@
       const res = await fetch('/create-checkout-session', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(Object.assign({ plan: planKey, name, email, gym }, isMulti ? { gyms: quantity() } : {}))
+        body: JSON.stringify(Object.assign({ plan: planKey, name, email, gym }, isMulti ? { entrances: quantity() } : {}))
       });
 
       let data = {};

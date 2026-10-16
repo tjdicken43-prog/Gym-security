@@ -248,7 +248,7 @@ function listGyms() {
 // Operator-only (the admin routes check ADMIN_TOKEN before calling this):
 // includes the codes, which the operator needs to hand a gym its link.
 function listGymsForAdmin() {
-  return load().map(g => ({ code: g.code, key: keyOf(g), gymName: g.gymName, email: g.email, createdAt: g.createdAt, timeZone: g.timeZone || null, codeIssuedAt: g.codeIssuedAt || null }));
+  return load().map(g => ({ code: g.code, key: keyOf(g), gymName: g.gymName, email: g.email, createdAt: g.createdAt, timeZone: g.timeZone || null, codeIssuedAt: g.codeIssuedAt || null, billing: g.billing || null }));
 }
 
 // --- Recovery ---------------------------------------------------------
@@ -317,10 +317,25 @@ async function recoverCode({ email, callerKey }) {
   return { ok: true };
 }
 
+// Billing facts from Stripe (no card details ever reach us): status,
+// Stripe's customer and subscription ids, when it last changed.
+function setBilling(key, billing) {
+  const list = load();
+  const g = list.find(x => keyOf(x) === resolveKey(key));
+  if (!g) return null;
+  g.billing = Object.assign({}, g.billing || {}, billing, { updatedAt: new Date().toISOString() });
+  if (!save(list)) throw new Error('Could not save.');
+  return g;
+}
+function findBySubscription(sub) {
+  if (!sub) return null;
+  return load().find(g => g.billing && (g.billing.subscription === sub || g.billing.customer === sub)) || null;
+}
+
 module.exports = {
   createGym, listGyms, listGymsForAdmin, isValidCode, anyCodesConfigured,
   findByCode, recoverCode, generateCode, normalize, timeZoneFor, gymNameFor,
   validTimeZone, publicBaseUrl, keyOf, resolveKey, isKnownKey, envCodes,
-  adoptKey, newCode, setTimeZone,
+  adoptKey, newCode, setTimeZone, setBilling, findBySubscription,
   isDamaged: () => { load(); return damaged; },
 };
