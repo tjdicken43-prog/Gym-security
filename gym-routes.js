@@ -80,6 +80,7 @@ function mount(app, deps) {
     }
     // A person signed in with their own email (people.js).
     const pc = people.fromRequest(req);
+    if (pc && gyms.isClosed(pc.key)) return null;   // the gym's service has ended
     if (pc) { people.touch(pc.key, pc.person.id); return { code: pc.key, gym: true, person: pc.person }; }
     // The cookie holds the sign-in code it was made with; it only works
     // while that is still the gym's CURRENT code (see "new code").
@@ -853,6 +854,7 @@ function mount(app, deps) {
     const raw = String((req.body || {}).code || '').trim();
     if (!gyms.anyCodesConfigured()) return res.json({ ok: true, gymName: null, open: true });
     const code = monitor.safeCode(raw);
+    if (raw && (gyms.isClosed(raw) || gyms.isClosed(code)) && gyms.findByCode(raw) && monitor.safeCode(gyms.findByCode(raw).code) === code) return res.status(403).json({ error: 'This gym\'s SecurityAI service has ended. Questions: contact SecurityAI.' });
     if (!raw || !gyms.isValidCode(raw) || !gyms.isValidCode(code)) {
       store.limited(`signin-fail:${key}`, 1e9, 15 * 60e3);
       store.limited('signin-fail:all', 1e9, 3600e3);
@@ -891,14 +893,14 @@ function mount(app, deps) {
   // link must not use up the one-time link before the person does.
   app.get('/gym/login', (req, res) => {
     res.set('Cache-Control', 'no-store').set('Referrer-Policy', 'no-referrer');
-    if (!store.readToken('login', req.query.t)) return res.status(403).send(unsubPage('This link doesn\'t work', 'It has expired (20 minutes). Ask for a new one on the sign-in page.', '<p><a href="/gym" style="color:#EDEFF1;">Back to sign in</a></p>'));
+    if (!store.readToken('login', req.query.t)) return res.status(403).send(unsubPage('This link doesn\'t work', 'It has expired (20 minutes). Ask for a new one on the sign-in page.', '<p><a href="/gym" style="color:#1D4FB0;">Back to sign in</a></p>'));
     res.send(unsubPage('Sign in to SecurityAI', 'Tap the button to finish signing in on this device.', `<form method="POST" action="/gym/login?t=${encodeURIComponent(req.query.t)}"><button type="submit">Sign in</button></form>`));
   });
   app.post('/gym/login', (req, res) => {
     res.set('Cache-Control', 'no-store').set('Referrer-Policy', 'no-referrer');
     const email = people.useLink(req.query.t);
     const mine = email ? people.gymsFor(email) : [];
-    if (!mine.length) return res.status(403).send(unsubPage('This link doesn\'t work', 'It was already used, has expired (20 minutes), or this email is no longer on a gym\'s list. Ask for a new one on the sign-in page.', '<p><a href="/gym" style="color:#EDEFF1;">Back to sign in</a></p>'));
+    if (!mine.length) return res.status(403).send(unsubPage('This link doesn\'t work', 'It was already used, has expired (20 minutes), or this email is no longer on a gym\'s list. Ask for a new one on the sign-in page.', '<p><a href="/gym" style="color:#1D4FB0;">Back to sign in</a></p>'));
     people.setCookie(req, res, mine[0].key, mine[0].person);
     res.statusCode = 302; res.setHeader('Location', '/activity.html'); res.end();
   });
@@ -1296,8 +1298,8 @@ function mount(app, deps) {
   // follow links, and must not take people off the list by doing so.
   function unsubPage(title, body, form) {
     return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex"><title>Alerts — SecurityAI</title>
-<style>body{margin:0;background:#14171A;color:#EDEFF1;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;display:flex;min-height:100vh;align-items:center;justify-content:center;padding:16px;box-sizing:border-box}
-.b{max-width:420px;text-align:center}h1{font-size:22px}p{color:#AEB5BC;font-size:16px;line-height:1.5}button{font-size:17px;padding:14px 22px;border-radius:8px;border:0;background:#3FCF8E;color:#0d1f16;font-weight:600;min-height:48px}</style></head>
+<link rel="stylesheet" href="/brand.css"><style>body{margin:0;background:#E4E6E3;color:#1E2124;font-family:var(--body);display:flex;min-height:100vh;align-items:center;justify-content:center;padding:16px;box-sizing:border-box}
+.b{max-width:440px;text-align:center;background:#F7F7F5;border-radius:16px;padding:28px 22px;box-shadow:var(--lift-hi)}h1{font:800 36px/1 var(--display);text-transform:uppercase}p{color:#3A4146;font-size:16px;line-height:1.5}button{font-size:17px;padding:14px 22px;border-radius:10px;border:0;background:#1D4FB0;color:#fff;font-weight:700;min-height:48px;cursor:pointer}</style></head>
 <body><div class="b"><h1>${title}</h1><p>${body}</p>${form || ''}</div></body></html>`;
   }
   function escHtml(v) { return String(v == null ? '' : v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }

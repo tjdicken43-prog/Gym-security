@@ -5,29 +5,35 @@
 <link rel="icon" type="image/svg+xml" href="logo.svg">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="noindex">
+<meta name="theme-color" content="#E4E6E3">
 <title>Subscribed — SecurityAI</title>
-<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@600&family=IBM+Plex+Sans:wght@400;500&display=swap" rel="stylesheet">
+<link rel="preload" href="/fonts/BigShoulders-Bold.woff" as="font" type="font/woff" crossorigin>
+<link rel="stylesheet" href="brand.css">
 <style>
-  body{margin:0;background:#14171A;color:#EDEFF1;font-family:'IBM Plex Sans',sans-serif;
-    display:flex;align-items:center;justify-content:center;min-height:100vh;}
-  .box{text-align:center;padding:40px 20px;max-width:440px;}
-  p{line-height:1.55;}
-  .check{width:56px;height:56px;border-radius:50%;background:rgba(63,207,142,0.14);
-    display:flex;align-items:center;justify-content:center;margin:0 auto 22px;color:#3FCF8E;font-size:26px;}
-  h1{font-family:'Oswald';font-weight:600;font-size:26px;margin-bottom:10px;}
-  p{color:#8B939B;font-size:14.5px;}
-  a{color:#EDEFF1;}
+  body{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:24px 16px;}
+  .box{max-width:520px;width:100%;background:var(--surface);border-radius:var(--r-panel);box-shadow:var(--lift-hi);padding:32px 28px;border-top:8px solid var(--green);}
+  .check{width:56px;height:56px;border-radius:14px;background:var(--green);display:grid;place-items:center;margin:0 0 18px;}
+  h1{font:800 56px/.92 var(--display);text-transform:uppercase;margin:0 0 14px;}
+  p{margin:0 0 14px;color:var(--ink2);}
+  ol{margin:6px 0 18px;padding:0;list-style:none;border-top:3px solid var(--ink);}
+  li{display:grid;grid-template-columns:34px 1fr;gap:4px;padding:14px 0;border-bottom:1px solid var(--line);}
+  li b{font:800 26px/1 var(--display);color:var(--blue);}
+  .small{font-size:15px;color:var(--muted);}
+  .small a{color:var(--ink);font-weight:600;}
 </style>
 </head>
 <body>
-  <div class="box">
-    <div class="check">✓</div>
+  <main class="box">
+    <div class="check" aria-hidden="true"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></div>
     <h1>You're subscribed</h1>
-    <p>A confirmation and receipt are on their way to your email.</p>
-    <p><strong style="color:#EDEFF1;">What happens next:</strong> TJ at SecurityAI will be in touch within one business day to arrange setup. He'll put a small computer (a laptop or a Raspberry Pi) next to your camera recorder, connect it to your entrance camera, and set your watched hours (9 PM to 5 AM unless you'd like different).</p>
-    <p>A welcome email with your gym's page and how to sign in is on its way too (check spam if you don't see it in a few minutes). Your gym page is where you see what happened overnight, add your staff, and choose who gets alerts. TJ will be in touch within one business day to book the install.</p>
-    <p>Questions before then: <a href="mailto:tjdicken43@gmail.com">tjdicken43@gmail.com</a> or <a href="tel:+14797212719">(479) 721-2719</a>.</p>
-    <p><a href="securityai.html">Back to SecurityAI</a></p>
-  </div>
+    <p>A receipt is on its way to your email, with a welcome email right behind it (check spam if you don't see them in a few minutes).</p>
+    <ol>
+      <li><b>1</b><span>TJ at SecurityAI contacts you within one business day to book the setup.</span></li>
+      <li><b>2</b><span>At your gym, a small computer (a Raspberry Pi) goes next to your camera recorder, and a small splitter lets it see your front-desk screen. Nothing is installed on your computers. Watched hours are 9 PM to 5 AM unless you'd like different.</span></li>
+      <li><b>3</b><span>Your gym page shows what happened overnight. Add your staff there and choose who gets alerts.</span></li>
+    </ol>
+    <p class="small">Questions before then: <a href="mailto:tjdicken43@gmail.com">tjdicken43@gmail.com</a> or <a href="tel:+14797212719">(479) 721-2719</a>.</p>
+    <p class="small" style="margin:0;"><a href="securityai.html">Back to SecurityAI</a></p>
+  </main>
 </body>
 </html>

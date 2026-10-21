@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Will it work at your gym? | SecurityAI</title>
+<meta name="description" content="Two minutes: tell us about your cameras, your check-in system and your front desk, and see straight away whether SecurityAI works at your gym.">
+<meta name="theme-color" content="#E4E6E3">
+<link rel="icon" type="image/svg+xml" href="logo.svg">
+<link rel="preload" href="/fonts/BigShoulders-Bold.woff" as="font" type="font/woff" crossorigin>
+<link rel="stylesheet" href="brand.css">
+<style>
+  .wrap{max-width:1120px;margin:0 auto;padding:0 20px;}
+  nav{border-bottom:1px solid var(--line);}
+  nav .wrap{display:flex;align-items:center;gap:12px;min-height:64px;}
+  .brand{display:flex;align-items:center;gap:10px;margin-right:auto;text-decoration:none;color:var(--ink);font:800 27px/1 var(--display);}
+  .brand:hover{color:var(--ink);}
+  h1{font:800 clamp(52px,8vw,96px)/.9 var(--display);text-transform:uppercase;margin:44px 0 12px;}
+  .lead{font-size:19px;color:var(--ink2);max-width:56ch;margin:0 0 32px;}
+  .layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,380px);gap:28px;align-items:start;padding-bottom:72px;}
+  @media(max-width:900px){.layout{grid-template-columns:1fr;}}
+  fieldset{border:0;margin:0 0 14px;padding:22px;background:var(--surface);border-radius:var(--r-panel);box-shadow:var(--lift);}
+  legend{float:left;width:100%;padding:0;margin:0 0 4px;font:800 28px/1.05 var(--display);}
+  legend + *{clear:both;}
+  .q{margin:14px 0 6px;font-weight:600;}
+  .hint{font-size:14.5px;color:var(--muted);margin:0 0 8px;}
+  .opts{display:flex;flex-wrap:wrap;gap:8px;}
+  .opts label{display:inline-flex;align-items:center;gap:8px;min-height:46px;padding:0 16px;border:1.5px solid #BFC4C0;border-radius:999px;background:#fff;cursor:pointer;font-weight:500;}
+  .opts input{position:absolute;opacity:0;width:1px;height:1px;}
+  .opts label:has(input:checked){background:var(--ink);border-color:var(--ink);color:#fff;}
+  .opts label:has(input:focus-visible){outline:3px solid var(--blue);outline-offset:2px;}
+  select,input[type=text],input[type=email],input[type=tel]{width:100%;min-height:50px;border:2px solid var(--line);border-radius:var(--r-btn);background:#fff;padding:10px 14px;font:16px var(--body);color:var(--ink);}
+  select:focus,input:focus{outline:none;border-color:var(--blue);}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+  @media(max-width:560px){.row2{grid-template-columns:1fr;}}
+  label.f{display:block;font-weight:600;font-size:15px;margin:12px 0 6px;}
+  aside{position:sticky;top:16px;}
+  .verdict{background:var(--surface);border-radius:var(--r-panel);box-shadow:var(--lift-hi);padding:22px;border-top:8px solid #BFC4C0;}
+  .verdict.ok{border-top-color:var(--green);} .verdict.ask{border-top-color:var(--yellow);} .verdict.fix{border-top-color:var(--red);}
+  .verdict h2{font:800 34px/1 var(--display);text-transform:uppercase;margin:0 0 6px;}
+  .verdict p{margin:0 0 12px;color:var(--ink2);}
+  .item{display:grid;grid-template-columns:12px 1fr;gap:12px;padding:12px 0;border-top:1px solid var(--line2);font-size:15px;}
+  .item i{width:10px;height:22px;border-radius:2px;background:#BFC4C0;margin-top:2px;}
+  .item.ok i{background:var(--green);} .item.ask i{background:var(--yellow);} .item.fix i{background:var(--red);}
+  .item b{display:block;}
+  .item span{color:var(--ink2);}
+  .send{margin-top:14px;}
+  .msg{margin-top:10px;font-weight:600;}
+  .msg.ok{color:var(--green);} .msg.bad{color:var(--red);}
+  .small{font-size:14px;color:var(--muted);}
+</style>
+</head>
+<body>
+<nav><div class="wrap">
+  <a class="brand" href="/"><svg width="30" height="30" viewBox="0 0 48 48" aria-hidden="true"><rect x="1" y="1" width="46" height="46" rx="9" fill="#1E2124"/><rect x="12" y="11" width="5" height="26" rx="1.5" fill="#E4E6E3"/><rect x="21.5" y="11" width="5" height="26" rx="1.5" fill="#E4E6E3"/><rect x="31" y="11" width="5" height="26" rx="1.5" fill="#C8281F"/></svg>SecurityAI</a>
+  <a href="/#pricing">Price</a>
+</div></nav>
+
+<main class="wrap">
+  <h1>Will it work at your gym?</h1>
+  <p class="lead">Two minutes. Tap what you have and the answer updates as you go. Send it and TJ gets back to you within one business day.</p>
+  <div class="layout">
+    <form id="f" autocomplete="on" novalidate>
+      <fieldset>
+        <legend>Your cameras</legend>
+        <p class="q" id="qRec">What records your cameras?</p>
+        <div class="opts" role="radiogroup" aria-labelledby="qRec">
+          <label><input type="radio" name="recorder" value="nvr">A recorder box in a back room</label>
+          <label><input type="radio" name="recorder" value="cloud">Cameras in an app, no box</label>
+          <label><input type="radio" name="recorder" value="unknown">Not sure</label>
+        </div>
+        <div id="brandBox" hidden>
+          <label class="f" for="brand">Which brand?</label>
+          <select id="brand" name="brand"></select>
+          <p class="hint" style="margin-top:6px;">It's printed on the recorder or shown in the app.</p>
+        </div>
+        <p class="q" id="qAng">Is there a camera that sees people come through the turnstile or door?</p>
+        <div class="opts" role="radiogroup" aria-labelledby="qAng">
+          <label><input type="radio" name="angle" value="above">Yes, from above</label>
+          <label><input type="radio" name="angle" value="side">Yes, from the side</label>
+          <label><input type="radio" name="angle" value="none">No</label>
+          <label><input type="radio" name="angle" value="unknown">Not sure</label>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Your front desk</legend>
+        <label class="f" for="checkin" style="margin-top:6px;">Which check-in system do members scan into?</label>
+        <select id="checkin" name="checkin">
+          <option value="">Choose…</option>
+          <option>Ashbourne</option><option>ABC Fitness (Glofox, Evo, DataTrak)</option><option>Mindbody</option><option>ClubReady</option>
+          <option>Zen Planner</option><option>Wodify</option><option>PushPress</option><option>Club OS</option><option>Daxko</option><option>Gym Assistant</option>
+          <option value="other">Something else</option>
+        </select>
+        <input type="text" id="checkinOther" name="checkinOther" placeholder="Its name" hidden style="margin-top:8px;" aria-label="Check-in system name">
+        <p class="q" id="qDesk">What's at the front desk?</p>
+        <div class="opts" role="radiogroup" aria-labelledby="qDesk">
+          <label><input type="radio" name="desk" value="pc">A Windows computer</label>
+          <label><input type="radio" name="desk" value="mac">A Mac</label>
+          <label><input type="radio" name="desk" value="ipad">Only an iPad</label>
+          <label><input type="radio" name="desk" value="android">Only an Android tablet</label>
+          <label><input type="radio" name="desk" value="none">Nothing</label>
+        </div>
+        <div id="showsBox" hidden>
+          <p class="q" id="qShows">What shows on that screen when a member scans?</p>
+          <div class="opts" role="radiogroup" aria-labelledby="qShows">
+            <label><input type="radio" name="shows" value="popup">A pop-up or card</label>
+            <label><input type="radio" name="shows" value="list">A list of check-ins</label>
+            <label><input type="radio" name="shows" value="name">Just their name and photo</label>
+            <label><input type="radio" name="shows" value="unknown">Not sure</label>
+          </div>
+        </div>
+        <div id="videoBox" hidden>
+          <p class="q" id="qVid">How does its screen plug in?</p>
+          <div class="opts" role="radiogroup" aria-labelledby="qVid">
+            <label><input type="radio" name="video" value="hdmi">HDMI</label>
+            <label><input type="radio" name="video" value="displayport">DisplayPort</label>
+            <label><input type="radio" name="video" value="unknown">Not sure</label>
+          </div>
+        </div>
+        <p class="q" id="qNet">A network cable near the camera recorder?</p>
+        <div class="opts" role="radiogroup" aria-labelledby="qNet">
+          <label><input type="radio" name="wired" value="yes">Yes</label>
+          <label><input type="radio" name="wired" value="no">No, Wi-Fi only</label>
+          <label><input type="radio" name="wired" value="unknown">Not sure</label>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Where to send the answer</legend>
+        <div class="row2">
+          <div><label class="f" for="gym">Gym name</label><input type="text" id="gym" name="gym" autocomplete="organization" required></div>
+          <div><label class="f" for="city">City and state</label><input type="text" id="city" name="city" autocomplete="address-level2"></div>
+          <div><label class="f" for="name">Your name</label><input type="text" id="name" name="name" autocomplete="name"></div>
+          <div><label class="f" for="email">Email</label><input type="email" id="email" name="email" autocomplete="email" required></div>
+          <div><label class="f" for="phone">Phone (optional)</label><input type="tel" id="phone" name="phone" autocomplete="tel"></div>
+        </div>
+        <label class="f" for="note">Anything else? (optional)</label>
+        <input type="text" id="note" name="note" maxlength="500" placeholder="e.g. two entrances, a side door">
+        <button class="btn btn-blue send" type="submit" id="sendBtn">Send it to TJ</button>
+        <div class="msg" id="msg" role="status"></div>
+        <p class="small" style="margin:10px 0 0;">Only used to answer you. No mailing list.</p>
+      </fieldset>
+    </form>
+
+    <aside aria-live="polite">
+      <div class="verdict" id="verdict"><h2>Your answer</h2><p>Tap your answers on the left.</p><div id="items"></div></div>
+      <p class="small" style="margin:12px 4px 0;">Prefer to talk? <a href="tel:+14797212719">(479) 721-2719</a></p>
+    </aside>
+  </div>
+</main>
+
+<script src="compat.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+const BRANDS = { nvr: ['Hikvision', 'Dahua', 'Lorex', 'Swann', 'Reolink', 'Amcrest', 'Night Owl', 'Uniview', 'Annke', 'Q-See', 'Axis', 'Hanwha', 'Avigilon', 'UniFi', 'Other / not sure'],
+  cloud: ['Ring', 'Wyze', 'Arlo', 'Nest', 'Blink', 'Eufy', 'Verkada', 'Meraki', 'Rhombus', 'Other / not sure'] };
+function answers(){
+  const f = $('f'), v = n => (f.querySelector(`input[name="${n}"]:checked`) || {}).value || '';
+  const ci = $('checkin').value === 'other' ? $('checkinOther').value.trim() : $('checkin').value;
+  return { recorder: v('recorder'), brand: /not sure/i.test($('brand').value) ? '' : $('brand').value, angle: v('angle'), checkin: ci, desk: v('desk'), shows: v('shows'), video: v('video'), wired: v('wired') };
+}
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+function update(){
+  const a = answers();
+  $('brandBox').hidden = !(a.recorder === 'nvr' || a.recorder === 'cloud');
+  if (!$('brandBox').hidden && $('brand').dataset.kind !== a.recorder) { $('brand').innerHTML = BRANDS[a.recorder].map(b => `<option>${esc(b)}</option>`).join(''); $('brand').dataset.kind = a.recorder; }
+  $('videoBox').hidden = !(a.desk === 'pc' || a.desk === 'mac');
+  $('showsBox').hidden = !a.desk || a.desk === 'none';
+  $('checkinOther').hidden = $('checkin').value !== 'other';
+  const touched = a.recorder || a.angle || a.checkin || a.desk;
+  if (!touched) return;
+  const r = Compat.verdict(answers());
+  const el = $('verdict');
+  el.className = 'verdict ' + r.overall.level;
+  el.querySelector('h2').textContent = r.overall.title;
+  el.querySelector('p').textContent = r.overall.text;
+  $('items').innerHTML = r.items.map(x => `<div class="item ${x.level}"><i aria-hidden="true"></i><div><b>${esc(x.title)}</b><span>${esc(x.text)}</span></div></div>`).join('');
+}
+$('f').addEventListener('change', update);
+$('f').addEventListener('input', e => { if (e.target.id === 'checkinOther') update(); });
+$('f').addEventListener('submit', async e => {
+  e.preventDefault();
+  const msg = $('msg'), btn = $('sendBtn');
+  if (!$('gym').value.trim() || !/^\S+@\S+\.\S+$/.test($('email').value.trim())) { msg.className = 'msg bad'; msg.textContent = 'Add your gym name and email, then send.'; return; }
+  btn.disabled = true; btn.textContent = 'Sending...';
+  const body = Object.assign(answers(), { gym: $('gym').value, city: $('city').value, name: $('name').value, email: $('email').value, phone: $('phone').value, note: $('note').value });
+  try {
+    const r = await fetch('/check/submit', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(j.error || 'error ' + r.status);
+    msg.className = 'msg ok'; msg.textContent = 'Sent. TJ will reply within one business day. If you can, reply to his email with a photo of the recorder label and the entrance camera view.';
+    btn.textContent = 'Sent';
+  } catch (err) {
+    msg.className = 'msg bad'; msg.textContent = `Couldn't send (${err.message}). Call or email instead: (479) 721-2719, tjdicken43@gmail.com.`;
+    btn.disabled = false; btn.textContent = 'Send it to TJ';
+  }
+});
+</script>
+</body>
+</html>

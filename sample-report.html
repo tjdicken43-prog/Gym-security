@@ -6,23 +6,25 @@
 <title>Sample Morning Report | SecurityAI</title>
 <meta name="description" content="A sample of what a gym owner sees each morning from SecurityAI: last night's entries, flagged ones first, with photos. Made-up data.">
 <link rel="icon" type="image/svg+xml" href="logo.svg">
-<meta name="theme-color" content="#14171A">
+<meta name="theme-color" content="#E4E6E3">
+<link rel="preload" href="/fonts/BigShoulders-Bold.woff" as="font" type="font/woff" crossorigin>
+<link rel="stylesheet" href="brand.css">
 <style>
   /* Same look as the real activity page (activity.html), so this is an honest preview. */
-  :root{--bg:#14171A;--panel:#1C2124;--panel-2:#242B30;--line:#353D43;
-        --text:#EDEFF1;--muted:#A3ABB3;--green:#3FCF8E;--red:#FF6B6B;--amber:#FFB54A;}
+  :root{--yel:#E8A700;--bg:#E4E6E3;--panel:#F7F7F5;--panel-2:#ECEEEB;--line:#D3D6D3;
+        --text:#1E2124;--muted:#4E565B;--green:#23804A;--red:#C8281F;--amber:#7A5800;}
   *{box-sizing:border-box;}
   html{-webkit-text-size-adjust:100%;}
-  body{margin:0;background:var(--bg);color:var(--text);font:16px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  body{margin:0;background:var(--bg);color:var(--text);font:16px/1.5 var(--body);
        padding-bottom:env(safe-area-inset-bottom);}
   a{color:var(--text);}
   button{font:inherit;}
   .wrap{max-width:760px;margin:0 auto;padding:0 16px;padding-left:max(16px,env(safe-area-inset-left));padding-right:max(16px,env(safe-area-inset-right));}
 
-  .samplebar{background:rgba(255,181,74,.12);border-bottom:1px solid rgba(255,181,74,.4);color:#FFD699;font-size:14px;}
+  .samplebar{background:#FFF1C7;border-bottom:1px solid rgba(232,167,0,.4);color:#4A3600;font-size:14px;}
   .samplebar .wrap{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:6px 14px;padding-top:9px;padding-bottom:9px;}
   .samplebar b{letter-spacing:.6px;}
-  .samplebar a{color:#FFD699;white-space:nowrap;}
+  .samplebar a{color:#4A3600;white-space:nowrap;}
 
   header{border-bottom:1px solid var(--line);background:var(--bg);}
   header .wrap{display:flex;align-items:center;gap:10px;min-height:60px;}
@@ -36,7 +38,7 @@
   .muted{color:var(--muted);}
   .small{font-size:14px;}
   .status{display:flex;gap:12px;align-items:flex-start;}
-  .dot{width:12px;height:12px;border-radius:50%;flex-shrink:0;margin-top:7px;background:var(--green);box-shadow:0 0 0 4px rgba(63,207,142,.15);}
+  .dot{width:12px;height:12px;border-radius:50%;flex-shrink:0;margin-top:7px;background:var(--green);box-shadow:0 0 0 4px rgba(35,128,74,.15);}
   .status .t{font-weight:600;font-size:17px;}
   .status .s{color:var(--muted);font-size:15px;}
   .summary .big{font-size:24px;font-weight:700;line-height:1.25;color:var(--red);}
@@ -63,9 +65,9 @@
   .actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px;}
   .btn{min-height:48px;padding:10px 14px;border-radius:10px;border:1px solid var(--line);background:var(--panel-2);color:var(--text);
        font-weight:600;font-size:16px;cursor:pointer;text-align:center;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;}
-  .btn.red{background:rgba(255,107,107,.14);border-color:rgba(255,107,107,.5);color:#FFB3B3;}
-  .btn.green{background:rgba(63,207,142,.12);border-color:rgba(63,207,142,.45);color:#8CE8BD;}
-  .btn.primary{background:var(--green);border-color:var(--green);color:#0b1f15;}
+  .btn.red{background:rgba(200,40,31,.14);border-color:rgba(200,40,31,.5);color:#A61F18;}
+  .btn.green{background:rgba(35,128,74,.12);border-color:rgba(35,128,74,.45);color:#1B6B3D;}
+  .btn.primary{background:var(--green);border-color:var(--green);color:#FFFFFF;}
   .verdict{margin-top:12px;background:var(--panel-2);border-radius:8px;padding:10px 12px;font-size:15px;}
 
   details.group{background:var(--panel);border:1px solid var(--line);border-radius:12px;margin-bottom:14px;}
@@ -103,6 +105,17 @@
   @media (orientation:landscape) and (max-height:500px){
     .inc{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);}
   }
+
+  /* ===== SecurityAI look (appended last so it wins) ===== */
+  h1,h2,h3{font-family:var(--display);font-weight:800;letter-spacing:.01em;}
+  body{background-color:var(--bg);background-image:var(--grain);}
+  .card,.inc{background:var(--panel);border:0;border-radius:16px;box-shadow:var(--lift);}
+  .inc{border-top:6px solid var(--red);}
+  .btn.primary{background:var(--blue);border-color:var(--blue);color:#fff;}
+  .summary .big{font-family:var(--display);font-weight:800;font-size:44px;line-height:.95;text-transform:uppercase;}
+  .section-title{font-family:var(--display);font-size:24px;letter-spacing:.02em;color:var(--text);}
+  /* Polish (Oct 20): comfortable line length on wide screens. */
+  p.muted{max-width:58ch;}
 </style>
 </head>
 <body>
@@ -113,12 +126,8 @@
 </div></div>
 
 <header><div class="wrap">
-  <svg width="30" height="30" viewBox="0 0 48 48" fill="none" aria-hidden="true">
-    <path d="M4 18V6a2 2 0 0 1 2-2h12M44 18V6a2 2 0 0 0-2-2H30M4 30v12a2 2 0 0 0 2 2h12M44 30v12a2 2 0 0 1-2 2H30" stroke="#EDEFF1" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
-    <line x1="10" y1="24" x2="38" y2="24" stroke="#3FCF8E" stroke-width="2.4" stroke-opacity=".4" stroke-linecap="round"/>
-    <circle cx="24" cy="24" r="5.5" fill="#3FCF8E"/>
-  </svg>
-  <h1>Maple Street Fitness (sample)<span class="by">SecurityAI entrance watch</span></h1>
+  <svg width="30" height="30" viewBox="0 0 48 48" aria-hidden="true" style="flex-shrink:0;"><rect x="1" y="1" width="46" height="46" rx="9" fill="#1E2124"/><rect x="12" y="11" width="5" height="26" rx="1.5" fill="#E4E6E3"/><rect x="21.5" y="11" width="5" height="26" rx="1.5" fill="#E4E6E3"/><rect x="31" y="11" width="5" height="26" rx="1.5" fill="#C8281F"/></svg>
+  <h1>Maple Street Fitness<span class="by">SecurityAI entrance watch</span></h1>
 </div></header>
 
 <main><div class="wrap">
@@ -257,7 +266,7 @@ function scene(kind, time){
     + '<circle cx="119" cy="62" r="3" fill="#d94a4a"/>'
     + glare
     + '<text x="8" y="16" font-family="monospace" font-size="11" fill="#cfd4d8">2026-09-22 ' + (time || '01:52:14') + '</text>'
-    + '<text x="290" y="232" font-family="monospace" font-size="9" fill="#8d959c">CAM4</text></svg>';
+    + '<text x="312" y="16" text-anchor="end" font-family="monospace" font-size="11" fill="#cfd4d8">CAM4</text></svg>';
 }
 document.querySelectorAll('[data-scene]').forEach(function(el){
   el.insertAdjacentHTML('afterbegin', scene(el.getAttribute('data-scene'), el.getAttribute('data-time')));

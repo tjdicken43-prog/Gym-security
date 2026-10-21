@@ -92,7 +92,7 @@ function watchedLine(r) {
 }
 function reviewTag(e) {
   if (!e.review) return '';
-  return e.review.verdict === 'tailgate' || e.review.verdict === 'shared' ? ` · <span style="color:#c0392b;font-weight:600;">${e.review.verdict === 'shared' ? 'Shared code, confirmed by you' : 'Confirmed by you'}</span>` : '';
+  return e.review.verdict === 'tailgate' || e.review.verdict === 'shared' ? ` · <span style="color:#C8281F;font-weight:600;">${e.review.verdict === 'shared' ? 'Shared code, confirmed by you' : 'Confirmed by you'}</span>` : '';
 }
 
 // Pulls the evidence frames for the events we're showing, as mail
@@ -126,10 +126,10 @@ function hourChart(r) {
   const total = h ? h.reduce((a, b) => a + b, 0) : 0;
   if (!h || total < 3) return '';
   const max = Math.max(...h);
-  const cells = h.map((v, i) => `<td valign="bottom" style="padding:0 1px;height:70px;" title="${esc(fmtHour(i))}: ${v}"><div style="background:${v ? '#C0392B' : '#E3E7EA'};height:${Math.max(2, Math.round(v / max * 66))}px;border-radius:2px 2px 0 0;"></div></td>`).join('');
-  const labels = h.map((_, i) => `<td style="font-size:9px;color:#8B939B;text-align:center;padding-top:3px;">${i % 6 === 0 ? esc(fmtHour(i).replace(':00', '')) : ''}</td>`).join('');
+  const cells = h.map((v, i) => `<td valign="bottom" style="padding:0 1px;height:70px;" title="${esc(fmtHour(i))}: ${v}"><div style="background:${v ? '#C8281F' : '#E3E7EA'};height:${Math.max(2, Math.round(v / max * 66))}px;border-radius:2px 2px 0 0;"></div></td>`).join('');
+  const labels = h.map((_, i) => `<td style="font-size:9px;color:#4E565B;text-align:center;padding-top:3px;">${i % 6 === 0 ? esc(fmtHour(i).replace(':00', '')) : ''}</td>`).join('');
   return `<tr><td style="padding:14px 28px 0;">
-    <div style="font-size:11px;color:#8B939B;letter-spacing:.5px;margin-bottom:6px;">FLAGGED ENTRIES BY HOUR</div>
+    <div style="font-size:11px;color:#4E565B;letter-spacing:.5px;margin-bottom:6px;">FLAGGED ENTRIES BY HOUR</div>
     <table width="100%" cellpadding="0" cellspacing="0" style="table-layout:fixed;border-bottom:1px solid #D5DBDF;"><tr>${cells}</tr></table>
     <table width="100%" cellpadding="0" cellspacing="0" style="table-layout:fixed;"><tr>${labels}</tr></table>
   </td></tr>`;
@@ -158,37 +158,37 @@ function renderHtml(report, gymName, opts) {
           : `<div style="width:110px;height:74px;background:#f0f2f4;border-radius:4px;"></div>`}
       </td>
       <td style="padding:12px 0 12px 14px;border-bottom:1px solid #e6e8eb;vertical-align:top;">
-        <div style="font-size:14px;color:#14171A;font-weight:600;">${esc(e.zoneLabel || 'Entrance')} — ${esc(fmtDateTime(e.capturedAt && Date.parse(e.capturedAt) <= Date.parse(e.timestamp) + 120000 ? e.capturedAt : e.timestamp))}${reviewTag(e)}</div>
-        <div style="font-size:13px;color:#5b636b;margin-top:4px;">${e.people_count == null ? 'Could not be counted automatically.' : `${esc(e.people_count)} people crossed, ${esc(e.expectedCount || 1)} expected.`}</div>
-        ${e.note ? `<div style="font-size:13px;color:#5b636b;margin-top:2px;font-style:italic;">"${esc(e.note)}"</div>` : ''}
-        ${e.review && e.review.note ? `<div style="font-size:13px;color:#14171A;margin-top:2px;">Your note: ${esc(e.review.note)}</div>` : ''}
+        <div style="font-size:14px;color:#1E2124;font-weight:600;">${esc(e.zoneLabel || 'Entrance')} — ${esc(fmtDateTime(e.capturedAt && Date.parse(e.capturedAt) <= Date.parse(e.timestamp) + 120000 ? e.capturedAt : e.timestamp))}${reviewTag(e)}</div>
+        <div style="font-size:13px;color:#4E565B;margin-top:4px;">${e.people_count == null ? 'Could not be counted automatically.' : `${esc(e.people_count)} people crossed, ${esc(e.expectedCount || 1)} expected.`}</div>
+        ${e.note ? `<div style="font-size:13px;color:#4E565B;margin-top:2px;font-style:italic;">"${esc(e.note)}"</div>` : ''}
+        ${e.review && e.review.note ? `<div style="font-size:13px;color:#1E2124;margin-top:2px;">Your note: ${esc(e.review.note)}</div>` : ''}
       </td>
     </tr>`).join('');
 
   // The web view (the gym opening "monthly report" on a phone) gets a
   // viewport tag and a fluid width; the email keeps its fixed 600px table.
   return `<!DOCTYPE html>
-<html lang="en"><head><meta charset="UTF-8">${web ? '<meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex"><title>Monthly report — SecurityAI</title><style>img{max-width:100%;height:auto}.pbar{position:sticky;top:0;z-index:2;display:flex;gap:8px;justify-content:center;padding:10px 16px;background:#14171A;}.pbar a,.pbar button{font:600 14px -apple-system,Segoe UI,Roboto,sans-serif;color:#fff;background:#2B3237;border:0;border-radius:8px;padding:10px 14px;text-decoration:none;cursor:pointer;}@media print{.pbar{display:none}body{background:#fff!important}*{-webkit-print-color-adjust:exact;print-color-adjust:exact}tr{break-inside:avoid}}</style>' : ''}</head><body style="margin:0;padding:0;background:#f4f6f8;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;">${web ? '<div class="pbar"><a href="/activity.html">Back to the gym page</a><button type="button" id="printBtn">Print or save as PDF</button></div><script>document.getElementById("printBtn").addEventListener("click",function(){window.print();});</script>' : ''}
-${web ? '<div style="max-width:600px;margin:0 auto;padding:14px 12px 0;"><a href="/activity.html" style="font-size:16px;color:#14171A;display:inline-block;padding:8px 0;">&larr; Back to activity</a></div>' : ''}
-<table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f6f8;padding:${web ? '8px 8px 28px' : '28px 12px'};">
+<html lang="en"><head><meta charset="UTF-8">${web ? '<meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex"><title>Monthly report — SecurityAI</title><link rel="stylesheet" href="/brand.css"><style>body{background-image:none!important}img{max-width:100%;height:auto}.pbar{position:sticky;top:0;z-index:2;display:flex;gap:8px;justify-content:center;padding:10px 16px;background:#1E2124;}.pbar a,.pbar button{font:600 14px -apple-system,Segoe UI,Roboto,sans-serif;color:#fff;background:#3A4146;border:0;border-radius:10px;padding:10px 14px;text-decoration:none;cursor:pointer;}@media print{.pbar{display:none}body{background:#fff!important}*{-webkit-print-color-adjust:exact;print-color-adjust:exact}tr{break-inside:avoid}}</style>' : ''}</head><body style="margin:0;padding:0;background:#E4E6E3;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;">${web ? '<div class="pbar"><a href="/activity.html">Back to the gym page</a><button type="button" id="printBtn">Print or save as PDF</button></div><script>document.getElementById("printBtn").addEventListener("click",function(){window.print();});</script>' : ''}
+${web ? '<div style="height:12px;"></div>' : ''}
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#E4E6E3;padding:${web ? '8px 8px 28px' : '28px 12px'};">
 <tr><td align="center">
 <table ${web ? 'width="100%"' : 'width="600"'} cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:8px;overflow:hidden;border:1px solid #e0e3e7;${web ? 'max-width:600px;' : ''}">
 
-  <tr><td style="background:#14171A;padding:22px 28px;">
-    <div style="color:#3FCF8E;font-size:12px;letter-spacing:1px;font-family:monospace;">SECURITYAI · MONTHLY SUMMARY</div>
-    <div style="color:#ffffff;font-size:20px;font-weight:600;margin-top:6px;">${esc(gymName || r.gymCode)}</div>
-    <div style="color:#8B939B;font-size:13px;margin-top:2px;">${r.periodLabel ? esc(r.periodLabel) : `${fmtDate(r.periodStart)} – ${fmtDate(r.periodEnd)}`}</div>
+  <tr><td style="background:#1E2124;padding:22px 28px;">
+    <div style="width:28px;height:4px;background:#C8281F;border-radius:2px;margin-bottom:10px;"></div><div style="color:#C9CDCA;font-size:13px;">SecurityAI monthly summary</div>
+    <div style="color:#ffffff;font-size:26px;font-weight:800;margin-top:4px;font-family:\'Big Shoulders\',\'Arial Narrow\',Impact,sans-serif;letter-spacing:.01em;">${esc(gymName || r.gymCode)}</div>
+    <div style="color:#4E565B;font-size:13px;margin-top:2px;">${r.periodLabel ? esc(r.periodLabel) : `${fmtDate(r.periodStart)} – ${fmtDate(r.periodEnd)}`}</div>
   </td></tr>
 
   <tr><td style="padding:26px 28px 8px;">
-    <div style="font-size:26px;font-weight:700;color:#14171A;line-height:1.25;">${esc(headline)}</div>
-    ${watchedLine(r) ? `<div style="font-size:15px;color:#14171A;margin-top:8px;">${esc(watchedLine(r))}</div>` : ''}
-    ${moneyLine(r) ? `<div style="font-size:17px;color:#1E8F5E;font-weight:700;margin-top:10px;">${esc(moneyLine(r))}</div>` : ''}
-    ${r.totalFlagged > 0 ? (r.extraPeopleSeen ? `<div style="font-size:14px;color:#5b636b;margin-top:8px;">
+    <div style="font-size:26px;font-weight:700;color:#1E2124;line-height:1.25;">${esc(headline)}</div>
+    ${watchedLine(r) ? `<div style="font-size:15px;color:#1E2124;margin-top:8px;">${esc(watchedLine(r))}</div>` : ''}
+    ${moneyLine(r) ? `<div style="font-size:17px;color:#23804A;font-weight:700;margin-top:10px;">${esc(moneyLine(r))}</div>` : ''}
+    ${r.totalFlagged > 0 ? (r.extraPeopleSeen ? `<div style="font-size:14px;color:#4E565B;margin-top:8px;">
       Up to ${esc(r.extraPeopleSeen)} more ${r.extraPeopleSeen === 1 ? 'person' : 'people'} than expected came through, across ${esc(r.daysWithActivity)} ${r.daysWithActivity === 1 ? 'day' : 'days'}.
-    </div>` : '') : `<div style="font-size:14px;color:#5b636b;margin-top:8px;">Every entry during monitored hours matched what was expected.</div>`}
-    ${r.secondLook ? `<div style="font-size:14px;color:#C0392B;margin-top:6px;">${esc(plural(r.secondLook, 'answer', 'answers'))} of "It was fine" went against both the camera and the scans: waiting for the owner's second look on the gym page.</div>` : ''}
-    ${r.markedFineByGym ? `<div style="font-size:14px;color:#5b636b;margin-top:6px;">${esc(plural(r.markedFineByGym, 'flag', 'flags'))} you marked as fine ${r.markedFineByGym === 1 ? 'is' : 'are'} left out.</div>` : ''}
+    </div>` : '') : `<div style="font-size:14px;color:#4E565B;margin-top:8px;">Every entry during monitored hours matched what was expected.</div>`}
+    ${r.secondLook ? `<div style="font-size:14px;color:#C8281F;margin-top:6px;">${esc(plural(r.secondLook, 'answer', 'answers'))} of "It was fine" went against both the camera and the scans: waiting for the owner's second look on the gym page.</div>` : ''}
+    ${r.markedFineByGym ? `<div style="font-size:14px;color:#4E565B;margin-top:6px;">${esc(plural(r.markedFineByGym, 'flag', 'flags'))} you marked as fine ${r.markedFineByGym === 1 ? 'is' : 'are'} left out.</div>` : ''}
   </td></tr>
 
   ${hourChart(r)}
@@ -197,12 +197,12 @@ ${web ? '<div style="max-width:600px;margin:0 auto;padding:14px 12px 0;"><a href
     <table width="100%" cellpadding="0" cellspacing="0" style="background:#f7f9fa;border-radius:6px;">
       <tr>
         ${r.busiestHour ? `<td style="padding:14px 16px;width:50%;">
-          <div style="font-size:11px;color:#8B939B;letter-spacing:.5px;">BUSIEST HOUR</div>
-          <div style="font-size:17px;color:#14171A;font-weight:600;margin-top:3px;">${esc(fmtHour(r.busiestHour.hour))} (${esc(r.busiestHour.count)})</div>
+          <div style="font-size:11px;color:#4E565B;letter-spacing:.5px;">BUSIEST HOUR</div>
+          <div style="font-size:17px;color:#1E2124;font-weight:600;margin-top:3px;">${esc(fmtHour(r.busiestHour.hour))} (${esc(r.busiestHour.count)})</div>
         </td>` : ''}
         <td style="padding:14px 16px;width:50%;">
-          <div style="font-size:11px;color:#8B939B;letter-spacing:.5px;">WORST DAY</div>
-          <div style="font-size:17px;color:#14171A;font-weight:600;margin-top:3px;">${r.worstDay ? esc(fmtDate(r.worstDay.date)) + ` (${esc(r.worstDay.count)})` : '—'}</div>
+          <div style="font-size:11px;color:#4E565B;letter-spacing:.5px;">WORST DAY</div>
+          <div style="font-size:17px;color:#1E2124;font-weight:600;margin-top:3px;">${r.worstDay ? esc(fmtDate(r.worstDay.date)) + ` (${esc(r.worstDay.count)})` : '—'}</div>
         </td>
       </tr>
     </table>
@@ -210,24 +210,24 @@ ${web ? '<div style="max-width:600px;margin:0 auto;padding:14px 12px 0;"><a href
 
   ${zoneRows.length ? `
   <tr><td style="padding:22px 28px 0;">
-    <div style="font-size:12px;color:#8B939B;letter-spacing:.5px;margin-bottom:8px;">BY ENTRANCE</div>
+    <div style="font-size:12px;color:#4E565B;letter-spacing:.5px;margin-bottom:8px;">BY ENTRANCE</div>
     <table width="100%" cellpadding="0" cellspacing="0">
       ${zoneRows.map(([z, n]) => `<tr>
-        <td style="padding:7px 0;font-size:14px;color:#14171A;border-bottom:1px solid #eef0f2;">${esc(z)}</td>
-        <td style="padding:7px 0;font-size:14px;color:#14171A;text-align:right;font-weight:600;border-bottom:1px solid #eef0f2;">${esc(n)}</td>
+        <td style="padding:7px 0;font-size:14px;color:#1E2124;border-bottom:1px solid #eef0f2;">${esc(z)}</td>
+        <td style="padding:7px 0;font-size:14px;color:#1E2124;text-align:right;font-weight:600;border-bottom:1px solid #eef0f2;">${esc(n)}</td>
       </tr>`).join('')}
     </table>
   </td></tr>` : ''}
 
   <tr><td style="padding:24px 28px 0;">
-    <div style="font-size:12px;color:#8B939B;letter-spacing:.5px;margin-bottom:4px;">
+    <div style="font-size:12px;color:#4E565B;letter-spacing:.5px;margin-bottom:4px;">
       WHAT WAS SEEN${r.totalFlagged > shown.length ? ` · SHOWING ${shown.length} OF ${esc(r.totalFlagged)}` : ''}
     </div>
     <table width="100%" cellpadding="0" cellspacing="0">${cards}</table>
   </td></tr>` : ''}
 
   <tr><td style="padding:24px 28px 28px;">
-    <div style="font-size:12px;color:#8b939b;line-height:1.6;border-top:1px solid #e6e8eb;padding-top:16px;">
+    <div style="font-size:12px;color:#4E565B;line-height:1.6;border-top:1px solid #e6e8eb;padding-top:16px;">
       These are entries where more people crossed than expected at that door. "Flagged" means the camera check thought so; "confirmed" means you marked it Tailgate on your activity page. SecurityAI counts people and describes what it saw — it does not identify anyone, so these aren't matched to member accounts. Anything you marked "It was fine" is left out. Photos of flagged entries (and anything you mark Tailgate) are kept for ${esc(r.keptDays || 35)} days; all others are deleted after ${esc(r.logHours || 48)} hours.${r.timeZone ? ` Times are ${esc(tzWords(r.timeZone))}.` : ''}
     </div>
   </td></tr>

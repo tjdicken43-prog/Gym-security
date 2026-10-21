@@ -264,6 +264,7 @@ function noteReader(gym, info) {
   for (const [k, v] of Object.entries(info || {})) if (v !== undefined && v !== null) clean[k] = v;
   if ('problem' in (info || {})) clean.problem = info.problem || null;    // a cleared problem clears
   if ('problemCode' in (info || {})) clean.problemCode = info.problemCode || null;
+  if ('note' in (info || {})) { clean.note = info.note || null; clean.noteText = info.noteText || null; }   // a cleared note clears
   d.reader = Object.assign({}, d.reader || {}, clean, { lastSeen: new Date().toISOString() });
   // When it was online (to tell "no scan" from "reader was off"): merged
   // spans, 48 h. It checks in at least every 5 minutes while running.
@@ -272,8 +273,30 @@ function noteReader(gym, info) {
   const last = spans[spans.length - 1];
   if (last && now - last[1] <= 7 * 60e3) last[1] = now; else spans.push([now, now]);
   d.reader.online = spans.slice(-200);
+  // When it could actually SEE the check-in screen. Running but blind (no
+  // picture, the check-in screen not showing, unreadable) doesn't count: an
+  // entry then is "front desk not visible", never "no scan". The reader says
+  // when it went blind; an older reader that doesn't is taken as blind from
+  // 10 minutes before it said so.
+  const blind = BLIND.includes(info && info.problemCode);
+  const seeing = (Array.isArray(d.reader.seeing) ? d.reader.seeing : (d.reader.online || []).map(x => x.slice())).filter(s => s[1] > now - 49 * 3600e3);
+  const sl = seeing[seeing.length - 1];
+  if (blind) {
+    const since = Math.min(now, Date.parse(info.blindSince || '') || now - 10 * 60e3);
+    if (sl && sl[1] > since) sl[1] = Math.max(sl[0], since);
+  } else if (sl && now - sl[1] <= 7 * 60e3) sl[1] = now; else seeing.push([now, now]);
+  d.reader.seeing = seeing.filter(s => s[1] > s[0] || s[1] >= now - 1).slice(-200);
+  // Worth telling the gym (not a problem): e.g. the Visit Log hidden behind an open account.
+  const notes = (Array.isArray(d.reader.notes) ? d.reader.notes : []).filter(n => n[1] > now - 49 * 3600e3);
+  const nl = notes[notes.length - 1], note = info && info.note;
+  if (note && note.code) {
+    const from = Math.min(now, Date.parse(note.since || '') || now);
+    if (nl && nl[2] === note.code && now - nl[1] <= 7 * 60e3) nl[1] = now; else notes.push([from, now, String(note.code).slice(0, 30)]);
+  }
+  d.reader.notes = notes.slice(-100);
   saveDevices(gym, d);
 }
+const BLIND = ['no-signal', 'popup-hidden', 'labels-changed', 'ashbourne-closed'];
 
 // ---- scans -------------------------------------------------------------
 const scanFile = gym => path.join(DATA_DIR, `gym-scans-${safe(gym)}.json`);
@@ -321,7 +344,31 @@ function addScans(gym, scans, skewMs) {
 // Was the reader running at this moment? (within its check-in spans)
 function readerCovered(gym, atMs) {
   const r = loadDevices(gym).reader;
-  return !!(r && Array.isArray(r.online) && r.online.some(s => atMs >= s[0] - 6 * 60e3 && atMs <= s[1] + 6 * 60e3));
+  if (!r) return false;
+  // Seeing the check-in screen at that moment (a minute's slack either side: it checks in every few minutes).
+  if (Array.isArray(r.seeing)) return r.seeing.some(s => atMs >= s[0] - 60e3 && atMs <= s[1] + 6 * 60e3) && !blindAt(r, atMs);
+  return !!(Array.isArray(r.online) && r.online.some(s => atMs >= s[0] - 6 * 60e3 && atMs <= s[1] + 6 * 60e3));
+}
+// Blind right now and since before atMs (the open end of a blind spell).
+function blindAt(r, atMs) {
+  if (!BLIND.includes(r.problemCode)) return false;
+  const last = r.seeing[r.seeing.length - 1];
+  return !last || atMs > last[1];
+}
+// The spells last night when the front desk wasn't readable, and the notes (for the morning summary).
+function readerNight(gym, fromMs, toMs) {
+  const r = loadDevices(gym).reader;
+  if (!r || !Array.isArray(r.seeing)) return null;
+  const gaps = [];
+  if (!r.seeing.length) return { blind: [], notes: [] };
+  let t = Math.max(fromMs, Math.min(...r.seeing.map(x => x[0])));     // not before the reader was ever running
+  for (const s of r.seeing.filter(s => s[1] >= fromMs && s[0] <= toMs).sort((a, b) => a[0] - b[0])) {
+    if (s[0] - t > 10 * 60e3) gaps.push([t, s[0]]);
+    t = Math.max(t, s[1]);
+  }
+  if (toMs - t > 10 * 60e3 && Date.parse(r.lastSeen || 0) > fromMs - 3600e3) gaps.push([t, toMs]);
+  const notes = (r.notes || []).filter(n => n[1] >= fromMs && n[0] <= toMs).map(n => [Math.max(n[0], fromMs), Math.min(n[1], toMs), n[2]]);
+  return { blind: gaps, notes };
 }
 // Scan TIMES only (no member data): for counting scans against people.
 function scanTimes(gym, fromMs, toMs) {
@@ -361,5 +408,5 @@ module.exports = {
   fingerprint, codeOf, verifySig, approvePayload, revokePayload, validJwk,
   getOwner, setOwner, delegatePayload, undelegatePayload, loadDelegates, requestDelegate, approveDelegate, removeDelegate, signerKey,
   scansByIds, loadDevices, requestDevice, approveDevice, addApprovedDevice, removeDevice, deviceStatus, touchDevice, adminView, trustFor, noteReader,
-  addScans, scansFor, keepAround, loadScans, readerCovered, scanTimes, scanList,
+  addScans, scansFor, keepAround, loadScans, readerCovered, readerNight, scanTimes, scanList,
 };
