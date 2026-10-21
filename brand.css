@@ -44,7 +44,9 @@ a:hover{color:var(--blue-d);}
 .btn-red{background:var(--red);color:#fff;}
 .btn-red:hover{background:var(--red-d);color:#fff;}
 .btn:disabled{opacity:.55;cursor:default;transform:none;}
-@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.001ms!important;animation-delay:0s!important;transition:none!important;}}
+/* Reduced motion: nothing moves, but color and fade changes stay (they tell you a tap landed). */
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.001ms!important;animation-delay:0s!important;animation-iteration-count:1!important;
+  transition-property:color,background-color,border-color,opacity,box-shadow!important;scroll-behavior:auto!important;}}
 
 /* Polish (Oct 20). Paragraphs never end on one lonely word, headlines break evenly. */
 p,li,dd,figcaption{text-wrap:pretty;}
@@ -56,17 +58,13 @@ h1,h2,h3,h4{text-wrap:balance;}
 }
 @media(pointer:coarse){footer a{display:inline-block;padding:10px 0;margin:-10px 0;}}
 
-/* Premium pass (Oct 21). Small, shared touches every page picks up:
-   brand-colored text selection, a button that lifts a hair on hover,
-   a "live" pulse for status dots, and the rise-in motion pages use as
-   sections scroll into view (only where the browser can do it without script). */
-:root{color-scheme:light;--ease-out:cubic-bezier(.23,1,.32,1);}
+/* Premium pass (Oct 21, revised). Brand-colored text selection, caret and
+   checkboxes; buttons give a small squeeze when pressed (no hover movement,
+   since hover happens dozens of times a day); a "live" pulse for status dots. */
+:root{color-scheme:light;--ease-out:cubic-bezier(.23,1,.32,1);accent-color:var(--blue);}
 ::selection{background:rgba(29,79,176,.18);color:inherit;}
-.btn{transition:background-color .15s ease,color .15s ease,border-color .15s ease,transform .18s var(--ease-out),box-shadow .18s ease;}
-@media(hover:hover){
-  .btn-blue:hover,.btn-red:hover{transform:translateY(-1px);}
-  .btn-blue:hover{box-shadow:0 1px 0 rgba(255,255,255,.18) inset,0 14px 28px -12px rgba(29,79,176,.85);}
-}
-.btn:active{transform:translateY(1px);transition-duration:.06s;}
+input,textarea{caret-color:var(--blue);}
+.btn{transition:background-color .15s ease,color .15s ease,border-color .15s ease,transform .16s var(--ease-out),box-shadow .15s ease;}
+.btn:active{transform:scale(.97);}
+.btn:disabled:active{transform:none;}
 @keyframes sai-live{0%{box-shadow:0 0 0 0 var(--live,rgba(35,128,74,.45));}70%,100%{box-shadow:0 0 0 10px rgba(35,128,74,0);}}
-@keyframes sai-rise{from{opacity:0;transform:translateY(18px);}to{opacity:1;transform:none;}}

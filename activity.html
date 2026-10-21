@@ -492,13 +492,13 @@
      follows the phone's dark setting, and the moon button in the header can
      pin it to dark or light. Colors only; nothing about what the page shows. */
   html.dk{color-scheme:dark;--bg:#141719;--panel:#1E2225;--panel-2:#272C30;--line:#353B40;--line2:#2C3135;
-    --text:#ECEDEA;--muted:#A3AAAE;--ink2:#C9CDCA;--green:#4CC38A;--red:#F0544A;--amber:#E8B54A;--blue:#3D7BF0;--yel:#E8A700;
+    --text:#ECEDEA;--muted:#A3AAAE;--ink2:#C9CDCA;--green:#4CC38A;--red:#D23B31;--amber:#E8B54A;--blue:#2F68DC;--yel:#E8A700;
     --lift:0 1px 0 rgba(255,255,255,.045) inset,0 1px 2px rgba(0,0,0,.4),0 16px 36px -20px rgba(0,0,0,.9);}
   html.dk body{background-image:radial-gradient(80% 50% at 50% 0,#1D2124,transparent 70%);}
   html.dk header svg rect:first-child{fill:#2A2E32;}
   html.dk .btn{background:var(--panel-2);border-color:#40474D;color:var(--text);}
   html.dk .btn:hover{border-color:#8A9398;}
-  html.dk .btn.primary{background:var(--blue);border-color:var(--blue);color:#fff;box-shadow:0 8px 20px -10px rgba(61,123,240,.7);}
+  html.dk .btn.primary{background:var(--blue);border-color:var(--blue);color:#fff;box-shadow:0 8px 20px -10px rgba(47,104,220,.7);}
   html.dk .btn.red{background:var(--red);border-color:var(--red);color:#fff;}
   html.dk .btn.green{background:transparent;border-color:var(--green);color:var(--green);}
   html.dk .btn.redline{background:transparent;border-color:var(--red);color:#FF8A80;}
@@ -520,6 +520,11 @@
   html.dk #demoBar{background:#2E260C!important;color:#F3DFA0!important;border-bottom-color:#5C4A12!important;}
   html.dk #demoBar a{color:#FFE7A3!important;}
   html.dk ::selection{background:rgba(61,123,240,.35);}
+  /* Audit (Oct 21): small counts meet 4.5:1, and tap targets are at least 44px. */
+  .tier.red .cnt{color:#A61F18;} .tier.green .cnt{color:#1B6B3D;}
+  html.dk .tier.red .cnt,html.dk .red > b{color:#FF8A80;}
+  html.dk [style*="color:var(--red)"]{color:#FF8A80!important;} html.dk .tier.green .cnt{color:var(--green);}
+  .spotSum,details summary{min-height:44px;}
   .hbtn.theme{min-width:44px;padding:8px 10px;display:inline-flex;align-items:center;justify-content:center;}
   .hbtn.theme svg{width:20px;height:20px;}
   /* Phones: the gym name comes first, so the moon steps aside while "Get alerts" is showing (the page still follows the phone's own setting). */
