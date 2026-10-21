@@ -7,24 +7,24 @@
 <meta name="robots" content="noindex, nofollow">
 <meta name="referrer" content="no-referrer">
 <title>Operations — SecurityAI</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+<link rel="preload" href="/fonts/BigShoulders-Bold.woff" as="font" type="font/woff" crossorigin>
+<link rel="preload" href="/fonts/InstrumentSans-Regular.woff" as="font" type="font/woff" crossorigin>
+<link rel="stylesheet" href="brand.css">
 <style>
-  :root{--bg:#14171A;--panel:#1C2124;--panel-2:#22282C;--line:#31383D;
-        --text:#EDEFF1;--muted:#8B939B;--green:#3FCF8E;--red:#FF5A5A;--amber:#FFB020;--blue:#7FB2FF;}
+  :root{--bg:#E4E6E3;--panel:#F7F7F5;--panel-2:#ECEEEB;--line:#D3D6D3;
+        --text:#1E2124;--muted:#4E565B;--green:#23804A;--red:#C8281F;--amber:#7A5800;--blue:#1D4FB0;--yel:#E8A700;}
   *{box-sizing:border-box;}
   html{-webkit-text-size-adjust:100%;}
-  body{margin:0;background:var(--bg);color:var(--text);font-family:'IBM Plex Sans',sans-serif;line-height:1.55;overflow-wrap:anywhere;}
-  h1,h2,h3{font-family:'Oswald',sans-serif;font-weight:600;margin:0;}
-  .mono{font-family:'IBM Plex Mono',monospace;}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:var(--body);line-height:1.55;overflow-wrap:anywhere;}
+  h1,h2,h3{font-family:var(--display);font-weight:800;letter-spacing:.01em;margin:0;}
+  .mono{font-family:ui-monospace,Menlo,Consolas,monospace;}
   a{color:inherit;}
   .wrap{max-width:860px;margin:0 auto;padding:0 16px;padding-left:max(16px,env(safe-area-inset-left));padding-right:max(16px,env(safe-area-inset-right));}
 
   nav{border-bottom:1px solid var(--line);}
   nav .wrap{display:flex;align-items:center;justify-content:space-between;min-height:56px;gap:10px;}
-  .brand{display:flex;align-items:center;gap:9px;font-family:'Oswald';font-size:18px;font-weight:600;text-decoration:none;color:var(--text);}
-  .brand .tag{font-family:'IBM Plex Mono';font-size:10px;color:var(--amber);border:1px solid rgba(255,176,32,.4);
+  .brand{display:flex;align-items:center;gap:9px;font-family:var(--display);font-size:18px;font-weight:600;text-decoration:none;color:var(--text);}
+  .brand .tag{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:10px;color:var(--amber);border:1px solid rgba(232,167,0,.4);
               border-radius:100px;padding:1px 8px;letter-spacing:.6px;}
   .navlink{color:var(--muted);font-size:13.5px;text-decoration:none;padding:10px 0;}
   .navlink:hover{color:var(--text);}
@@ -37,19 +37,19 @@
   .row{display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-bottom:1px solid var(--line);font-size:13.5px;}
   .row:last-child{border-bottom:none;}
   .row .k{color:var(--muted);flex-shrink:0;max-width:48%;}
-  .row .v{font-family:'IBM Plex Mono';font-size:12.5px;text-align:right;min-width:0;}
+  .row .v{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12.5px;text-align:right;min-width:0;}
   .v.ok{color:var(--green);} .v.bad{color:var(--red);} .v.warn{color:var(--amber);}
 
   .btn{background:transparent;color:var(--text);font-weight:500;font-size:14px;padding:10px 14px;min-height:44px;
        border-radius:6px;border:1px solid var(--line);cursor:pointer;font-family:inherit;}
-  .btn:hover{border-color:#4a545b;}
+  .btn:hover{border-color:#1E2124;}
   .btn[disabled]{opacity:.55;}
   a.btn{text-decoration:none;display:inline-flex;align-items:center;}
-  .btn.primary{background:var(--green);color:#0C1512;border-color:var(--green);font-weight:600;}
-  .btn.danger{color:#FF9C9C;border-color:rgba(255,90,90,.45);}
-  input[type=password],input[type=text],input[type=email],input[type=number],input[type=time],select,textarea{width:100%;background:#0F1214;border:1px solid var(--line);
+  .btn.primary{background:var(--green);color:#FFFFFF;border-color:var(--green);font-weight:600;}
+  .btn.danger{color:#C8281F;border-color:rgba(200,40,31,.45);}
+  input[type=password],input[type=text],input[type=email],input[type=number],input[type=time],select,textarea{width:100%;background:#FFFFFF;border:1px solid var(--line);
     border-radius:6px;color:var(--text);font-size:16px;padding:11px 12px;margin-bottom:10px;font-family:inherit;}
-  input[type=time]{color-scheme:dark;}
+  input[type=time]{color-scheme:light;}
   input:focus,select:focus,textarea:focus{outline:none;border-color:var(--green);}
   .note{background:var(--panel-2);border-left:3px solid var(--amber);border-radius:0 6px 6px 0;
         padding:10px 12px;font-size:13px;color:var(--muted);margin:10px 0 0;}
@@ -93,20 +93,25 @@
   .gym .top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap;}
   .gym h3{font-size:18px;line-height:1.25;}
   .pill{font-size:12px;font-weight:600;border-radius:100px;padding:3px 10px;white-space:nowrap;background:var(--panel-2);color:var(--muted);border:1px solid var(--line);}
-  .pill.ok{color:var(--green);border-color:rgba(63,207,142,.4);} .pill.bad{color:var(--red);border-color:rgba(255,90,90,.45);} .pill.warn{color:var(--amber);border-color:rgba(255,176,32,.45);}
-  .code{font-family:'IBM Plex Mono';font-size:12.5px;color:var(--muted);}
+  .pill.ok{color:var(--green);border-color:rgba(35,128,74,.4);} .pill.bad{color:var(--red);border-color:rgba(200,40,31,.45);} .pill.warn{color:var(--amber);border-color:rgba(232,167,0,.45);}
+  .code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12.5px;color:var(--muted);}
   .lines{margin:8px 0 4px;font-size:14px;}
   .lines div{padding:3px 0;}
   .lines .l{color:var(--muted);display:inline-block;min-width:92px;}
   .zone{padding-left:10px;}
   .copyrow{display:flex;gap:8px;align-items:stretch;margin-top:6px;}
-  .copyrow input{margin:0;font-family:'IBM Plex Mono',monospace;font-size:12.5px;min-width:0;}
+  .copyrow input{margin:0;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12.5px;min-width:0;}
   .copyrow .btn{flex-shrink:0;}
   details.box{border-top:1px solid var(--line);margin-top:10px;}
   details.box > summary{cursor:pointer;list-style:none;min-height:44px;display:flex;align-items:center;gap:8px;font-size:14px;font-weight:600;}
   details.box > summary::-webkit-details-marker{display:none;}
   details.box > summary::before{content:"▸";color:var(--green);font-size:12px;}
   details.box[open] > summary::before{content:"▾";}
+  details.card > summary{cursor:pointer;list-style:none;min-height:44px;display:flex;align-items:center;gap:8px;}
+  details.card > summary::-webkit-details-marker{display:none;}
+  details.card > summary::before{content:"▸";color:var(--green);font-size:12px;}
+  details.card[open] > summary::before{content:"▾";}
+  details.card > summary h2{margin:0;}
   .inner{padding:4px 0 8px;}
   .out{font-size:13.5px;margin-top:8px;}
   .src{font-size:12px;color:var(--muted);margin:-6px 0 10px;}
@@ -114,19 +119,19 @@
   .check input{width:18px;height:18px;accent-color:var(--green);}
 
   .msgbox{min-height:190px;font-size:14px;line-height:1.5;resize:vertical;}
-  .paircode{font-family:'IBM Plex Mono',monospace;font-size:40px;letter-spacing:6px;text-align:center;padding:12px 0 2px;}
+  .paircode{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:40px;letter-spacing:6px;text-align:center;padding:12px 0 2px;}
   .pairmeta{text-align:center;color:var(--muted);font-size:13px;}
   .steps{margin:12px 0 0;padding-left:20px;font-size:14px;}
   .steps li{margin:8px 0;}
-  kbd{font-family:'IBM Plex Mono',monospace;font-size:12.5px;background:#0F1214;border:1px solid var(--line);border-radius:4px;padding:1px 6px;}
+  kbd{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12.5px;background:#FFFFFF;border:1px solid var(--line);border-radius:4px;padding:1px 6px;}
 
-  .need{font-size:10.5px;font-family:'IBM Plex Mono';letter-spacing:.5px;text-transform:uppercase;border:1px solid var(--line);border-radius:100px;padding:1px 7px;color:var(--muted);white-space:nowrap;}
-  .need.required{color:var(--text);border-color:#4a545b;}
-  .need.remove{color:var(--amber);border-color:rgba(255,176,32,.5);}
+  .need{font-size:12px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.5px;text-transform:uppercase;border:1px solid var(--line);border-radius:100px;padding:1px 7px;color:var(--muted);white-space:nowrap;}
+  .need.required{color:var(--text);border-color:#1E2124;}
+  .need.remove{color:var(--amber);border-color:rgba(232,167,0,.5);}
   .envrow{display:grid;grid-template-columns:22px 1fr;gap:4px 10px;padding:10px 0;border-bottom:1px solid var(--line);}
   .envrow:last-child{border-bottom:none;}
   .envrow .mark{font-size:15px;line-height:1.4;}
-  .envrow .key{font-family:'IBM Plex Mono';font-size:12.5px;}
+  .envrow .key{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12.5px;}
   .envrow .why{grid-column:2;font-size:13px;color:var(--muted);}
   .envrow .fix{grid-column:2;font-size:13px;color:var(--amber);}
   details.more > summary{cursor:pointer;color:var(--muted);font-size:13.5px;min-height:40px;display:flex;align-items:center;}
@@ -136,25 +141,90 @@
   .acc h4{font-family:'Oswald',sans-serif;font-size:15px;font-weight:600;margin:0;}
   .acc .when{font-size:12.5px;color:var(--muted);margin:2px 0 8px;}
   .scgrid{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:3px 12px;}
-  .scgrid .n{font-family:'IBM Plex Mono',monospace;font-size:13px;text-align:right;white-space:nowrap;}
+  .scgrid .n{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px;text-align:right;white-space:nowrap;}
   .cmp{margin-top:10px;padding:10px 12px;background:var(--panel-2);border-radius:6px;}
-  .cmp .big{font-family:'IBM Plex Mono',monospace;font-size:13px;}
+  .cmp .big{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px;}
   .acc .wk{font-size:13px;padding:3px 0;border-bottom:1px solid var(--line);}
   .acc .wk:last-child{border-bottom:none;}
+
+  /* ===== SecurityAI look (appended last so it wins) ===== */
+  #gymBar{position:sticky;top:0;z-index:20;margin:0 0 14px;background:rgba(228,230,227,.94);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border-bottom:1px solid var(--line);padding:10px 0;}
+  #gymBar .gb-in{display:flex;flex-wrap:wrap;align-items:center;gap:8px 16px;}
+  .gb-title{display:flex;flex-direction:column;line-height:1.05;min-width:0;}
+  .gb-title .sub{margin:0;font-size:12px;}
+  .gb-title b{font:800 28px/1 var(--display);letter-spacing:.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:60vw;}
+  .chips{display:flex;gap:6px;overflow-x:auto;flex:1 1 280px;padding:2px;scrollbar-width:thin;}
+  .chip-g{flex:none;display:inline-flex;align-items:center;gap:8px;min-height:40px;padding:0 14px;border-radius:999px;border:1.5px solid #BFC4C0;background:#fff;color:var(--text);font:600 14px var(--body);cursor:pointer;white-space:nowrap;}
+  .chip-g:hover{border-color:var(--text);}
+  .chip-g[aria-pressed="true"]{background:var(--text);border-color:var(--text);color:#fff;}
+  .chip-g i{width:9px;height:9px;border-radius:50%;background:#AEB6BB;flex:none;}
+  .chip-g i.ok{background:var(--green);} .chip-g i.warn{background:var(--yel);} .chip-g i.bad{background:var(--red);}
+  .chip-g em{font-style:normal;font-size:12px;font-weight:700;background:var(--red);color:#fff;border-radius:999px;padding:1px 7px;}
+  .chip-g[aria-pressed="true"] em{background:#fff;color:var(--red);}
+  .tblwrap{overflow-x:auto;margin:0 -4px;}
+  .gtbl{width:100%;min-width:720px;border-collapse:collapse;font-size:14px;}
+  .gtbl th{text-align:left;font-weight:600;color:var(--muted);font-size:12.5px;padding:8px 10px;border-bottom:2px solid var(--text);white-space:nowrap;}
+  .gtbl td{padding:12px 10px;border-bottom:1px solid var(--line);vertical-align:top;}
+  .gtbl tr.gr{cursor:pointer;}
+  .gtbl tr.gr:hover td{background:#fff;}
+  .gtbl .gn{font:800 22px/1.05 var(--display);letter-spacing:.01em;}
+  .gtbl .score{font:800 26px/1 var(--display);}
+  .gtbl .s-ok{color:var(--green);} .gtbl .s-warn{color:var(--amber);} .gtbl .s-bad{color:var(--red);}
+  .gtbl .open{min-height:38px;padding:4px 16px;white-space:nowrap;}
+  /* Phones: each gym is a small card (name and health on top, the rest in two columns). */
+  @media (max-width:700px){
+    .tblwrap{overflow:visible;margin:0;}
+    .gtbl{min-width:0;display:block;}
+    .gtbl thead{display:none;}
+    .gtbl tbody{display:grid;gap:12px;}
+    .gtbl tr.gr{display:grid;grid-template-columns:1fr 1fr;gap:10px 14px;padding:16px;border:1px solid var(--line);border-radius:14px;background:#fff;}
+    .gtbl td{display:block;padding:0;border:0;}
+    .gtbl td[data-l]::before{content:attr(data-l);display:block;font-size:12px;font-weight:600;color:var(--muted);margin-bottom:2px;}
+    .gtbl td.g-name{grid-column:1 / -1;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;}
+    .gtbl td.g-open{grid-column:1 / -1;}
+    .gtbl td.g-open .btn{width:100%;}
+  }
+  .gyfilt-hidden{display:none !important;}
+  body{background-color:var(--bg);background-image:var(--grain);}
+  nav{background:var(--rubber);border-bottom:0;color:#F7F7F5;}
+  nav .wrap{min-height:60px;}
+  .brand{color:#F7F7F5;font-size:26px;font-weight:800;}
+  .brand .tag{font-family:var(--body);font-size:12px;font-weight:600;letter-spacing:0;color:#C9CDCA;border:0;padding:0;}
+  .navlink{color:#C9CDCA;}
+  .navlink:hover{color:#fff;}
+  .card,.gym{background:var(--panel);border:0;border-radius:16px;box-shadow:var(--lift);padding:20px;}
+  .card h2{font-size:30px;line-height:1.02;margin-bottom:6px;}
+  .gym{border-top:6px solid #BFC4C0;}
+  .gym.s-ok{border-top-color:var(--green);} .gym.s-bad{border-top-color:var(--red);} .gym.s-warn{border-top-color:var(--yel);}
+  .gym h3{font-size:30px;}
+  .kgym h3{font-size:24px;}
+  .btn{background:#fff;border:1.5px solid #BFC4C0;color:var(--text);border-radius:10px;font-weight:600;}
+  .btn:hover{border-color:var(--text);}
+  .btn.primary{background:var(--blue);border-color:var(--blue);color:#fff;box-shadow:0 8px 18px -10px rgba(29,79,176,.8);}
+  .btn.primary:hover{background:#163C86;border-color:#163C86;}
+  .btn.danger{background:#fff;color:var(--red);border-color:var(--red);}
+  input[type=password],input[type=text],input[type=email],input[type=number],input[type=time],select,textarea{border:2px solid var(--line);border-radius:10px;}
+  input:focus,select:focus,textarea:focus{border-color:var(--blue);}
+  .btn:focus-visible,a:focus-visible{outline:3px solid var(--blue);}
+  .note{position:relative;background:#fff;border-left:0;border-radius:12px;padding:12px 14px 12px 34px;color:var(--muted);box-shadow:0 0 0 1px var(--line) inset;}
+  .note::before{content:"";position:absolute;left:13px;top:13px;bottom:13px;max-height:44px;width:9px;border-radius:2px;background:var(--yel);}
+  .note.red::before{background:var(--red);} .note.green::before{background:var(--green);} .note.blue::before{background:var(--blue);}
+  .verdict.warn,.warn-t,.v.warn,.pill.warn,.pill.off{color:var(--amber);}
+  .pill{background:#fff;}
+  .chip,kbd{background:#fff;}
+  .need.required{border-color:var(--text);}
+  .paircode{font-family:var(--display);font-weight:800;font-size:64px;letter-spacing:.12em;}
+  details.box > summary::before,details.card > summary::before{color:var(--blue);}
+  .envrow .fix{color:var(--amber);}
+  /* Polish (Oct 20): comfortable line length on wide screens. */
+  p.sub{max-width:58ch;}
 </style>
 </head>
 <body>
 
 <nav><div class="wrap">
   <a class="brand" href="admin.html">
-    <svg width="21" height="21" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" style="flex-shrink:0;">
-      <path d="M4 18V6a2 2 0 0 1 2-2h12" stroke="currentColor" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/>
-      <path d="M44 18V6a2 2 0 0 0-2-2H30" stroke="currentColor" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/>
-      <path d="M4 30v12a2 2 0 0 0 2 2h12" stroke="currentColor" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/>
-      <path d="M44 30v12a2 2 0 0 1-2 2H30" stroke="currentColor" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/>
-      <line x1="10" y1="24" x2="38" y2="24" stroke="#3FCF8E" stroke-width="2.4" stroke-opacity=".4" stroke-linecap="round"/>
-      <circle cx="24" cy="24" r="5.5" fill="#3FCF8E"/>
-    </svg>SecurityAI <span class="tag">OPS</span>
+    <svg width="28" height="28" viewBox="0 0 48 48" aria-hidden="true" style="flex-shrink:0;"><rect x="1" y="1" width="46" height="46" rx="9" fill="#1E2124"/><rect x="12" y="11" width="5" height="26" rx="1.5" fill="#E4E6E3"/><rect x="21.5" y="11" width="5" height="26" rx="1.5" fill="#E4E6E3"/><rect x="31" y="11" width="5" height="26" rx="1.5" fill="#C8281F"/></svg>SecurityAI <span class="tag">OPS</span>
   </a>
   <a class="navlink" href="monitor.html">Browser monitor →</a>
 </div></nav>
@@ -175,35 +245,57 @@
 
   <div id="panel" style="display:none;">
 
+    <div id="gymBar" role="navigation" aria-label="Choose a gym">
+      <div class="gb-in">
+        <div class="gb-title"><span class="sub" id="gbLabel">Looking at</span><b id="gbName">All gyms</b></div>
+        <div class="chips" id="gymChips"></div>
+      </div>
+    </div>
+
+    <div class="card" id="allCard" hidden>
+      <h2>Overview</h2>
+      <p class="sub" style="margin:0 0 10px;" id="allSub"></p>
+      <div class="tblwrap"><table class="gtbl" id="gymTable"></table></div>
+      <p class="sub" style="margin:10px 0 0;">Tap a gym to see only that gym: its self-check, camera computer, front-desk reader, member-number approvals, settings and test alerts.</p>
+    </div>
+
     <div class="card" id="selfCard" style="display:none;">
       <h2>Self-check</h2>
       <p class="sub" style="margin:0 0 8px;">What the website thinks needs doing, from its own numbers. It fixes what's safe by itself (restarts, retries, the backup AI model, camera-computer updates and roll-backs) and only suggests anything that could change what gets caught.</p>
+      <p class="sub" id="selfAllHint" hidden style="margin:0 0 8px;">The number of things to do for each gym is in the table above. Open a gym to see its list and run its checks.</p>
       <div id="selfBody"></div>
       <div class="btns" style="margin-top:8px;"><button class="btn" type="button" id="selfSend">Email me this now</button></div>
       <div class="sub" id="selfNext" style="margin-top:6px;"></div>
     </div>
 
-    <div class="card" id="repairCard" style="display:none;">
+    <div class="card" data-scope="site" id="repairCard" style="display:none;">
       <h2>Self-repair and changes</h2>
       <p class="sub" style="margin:0 0 10px;">When something breaks, the website works out why, fixes what is safe to fix, and emails you every time. You can also ask it for a change in plain words. Every code change is tested on a full copy of the website and reviewed before it can ship, goes through GitHub so it can always be undone, and never touches detection, sign-in, encryption, prices or privacy.</p>
       <label class="f" for="askIn">Ask for a change</label>
-      <textarea id="askIn" rows="3" maxlength="1500" placeholder="e.g. Add tomorrow's watch hours to the bottom of the morning email" style="width:100%;box-sizing:border-box;background:#101315;border:1px solid var(--line);border-radius:8px;color:var(--text);font:inherit;font-size:16px;padding:10px 12px;"></textarea>
+      <textarea id="askIn" rows="3" maxlength="1500" placeholder="e.g. Add tomorrow's watch hours to the bottom of the morning email" style="width:100%;box-sizing:border-box;background:#fff;border:2px solid var(--line);border-radius:10px;color:var(--text);font:inherit;font-size:16px;padding:10px 12px;"></textarea>
       <div class="btns" style="margin-top:8px;"><button class="btn primary" type="button" id="askBtn">Work on it</button></div>
       <div class="sub" id="askOut" role="status" style="margin-top:6px;"></div>
       <div class="sub" id="repairFacts" style="margin-top:10px;"></div>
       <div id="repairList" style="margin-top:6px;"></div>
     </div>
 
-    <div class="card" id="backupCard">
+    <div class="card" data-scope="site" id="backupCard">
       <h2>Backup</h2>
       <p class="sub" style="margin:0 0 8px;">Every record (gyms, settings, alert lists, staff answers, results, logs; not photos) in one file, locked with a password you choose. Without the password nobody can open it, including us. Set <span class="mono">BACKUP_PASSWORD</span> on Render to also get one by email every night at 3 AM.</p>
       <label class="f" for="bkPw">Password (at least 10 characters; write it down)</label>
       <input type="password" id="bkPw" autocomplete="new-password" style="width:100%;box-sizing:border-box;">
       <div class="btns" style="margin-top:8px;"><button class="btn" type="button" id="bkBtn">Download a backup now</button></div>
       <div class="sub" id="bkOut" role="status"></div>
+      <details class="box" style="margin-top:12px;"><summary>Practice a restore: check a backup file opens</summary><div class="inner">
+        <p class="sub" style="margin:0 0 8px;">Pick a backup file (from the nightly email or a download) and type its password. It is opened on the website and you see what's inside. Nothing is changed. Do this once a month, so you know the backups work before you need one. Restoring for real: <kbd>node backup.js restore &lt;file&gt; &lt;password&gt; &lt;folder&gt;</kbd>, then copy the files into DATA_DIR (Render &gt; Shell).</p>
+        <input type="file" id="bkFile" accept=".sabak,application/octet-stream" style="margin-bottom:8px;">
+        <input type="password" id="bkPw2" placeholder="That backup's password" autocomplete="off">
+        <div class="btns"><button class="btn" type="button" id="bkCheck">Check it</button></div>
+        <div class="sub" id="bkCheckOut" role="status"></div>
+      </div></details>
     </div>
 
-    <div class="card" id="nowCard">
+    <div class="card" data-scope="site" id="nowCard">
       <h2>Right now</h2>
       <p class="verdict" id="verdict" aria-live="polite">Checking…</p>
       <div id="warnings"></div>
@@ -222,9 +314,16 @@
 
     <div id="noAdmin" class="note red" style="display:none;margin:0 0 14px;"></div>
 
+    <p class="note blue" id="pickHint" hidden style="margin:0 0 14px;">Each gym's camera, settings, test alerts and member-number approvals are on its own page: tap its name in the bar at the top.</p>
     <div id="gymBlocks"></div>
 
-    <div class="card" id="addCard">
+    <div class="card" data-scope="site" id="leadsCard">
+      <h2>Gyms that checked</h2>
+      <p class="sub" style="margin:0 0 8px;">From the "Will it work at your gym?" page (<a href="/check" target="_blank" rel="noopener">/check</a>). Each one is also emailed to you. Reply to them, then tick it off.</p>
+      <div id="leadsList"><div class="empty">Loading…</div></div>
+    </div>
+
+    <div class="card" data-scope="site" id="addCard">
       <details class="box" id="newGymBox" style="border-top:0;margin-top:0;">
         <summary>Add a gym</summary>
         <div class="inner">
@@ -251,7 +350,7 @@
       </div>
     </div>
 
-    <div class="card" id="pairCard">
+    <div class="card" data-scope="gym" id="pairCard">
       <h2>Connect a camera computer</h2>
       <div class="sub">A new laptop or Raspberry Pi, or one that says it isn't recognised. No long token to type — just 6 numbers.</div>
       <label class="f" for="pairGym">Which gym is it for?</label>
@@ -272,8 +371,9 @@
       <div id="pairHistory" style="margin-top:8px;"></div>
     </div>
 
-    <div class="card" id="checkCard">
-      <h2>Ashbourne screen check</h2>
+    <div class="card" data-scope="site" id="checkCardWrap"><details class="box" id="checkCard" style="border-top:0;margin-top:0;">
+      <summary>Old way: Ashbourne screen check from a Windows PC</summary>
+      <div class="sub" style="margin-top:8px;">Not needed with the Pi and capture stick: there, run <kbd>node screen-reader.js --check</kbd> on the Pi instead.</div>
       <div class="sub">Run once on the Ashbourne PC so the front-desk reader can be fitted to Ashbourne’s screen. Read-only; member names and numbers are blanked out before anything leaves that PC.</div>
       <ol class="steps">
         <li>On the Ashbourne PC, open Ashbourne on the <strong>Visit Log</strong>.</li>
@@ -284,7 +384,7 @@
         <li>The report appears below. Download it and send it to Claude.</li>
       </ol>
       <div id="checkReports"><p class="empty">No reports yet.</p></div>
-    </div>
+    </details></div>
 
     <div class="card" id="keysCard">
       <h2>Protected member numbers</h2>
@@ -293,14 +393,14 @@
       <div id="keysGyms"></div>
     </div>
 
-    <div class="card" id="setupCard">
+    <div class="card" data-scope="site" id="setupCard">
       <h2>Render settings</h2>
       <div class="sub">Render &gt; your service &gt; Environment. Shows only whether each one is set — never the value.</div>
       <div id="diskLine"></div>
       <div id="envList"><div class="empty">Loading…</div></div>
     </div>
 
-    <div class="card">
+    <div class="card" data-scope="gym">
       <details class="box" id="techBox" style="border-top:0;margin-top:0;">
         <summary>Technical details (one gym)</summary>
         <div class="inner">
@@ -313,7 +413,7 @@
       </details>
     </div>
 
-    <div class="card" id="toolsCard" style="display:none;">
+    <div class="card" data-scope="site" id="toolsCard" style="display:none;">
       <h2>Email camera tools</h2>
       <div class="sub">Only for gyms whose recorder emails its alarm photos. Re-analysing costs money — one analysis per email.</div>
       <div class="btns">
@@ -465,9 +565,12 @@ async function refresh(){
     renderNow();
     loadSelf();
     loadRepair();
+    settleSel();
+    loadLeads();
     renderGyms();
     renderAdopt();
     fillGymSelects();
+    renderPicker(); applyGymFilter();
     // J17: the email tools only make sense when email ingest is set up.
     const tr = (dbg.ingestDetail && dbg.ingestDetail.transports) || [];
     $('toolsCard').style.display = tr.some(t => /email|imap|mail/i.test(String(t))) ? 'block' : 'none';
@@ -491,6 +594,22 @@ document.addEventListener('click', async ev => {
     $('bkOut').textContent = 'Downloaded. Keep the password somewhere safe: the file is useless without it.'; $('bkPw').value = '';
   }catch(e){ $('bkOut').textContent = 'Not done: ' + e.message; }
   ev.target.disabled = false;
+});
+
+document.addEventListener('click', async ev => {
+  if(!ev.target || ev.target.id !== 'bkCheck') return;
+  const f = $('bkFile').files && $('bkFile').files[0], out = $('bkCheckOut');
+  if(!f){ out.textContent = 'Pick a backup file first.'; return; }
+  if(!$('bkPw2').value){ out.textContent = 'Type its password.'; return; }
+  ev.target.disabled = true; out.textContent = 'Opening it (takes a few seconds)…';
+  try{
+    const h = { 'Content-Type': 'text/plain', 'X-Backup-Password': $('bkPw2').value }; if(token) h['X-Admin-Token'] = token; if(adminSession) h['X-Admin-Session'] = adminSession;
+    const r = await fetch('/admin/backup/check', { method:'POST', headers: h, body: await f.text() });
+    const j = await r.json().catch(() => ({}));
+    if(!r.ok) throw new Error(j.error || 'error ' + r.status);
+    out.innerHTML = `<span class="ok-t">It opens.</span> Made ${esc(when(j.at))}: ${esc(j.files)} files, ${esc(j.gyms.length)} ${j.gyms.length === 1 ? 'gym' : 'gyms'} (${esc(j.gyms.join(', ') || 'none')}), ${esc(j.entries)} entries. The website has ${esc(j.nowGyms)} ${j.nowGyms === 1 ? 'gym' : 'gyms'} now.`;
+  }catch(e){ out.innerHTML = `<span class="bad-t">Not OK: ${esc(e.message)}</span>`; }
+  ev.target.disabled = false; $('bkPw2').value = '';
 });
 
 // ---------- self-repair ----------
@@ -519,7 +638,7 @@ async function loadRepair(){
       ${x.cause ? `<div style="margin-top:4px;"><em>Why:</em> ${esc(x.cause)}</div>` : ''}
       ${x.did ? `<div style="margin-top:4px;"><em>What it did:</em> ${esc(x.did)}</div>` : ''}
       ${x.fix && x.kind !== 'code' ? `<div style="margin-top:4px;"><em>What to do:</em> ${esc(x.fix)}</div>` : ''}
-      ${x.diff ? `<details class="more" style="margin-top:6px;"><summary>See the exact change${x.checks ? ' and its checks' : ''}</summary><pre style="white-space:pre-wrap;font-size:12px;max-height:320px;overflow:auto;background:#101315;border:1px solid var(--line);border-radius:8px;padding:8px;">${esc(x.diff)}</pre>${(x.checks || []).map(c => `<div class="sub">${c.ok ? '✓' : '✗'} ${esc(c.name)}${c.detail ? ' — ' + esc(c.detail) : ''}</div>`).join('')}</details>` : ''}
+      ${x.diff ? `<details class="more" style="margin-top:6px;"><summary>See the exact change${x.checks ? ' and its checks' : ''}</summary><pre style="white-space:pre-wrap;font-size:12px;max-height:320px;overflow:auto;background:#fff;border:1px solid var(--line);border-radius:8px;padding:8px;">${esc(x.diff)}</pre>${(x.checks || []).map(c => `<div class="sub">${c.ok ? '✓' : '✗'} ${esc(c.name)}${c.detail ? ' — ' + esc(c.detail) : ''}</div>`).join('')}</details>` : ''}
       ${x.pr && x.pr.url ? `<div class="sub" style="margin-top:4px;"><a href="${esc(x.pr.url)}" target="_blank" rel="noopener">On GitHub (#${esc(x.pr.number)})</a></div>` : ''}
       ${acts ? `<div class="btns" style="margin-top:8px;">${acts}</div>` : ''}</div>`;
   }).join('') || '<div class="sub">Nothing has needed fixing yet.</div>';
@@ -558,11 +677,13 @@ async function loadSelf(force){
   const gyms = r.body.gyms || [];
   $('selfCard').style.display = gyms.length ? 'block' : 'none';
   const col = l => l === 'red' ? 'red' : l === 'amber' ? '' : 'green';
-  $('selfBody').innerHTML = gyms.map(g => `<div style="margin:6px 0 10px;"><div style="font-size:17px;font-weight:700;">${esc(g.name || g.key)}: <span style="color:${g.score >= 90 ? 'var(--green)' : g.score >= 50 ? 'var(--amber)' : 'var(--red)'}">${esc(g.score)}/100</span> <span class="sub">${esc(g.grade)}</span></div>
+  selfByKey = {}; gyms.forEach(g => { selfByKey[g.key] = g; });
+  $('selfBody').innerHTML = gyms.map(g => `<div style="margin:6px 0 10px;" data-gymkey="${esc(g.key)}"><div style="font-size:17px;font-weight:700;">${esc(g.name || g.key)}: <span style="color:${g.score >= 90 ? 'var(--green)' : g.score >= 50 ? 'var(--amber)' : 'var(--red)'}">${esc(g.score)}/100</span> <span class="sub">${esc(g.grade)}</span></div>
     ${g.items.length ? g.items.map(x => `<div class="note ${col(x.level)}" style="margin:6px 0;"><strong>${esc(x.title)}.</strong> ${esc(x.detail)}${x.fix ? `<br><em>What to do:</em> ${esc(x.fix)}` : ''}</div>`).join('') : '<div class="sub">Nothing to do.</div>'}
     <div class="btns" style="margin-top:6px;"><button class="btn" type="button" data-selftest="${esc(g.key)}">Run the AI self-test now</button><button class="btn" type="button" data-morning="${esc(g.key)}">Email me the morning summary</button><button class="btn" type="button" data-compare="${esc(g.key)}">Would the cheaper AI still catch them?</button></div>
     <div class="sub" data-selfout="${esc(g.key)}"></div></div>`).join('');
   $('selfNext').textContent = 'Weekly email: ' + (r.body.nextEmail || '');
+  renderPicker(); applyGymFilter();
 }
 document.addEventListener('click', async ev => {
   const b = ev.target && ev.target.closest && ev.target.closest('button[data-selftest],button[data-morning],button[data-compare]'); if(!b) return;
@@ -603,6 +724,7 @@ const emailWorks = () => !(overview && (overview.warnings || []).some(w => w.id 
 // Returns { cls: ok|warn|bad|'', label, lines[] (HTML) }.
 function zoneWarnings(z){ return [].concat(z.warnings || []).filter(Boolean); }
 function gymState(g){
+  if(typeof accounts !== 'undefined' && (accounts[g.key] || {}).closedAt) return { cls:'', label:'Closed' };
   const r = g.runner;
   const zones = r ? r.zones || [] : [];
   const warned = zones.some(z => z.picture === 'ok' && (zoneWarnings(z).length || z.lastError));
@@ -643,7 +765,7 @@ function renderNow(){
   // One line per camera computer: is it on, what version, updates.
   $('fleet').innerHTML = gyms.map(g => { const r = g.runner, u = r && r.update;
     const upd = !r ? '' : !u ? 'updates: automatic' : u.pending ? `updating to ${u.pending.version}` : (u.lastRollback && Date.now() - Date.parse(u.lastRollback.at) < 7 * 864e5) ? `went back from ${u.lastRollback.version}` : u.installed ? `program ${u.installed}` : 'updates: automatic';
-    return `<div class="row"><span class="k">${esc(g.name)}</span><span class="v ${!r ? '' : r.online ? 'ok' : 'bad'}">${r ? `${esc(r.host || 'camera computer')} · ${r.online ? 'online' : 'OFFLINE'} · v${esc(r.version || '?')} · ${esc(upd)}${r.lastSeen ? ' · ' + esc(shortAgo(r.lastSeen)) : ''}` : 'no camera computer yet'}</span></div>`; }).join('') || '<div class="empty">No gyms yet.</div>';
+    return `<div class="row" data-gymkey="${esc(g.key)}"><span class="k">${esc(g.name)}</span><span class="v ${!r ? '' : r.online ? 'ok' : 'bad'}">${r ? `${esc(r.host || 'camera computer')} · ${r.online ? 'online' : 'OFFLINE'} · v${esc(r.version || '?')} · ${esc(upd)}${r.lastSeen ? ' · ' + esc(shortAgo(r.lastSeen)) : ''}` : 'no camera computer yet'}</span></div>`; }).join('') || '<div class="empty">No gyms yet.</div>';
 }
 
 // ---------- one card per gym ----------
@@ -672,7 +794,18 @@ function gymCard(g){
         <button class="btn" type="button" data-act="newcode">Issue new sign-in code</button>
         <button class="btn danger" type="button" data-act="unpair">Unpair camera computers</button>
       </div>
-      <div class="out" data-out="access" role="status"></div></div></details>`;
+      <div class="out" data-out="access" role="status"></div></div></details>
+    <details class="box" data-box="fresh"><summary>Start the pilot fresh</summary><div class="inner">
+      <p class="sub" style="margin:0 0 8px;">Clears test walk-throughs so the gym's results start at zero: entries and their photos, staff answers, results, nightly counts, camera problems. A copy of the numbers (no photos) is kept on the website's disk. Settings, the alert list, staff logins and camera pairing stay as they are.</p>
+      <button class="btn danger" type="button" data-act="fresh">Start fresh…</button>
+      <div class="out" data-out="fresh" role="status"></div></div></details>
+    <details class="box" data-box="close"><summary>Close this gym (they cancelled)</summary><div class="inner">
+      <p class="sub" style="margin:0 0 8px;">Do this when their last paid day is over. It switches everything off: the sign-in code, staff logins, the camera computer and the front-desk reader stop working. Their photos and entries, alert list, staff logins, approved phones, member-number data and notes are deleted. The results (numbers only, no photos or names) are archived on the website's disk for your records. Bring the Pi and splitter back.</p>
+      <button class="btn danger" type="button" data-act="close">Close this gym…</button>
+      <div class="out" data-out="close" role="status"></div></div></details>
+    <div class="closedBox" hidden><div class="note red" style="margin-top:10px;"><strong>Closed.</strong> <span data-f="closedLine"></span></div>
+      <div class="btns" style="margin-top:8px;"><button class="btn" type="button" data-act="reopen">Open it again (new sign-in code)</button></div>
+      <div class="out" data-out="reopen" role="status"></div></div>`;
   return el;
 }
 function renderGyms(){
@@ -697,7 +830,11 @@ document.addEventListener('click', async ev => {
   if(!r.ok) alert(r.body.error || 'Could not change it.'); else refresh();
 });
 function renderGymStatus(el, g){
-  const st = gymState(g);
+  const closed = (accounts[g.key] || {}).closedAt;
+  el.querySelector('.closedBox').hidden = !closed;
+  if(closed) el.querySelector('[data-f="closedLine"]').textContent = `Since ${when(closed, g.timeZone)}. Nothing is watched, and its data has been deleted.`;
+  el.querySelectorAll('details.box, .btns, .acc').forEach(x => { if(!x.closest('.closedBox')) x.hidden = !!closed; });
+  const st = closed ? { cls: '', label: 'Closed' } : gymState(g);
   el.className = 'gym ' + (st.cls ? 's-' + st.cls : '');
   const r = g.runner;
   const acct = accounts[g.key] || {};
@@ -898,6 +1035,33 @@ $('gymBlocks').addEventListener('click', async ev => {
     out.innerHTML = r.ok ? `<span class="${/RUNNER_TOKEN/.test(r.body.message || '') ? 'warn-t' : 'ok-t'}">${esc(r.body.message)}</span>` : `<span class="bad-t">${esc(r.body.error || 'Could not do that.')}</span>`;
     return refresh();
   }
+  if(act === 'close'){
+    const typed = prompt(`Close ${name}?\n\nEverything stops, and their photos, entries, logins, alert list and member data are deleted. Only the numbers are kept. This can't be undone.\n\nType the gym's name to confirm: ${name}`);
+    if(typed == null) return;
+    const out = el.querySelector('[data-out="close"]');
+    b.disabled = true;
+    const r = await call(`/admin/gyms/${encodeURIComponent(key)}/close`, { json: { confirm: typed } }).catch(e => ({ body:{ error: e.message } }));
+    b.disabled = false;
+    out.innerHTML = r.ok ? `<span class="ok-t">${esc(r.body.message)}</span>` : `<span class="bad-t">${esc(r.body.error || 'Could not do that.')}</span>`;
+    return refresh();
+  }
+  if(act === 'reopen'){
+    if(!confirm(`Open ${name} again? It gets a new sign-in code; pair its camera computer and reader again.`)) return;
+    const out = el.querySelector('[data-out="reopen"]');
+    const r = await call(`/admin/gyms/${encodeURIComponent(key)}/reopen`, { json: {} }).catch(e => ({ body:{ error: e.message } }));
+    out.innerHTML = r.ok ? `<span class="ok-t">${esc(r.body.message)}</span>` : `<span class="bad-t">${esc(r.body.error || 'Could not do that.')}</span>`;
+    return refresh();
+  }
+  if(act === 'fresh'){
+    const typed = prompt(`Start ${name} fresh?\n\nTest entries, photos, answers and results are cleared (a copy of the numbers is kept). This can't be undone from here.\n\nType the gym's name to confirm: ${name}`);
+    if(typed == null) return;
+    const out = el.querySelector('[data-out="fresh"]');
+    b.disabled = true;
+    const r = await call(`/admin/gyms/${encodeURIComponent(key)}/fresh-start`, { json: { confirm: typed } }).catch(e => ({ body:{ error: e.message } }));
+    b.disabled = false;
+    out.innerHTML = r.ok ? `<span class="ok-t">${esc(r.body.message)}</span>` : `<span class="bad-t">${esc(r.body.error || 'Could not do that.')}</span>`;
+    return refresh();
+  }
   if(act === 'save') return saveSettings(el, key, b);
   if(act === 'compare') return compareModels(el, key, b.dataset.run, b);
   if(act === 'model') return switchModel(el, key, b.dataset.model, name);
@@ -1041,7 +1205,7 @@ async function createGym(){
     const r = await call('/admin/gyms', { json: body });
     if(!r.ok){ out.innerHTML = `<span class="bad-t">${esc(r.body.error || 'Could not create it.')}</span>`; return; }
     const g = r.body.gym;
-    let html = `<div class="ok-t">Created ${esc(g.gymName)}. Sign-in code: <span class="mono">${esc(g.code)}</span></div>`;
+    let html = `<div class="ok-t">Created ${esc(g.gymName)}. Sign-in code: <span class="mono">${esc(g.code)}</span></div><div class="btns" style="margin-top:8px;"><button class="btn primary" type="button" data-pick="${esc(g.key)}">Open ${esc(g.gymName)}: connect its camera computer</button></div>`;
     (r.body.adoptable || []).forEach(a => {
       html += `<div class="note">${esc(a.hint || r.body.adoptHint || '')}<div class="btns" style="margin-top:8px;"><button class="btn primary" type="button" data-adoptnow="${esc(a.code)}" data-gym="${esc(g.key)}">${esc(a.label || "Adopt '" + a.code + "'")}</button></div></div>`;
     });
@@ -1114,6 +1278,108 @@ document.addEventListener('click', ev => {
   copyText(text || '', b);
 });
 
+// ---------- gyms that checked (leads) ----------
+async function loadLeads(){
+  const r = await call('/admin/leads').catch(() => null);
+  const el = $('leadsList'); if(!el) return;
+  if(!r || !r.ok){ el.innerHTML = '<div class="empty">Couldn’t load them.</div>'; return; }
+  const list = r.body.leads || [];
+  const lv = { ok: 'ok-t', ask: 'warn-t', fix: 'bad-t' };
+  el.innerHTML = list.length ? list.map(l => `<div class="kline" style="${l.done ? 'opacity:.55;' : ''}"><div class="kl"><b>${esc(l.gym)}</b>${l.city ? ' · ' + esc(l.city) : ''} · <span class="${lv[l.level] || ''}">${esc(l.verdict || '')}</span>
+      <div class="ks">${esc(when(l.at))} · ${esc(l.name || 'no name')} · <a href="mailto:${esc(l.email)}">${esc(l.email)}</a>${l.phone ? ` · <a href="tel:${esc(l.phone)}">${esc(l.phone)}</a>` : ''}</div>
+      <div class="ks">${esc([l.answers.recorder && (l.answers.recorder + (l.answers.brand ? ' ' + l.answers.brand : '')), l.answers.angle && 'camera ' + l.answers.angle, l.answers.checkin, l.answers.desk && 'desk ' + l.answers.desk + (l.answers.video ? ' ' + l.answers.video : '')].filter(Boolean).join(' · '))}${l.note ? ' · “' + esc(l.note) + '”' : ''}</div></div>
+      <div class="ka"><button class="btn" type="button" data-lead="${esc(l.id)}" data-done="${l.done ? '0' : '1'}">${l.done ? 'Not done' : 'Replied'}</button></div></div>`).join('')
+    : '<div class="empty">None yet. Share the link with gyms you talk to: they see straight away whether it works for them.</div>';
+}
+document.addEventListener('click', async ev => {
+  const b = ev.target.closest && ev.target.closest('button[data-lead]'); if(!b) return;
+  b.disabled = true;
+  await call('/admin/leads/' + encodeURIComponent(b.dataset.lead), { json: { done: b.dataset.done === '1' } }).catch(() => null);
+  loadLeads();
+});
+
+// ---------- which gym the page shows ----------
+// "" = all gyms (an overview table), or one gym's key: then every section
+// shows only that gym. Remembered on this device and in the address (#gym=).
+let selGym = null, selfByKey = {};
+function gymList(){ return (overview && overview.gyms) || []; }
+function readSel(){
+  const m = /[#&]gym=([^&]+)/.exec(location.hash);
+  if(m) return decodeURIComponent(m[1]);
+  try{ const v = localStorage.getItem('sai:adminGym'); if(v != null) return v; }catch(e){}
+  return null;
+}
+function selectGym(key){
+  selGym = key || '';
+  try{ localStorage.setItem('sai:adminGym', selGym); }catch(e){}
+  const h = selGym ? '#gym=' + encodeURIComponent(selGym) : '';
+  if(location.hash !== h) history.replaceState(null, '', location.pathname + location.search + h);
+  if(selGym){ ['pairGym', 'techGym'].forEach(id => { const el = $(id); if(el && [...el.options].some(o => o.value === selGym)) el.value = selGym; }); if($('techGym') && $('runner') && !/Open to load/.test($('runner').textContent)) loadTech(); }
+  renderPicker(); applyGymFilter();
+}
+function settleSel(){
+  const keys = gymList().map(g => g.key);
+  if(selGym == null) selGym = readSel();
+  if(selGym && !keys.includes(selGym)) selGym = null;
+  if(selGym == null) selGym = '';
+}
+function gymIssues(key){ const x = selfByKey[key]; return x ? x.items.filter(i => i.level === 'red' || i.level === 'amber').length : 0; }
+function renderPicker(){
+  const gyms = gymList();
+  $('gymBar').hidden = !gyms.length;
+  const dot = g => { const c = gymState(g).cls; return c === 'ok' ? 'ok' : c === 'bad' ? 'bad' : 'warn'; };
+  const allIssues = gyms.reduce((n, g) => n + gymIssues(g.key), 0);
+  $('gymChips').innerHTML = `<button type="button" class="chip-g" data-pick="" aria-pressed="${!selGym}">All gyms (${gyms.length})${allIssues ? `<em>${allIssues}</em>` : ''}</button>`
+    + gyms.map(g => `<button type="button" class="chip-g" data-pick="${esc(g.key)}" aria-pressed="${selGym === g.key}"><i class="${dot(g)}"></i>${esc(g.name)}${gymIssues(g.key) ? `<em title="Things to do">${gymIssues(g.key)}</em>` : ''}</button>`).join('');
+  const cur = gyms.find(g => g.key === selGym);
+  $('gbLabel').textContent = cur ? 'Looking at' : 'Looking at';
+  $('gbName').textContent = cur ? cur.name : 'All gyms';
+  // The overview table, only on "All gyms".
+  const showAll = !selGym && gyms.length > 0;
+  $('allCard').hidden = !showAll;
+  if(showAll){
+    const paying = gyms.filter(g => { const b = (accounts[g.key] || {}).billing; return b && b.status === 'active'; }).length;
+    const off = gyms.filter(g => gymState(g).cls === 'bad').length;
+    $('allSub').textContent = `${gyms.length} ${gyms.length === 1 ? 'gym' : 'gyms'} · ${paying} paying · ${off ? off + ' need you now' : 'none down right now'}`;
+    const kg = (typeof keysData !== 'undefined' && keysData && keysData.gyms) || {};
+    $('gymTable').innerHTML = `<thead><tr><th>Gym</th><th>Health</th><th>Camera computer</th><th>Front desk</th><th>Last entry</th><th>AI today</th><th>Billing</th><th></th></tr></thead><tbody>` + gyms.map(g => {
+      const st = gymState(g), x = selfByKey[g.key], r = g.runner, rd = kg[g.key] && kg[g.key].reader, acct = accounts[g.key] || {}, bl = acct.billing, t = g.today || {};
+      const rdFresh = rd && rd.lastSeen && Date.now() - Date.parse(rd.lastSeen) < 15 * 60e3;
+      const sc = x ? `<span class="score ${x.score >= 90 ? 's-ok' : x.score >= 50 ? 's-warn' : 's-bad'}">${esc(x.score)}</span><span class="sub"> /100</span>${gymIssues(g.key) ? `<div class="sub">${gymIssues(g.key)} to do</div>` : ''}` : '<span class="sub">…</span>';
+      return `<tr class="gr" data-pick="${esc(g.key)}"><td class="g-name"><div><div class="gn">${esc(g.name)}</div><span class="pill ${esc(st.cls)}" style="margin-top:6px;">${esc(st.label)}</span></div></td>
+        <td data-l="Health">${sc}</td>
+        <td data-l="Camera computer">${!r ? '<span class="sub">none yet</span>' : `<span class="${r.online ? 'ok-t' : 'bad-t'}">${r.online ? 'online' : 'OFFLINE'}</span><div class="sub">${esc(shortAgo(r.lastSeen))}</div>`}</td>
+        <td data-l="Front desk">${!rd || !rd.lastSeen ? '<span class="sub">not set up</span>' : `<span class="${rdFresh && !rd.problem ? 'ok-t' : rd.problem ? 'bad-t' : 'warn-t'}">${rdFresh ? (rd.problem ? 'needs attention' : 'online') : 'offline'}</span>`}</td>
+        <td data-l="Last entry">${g.lastCrossing ? esc(shortAgo(g.lastCrossing)) : '<span class="sub">none yet</span>'}</td>
+        <td data-l="AI today">${esc(t.bursts || 0)}<div class="sub">${esc(money(t.estimatedCost))}</div></td>
+        <td data-l="Billing">${bl && bl.status ? `<span class="${bl.status === 'active' ? 'ok-t' : 'bad-t'}">${esc({ active: 'paying', 'payment-failed': 'payment failed', canceled: 'canceled' }[bl.status] || bl.status)}</span>` : '<span class="sub">pilot / not billed</span>'}</td>
+        <td class="g-open"><button class="btn open" type="button" data-pick="${esc(g.key)}">Open</button></td></tr>`;
+    }).join('') + '</tbody>';
+  }
+}
+function applyGymFilter(){
+  const many = true;   // "All gyms" is an overview even with one gym: details live under each gym
+  // Website-wide cards (backup, self-repair, Render settings...) on "All gyms";
+  // camera pairing and technical details on a gym's own view.
+  document.querySelectorAll('[data-scope="site"]').forEach(el => el.classList.toggle('gyfilt-hidden', !!selGym));
+  document.querySelectorAll('[data-scope="gym"]').forEach(el => el.classList.toggle('gyfilt-hidden', !selGym && gymList().length > 0));
+  document.querySelectorAll('[data-gymkey]').forEach(el => el.classList.toggle('gyfilt-hidden', !!selGym && el.dataset.gymkey !== selGym));
+  // On "All gyms" the table already has each gym's score and to-do count.
+  document.querySelectorAll('#selfBody [data-gymkey]').forEach(el => el.classList.toggle('gyfilt-hidden', selGym ? el.dataset.gymkey !== selGym : many));
+  if($('selfAllHint')) $('selfAllHint').hidden = !!selGym || !many;
+  // One gym's detail cards only when a gym is chosen (or there is just one).
+  document.querySelectorAll('#gymBlocks section.gym').forEach(el => el.classList.toggle('gyfilt-hidden', selGym ? el.dataset.key !== selGym : many));
+  document.querySelectorAll('#keysGyms .kgym').forEach(el => el.classList.toggle('gyfilt-hidden', selGym ? el.dataset.gymkey !== selGym : many));
+  const hint = $('pickHint');
+  if(hint) hint.hidden = !!selGym || !many;
+}
+document.addEventListener('click', ev => {
+  const b = ev.target.closest && ev.target.closest('[data-pick]'); if(!b) return;
+  selectGym(b.dataset.pick);
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+});
+window.addEventListener('hashchange', () => { const v = readSel(); if(v != null && v !== selGym) selectGym(v); });
+
 // ---------- gym pickers ----------
 function fillGymSelects(){
   const list = ((overview && overview.gyms) || []).map(g => ({ key: g.key, name: g.name }));
@@ -1122,6 +1388,7 @@ function fillGymSelects(){
     sel.innerHTML = list.length ? list.map(g => `<option value="${esc(g.key)}">${esc(g.name)}</option>`).join('')
       : '<option value="">(no gyms yet — add one first)</option>';
     if(cur && list.some(g => g.key === cur)) sel.value = cur;
+    if(selGym && list.some(g => g.key === selGym)) sel.value = selGym;
   }
 }
 
@@ -1349,7 +1616,8 @@ async function ensureOwnReadDevices(){
   }
   const r = await call('/admin/keys'); if(r.ok) keysData = r.body;
 }
-function renderKeys(){
+function renderKeys(){ renderKeysInner(); renderPicker(); applyGymFilter(); }
+function renderKeysInner(){
   const o = keysData.owner;
   let h = '';
   if(!o) h = `<div class="note">No owner device yet. Do this on <strong>your own phone</strong> (the one you’ll approve staff from):</div>
@@ -1372,9 +1640,10 @@ function renderKeys(){
     const reader = !rd || !rd.lastSeen
       ? `<div class="kline"><div class="kl"><b>Front-desk reader</b><div class="ks">Not set up yet. Get a code below and run it on the Ashbourne PC.</div></div><span class="pill none">Not set up</span></div>`
       : `<div class="kline"><div class="kl"><b>${/^screen/.test(rd.version || '') ? 'Front-desk screen reader' : 'Front-desk reader'}</b> · ${esc(rd.host || 'Ashbourne PC')}
-           <div class="ks">Checked in ${esc(ago(rd.lastSeen))}${rd.lastScanAt ? ' · last scan ' + esc(ago(rd.lastScanAt)) : ' · no scans yet'}${rd.counts && rd.counts.scans ? ` · since it started: ${esc(rd.counts.scans)} scans${rd.counts.confirmed ? `, ${esc(rd.counts.confirmed)} confirmed by the Visit Log` : ''}${rd.counts.fromList ? `, ${esc(rd.counts.fromList)} caught from the Visit Log` : ''}${rd.counts.conflicts ? `, ${esc(rd.counts.conflicts)} uncertain` : ''}` : ''}${rd.clockSkewSec ? ` · PC clock ${Math.abs(rd.clockSkewSec)} s ${rd.clockSkewSec > 0 ? 'slow' : 'fast'} (corrected)` : ''}</div></div>
+           <div class="ks">Checked in ${esc(ago(rd.lastSeen))}${rd.lastScanAt ? ' · last scan ' + esc(ago(rd.lastScanAt)) : ' · no scans yet'}${rd.counts && rd.counts.scans ? ` · since it started: ${esc(rd.counts.scans)} scans${rd.counts.confirmed ? `, ${esc(rd.counts.confirmed)} confirmed by the check-in list` : ''}${rd.counts.fromList ? `, ${esc(rd.counts.fromList)} from the check-in list` : ''}${rd.counts.listResets ? `, list changed pages ${esc(rd.counts.listResets)}×` : ''}${rd.counts.denied ? `, ${esc(rd.counts.denied)} turned down at the desk (not counted)` : ''}${rd.counts.conflicts ? `, ${esc(rd.counts.conflicts)} uncertain` : ''}` : ''}${rd.clockSkewSec ? ` · PC clock ${Math.abs(rd.clockSkewSec)} s ${rd.clockSkewSec > 0 ? 'slow' : 'fast'} (corrected)` : ''}</div></div>
          <span class="pill ${fresh && !rd.problem ? 'on' : 'off'}">${fresh ? (rd.problem ? 'Needs attention' : 'Online') : 'Offline'}</span></div>
          ${rd.problem ? `<div class="note red" style="margin:0 0 6px;"><strong>${esc(rd.problem)}</strong>${rd.fix ? `<br>How to fix: ${esc(rd.fix)}` : ''}</div>` : ''}
+         ${!rd.problem && rd.noteText ? `<div class="note" style="margin:0 0 6px;">${esc(rd.noteText)}</div>` : ''}
          ${rd.version && rd.latest && !/^screen/.test(rd.version) && rd.version !== rd.latest ? `<div class="note" style="margin:0 0 6px;">Reader ${esc(rd.version)} on the PC; ${esc(rd.latest)} is out. It updates itself within 6 hours (or on the PC: run the setup line and choose 1).</div>` : ''}`;
     const staff = g.devices.filter(d => !d.owner);
     const devs = staff.map(d => `<div class="kline"><div class="kl"><b>${esc(d.name)}</b> <span class="chip">${esc(d.code)}</span>
@@ -1383,7 +1652,7 @@ function renderKeys(){
           ? (isApproverHere()          ? `<button class="btn primary" type="button" data-k="approve" data-g="${esc(key)}" data-dev="${esc(d.id)}">Approve</button>` : '') + `<button class="btn" type="button" data-k="remove" data-g="${esc(key)}" data-dev="${esc(d.id)}">Reject</button>`
           : (isApproverHere() ? `<button class="btn danger" type="button" data-k="remove" data-g="${esc(key)}" data-dev="${esc(d.id)}" data-approved="1">Remove</button>` : '<span class="pill on">Approved</span>')}</div></div>`).join('');
     const nApproved = staff.filter(d => d.status === 'approved').length;
-    return `<div class="kgym"><h3>${esc(g.name)}</h3>
+    return `<div class="kgym" data-gymkey="${esc(key)}"><h3>${esc(g.name)}</h3>
       ${reader}
       <div class="kline"><div class="kl"><b>Who can see member numbers</b><div class="ks">You${nApproved ? ` and ${nApproved} approved ${nApproved === 1 ? 'device' : 'devices'}` : ' only'}. Staff ask from the gym page and appear here with a code.</div></div></div>
       ${devs}

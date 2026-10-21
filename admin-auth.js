@@ -96,11 +96,11 @@ function deviceWords(ua) {
 }
 function page(title, body) {
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><meta name="referrer" content="no-referrer"><title>${esc(title)}</title>
-<style>body{margin:0;background:#14171A;color:#EDEFF1;font:17px/1.5 -apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;padding:24px 16px;}
-.c{max-width:460px;margin:8vh auto;background:#1C2124;border:1px solid #353D43;border-radius:14px;padding:22px;}
-h1{font-size:21px;margin:0 0 8px;} p{color:#A3ABB3;margin:6px 0;} b{color:#EDEFF1;}
+<link rel="stylesheet" href="/brand.css"><style>body{margin:0;background:#E4E6E3;color:#1E2124;font:17px/1.55 var(--body);padding:24px 16px;}
+.c{max-width:460px;margin:8vh auto;background:#F7F7F5;border-radius:16px;padding:24px;box-shadow:var(--lift-hi);}
+h1{font:800 34px/1 var(--display);text-transform:uppercase;margin:0 0 10px;} p{color:#3A4146;margin:6px 0;} b{color:#1E2124;}
 button{width:100%;min-height:52px;margin-top:16px;border:0;border-radius:10px;font:inherit;font-weight:700;cursor:pointer;}
-.ok{background:#3FCF8E;color:#0b1f15;} .no{background:transparent;color:#A3ABB3;border:1px solid #353D43;}</style></head><body><div class="c">${body}</div></body></html>`;
+.ok{background:#1D4FB0;color:#fff;} .no{background:transparent;color:#1E2124;border:2px solid #1E2124;}</style></head><body><div class="c">${body}</div></body></html>`;
 }
 
 function mount(app, deps) {

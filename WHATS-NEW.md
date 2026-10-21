@@ -1,3 +1,95 @@
+# What's new (October 20, design polish)
+
+Checked in a real browser on phone and desktop, and against two published design checklists (Impeccable's audit, Emil Kowalski's motion review). Design-checker findings went from 235 to 141; what's left is the look itself (status stripes, cards, the drawn camera scenes) plus a few false alarms.
+
+- **Gym page:** the gym's whole name shows (it was cut to "Maple Street Fitn..."), the step instructions read in plain sentences instead of small capitals, the small print on the answer buttons is easier to read, and keyboard shortcuts no longer show on phones.
+- **Sign-in:** the email box and button stack on a phone, so the address isn't cut off.
+- **Checkout:** text and boxes match the rest of the site (they were smaller), with proper headings for screen readers.
+- **Phones:** typing in any box never zooms the page on an iPhone; footer links are finger-sized.
+- **Everywhere:** paragraphs don't end on one lonely word, headlines break evenly, and long text stays a comfortable width on big screens.
+- **Browser monitor page:** its top bar and start bar match the site (they were dark, with links you could hardly read).
+- **Small fixes:** the sample report's camera label isn't hidden behind the photo count; a shared-photo link opened without its code says so instead of making a failed lookup; the few UI animations use a firmer ease-out.
+
+# What's new (October 19, nothing-to-drive-for pass)
+
+Everything here is about the gym running on its own, so you don't have to drive there.
+
+**Front desk**
+- **An account (or another page) left open:** the reader no longer mistakes a member's account for a new scan, on Ashbourne or any taught system. A screen that goes back to something it already showed, or shows an older entry time than the newest one it has seen, is not a scan. One member's own visit history is never taken for the check-in list. If the list stays hidden for 10 minutes, the admin page and the morning report say so ("an account or another page left open?"): pop-ups are still read.
+- **A locked, asleep or unplugged front-desk PC never turns into "no scan":** while the reader can't see the screen, entries are checked by the camera only and the gym page says so; the morning report lists the times the screen couldn't be read.
+- **Turned-down scans on Ashbourne:** the "Admission Message" box (where Ashbourne writes "Membership Expired") is read too.
+- **Old and updated Ashbourne:** tested on the current look (with "Update Available" in the top bar, like J Street today) and on the updated look. Times written "8:21PM" (no space) and long values that run past their label are read correctly; a time whose AM/PM wasn't read is never trusted to throw a scan out.
+- **The newer Ashbourne look reads its pop-up too** (values beside their labels instead of under them). Before, only its Visit Log was read there.
+- **The first scan after the reader starts** is no longer taken for "what was already on screen" when the pop-up shows a later time than the Visit Log.
+- **The pop-up spot is remembered** across restarts, so after a power cut the reader finds it again straight away. The list's spot is watched the same way: when staff come back to the check-in page, new rows are read straight away, not up to 20 seconds later.
+- **Other systems:** taught panels only count the panel where it was taught (not a matching label somewhere else on the screen), and only scans for the gym's own zone count.
+- **A list that reloads or empties for a moment** never counts its old rows again (a list with times only counts rows newer than anything it showed before, and never a row it already showed). A list whose rows are there but can't be read is looked for again instead of being taken as empty; if it can't be found, the admin page says to teach it again.
+- **Teaching:** a big "Welcome, Taylor" name reads cleanly (the comma isn't run into the name), and a list on a dark screen is recognized as a list even when a row or two misread.
+- **Tested on every system type so far, old and updated looks:** Ashbourne (current and updated look: normal, pop-up closing, account left open, PC locked, turned-down scan), scan logs (newest at the top or bottom), plain lists, name-only lists and welcome cards, pop-up plus list, dark screens, codes with letters, and a member profile left open. Each was taught on its old look, run on it, then "updated overnight" to a new look without re-teaching. An update that renames things either keeps reading correctly or says "teach it again"; it never makes up scans.
+
+**Camera**
+- **The recorder got a new address** (power cut, new router): the camera computer finds it again by its network card (MAC) and updates its own settings. The camera password is only ever sent to that one device.
+
+**Pi and internet**
+- **Backup Wi-Fi** (optional, during setup) and a reminder to turn off Tailscale's 6-month key expiry.
+- **Spare memory card:** `bash make-spare-card.sh` copies the Pi's card onto a second card in a USB reader. If the card ever dies, swap them.
+- **PI-SETUP.md** has a new table: "Fixing things without driving to the gym".
+
+**Daylight saving (Nov 1)**
+- The repeated hour is labelled on the gym page: "1:30 AM (first time: clocks went back)" and "(second time)".
+
+# What's new (October 18, polish and speed pass)
+
+- **Turned-down scans don't count:** a check-in the desk refused (denied, expired, frozen, past due...) is no longer counted as a scan, on any system, Ashbourne included. Before, a refused member following someone in could look like "2 people, 2 scans" and hide the tailgate. The admin page shows how many were turned down.
+- **Lists without a pop-up keep a member's real second entry** (the "same member within 5 minutes counts once" rule is for re-reading a pop-up, not for a list where each row is its own scan).
+- **A screen that keeps changing with nothing new** (a clock ticking inside the watched area) is read at most every 2 seconds after a while, so the Pi isn't busy all night. Scans are still timed to the moment they appeared.
+- **Faster website:** pages, scripts and styles go out compressed (the home page is 16 KB instead of 70 KB; the gym page 48 KB instead of 193 KB), and a repeat visit is a tiny "not changed". Fonts are cached for a year, icons for a week.
+- **Home page "Try it" rebuilt** as the same overhead camera as the top of the page: people walk through the turnstile, the desk reader blinks on a scan, the counts go up, and the right side shows the actual card your phone gets (with Tailgate / Shared code / It was fine), plus the quiet list of normal entries.
+- **Live demo photos** are now the same overhead camera drawing (four photos of the walk-through), and the demo gym and the sample report are the same gym (Maple Street Fitness).
+- **Gym page:** the "last 24 hours" strip reads "24 h ago · 12 h ago · Now"; alerts only mention text messages once texting is switched on.
+- **Admin page on a phone:** the All gyms overview is a card per gym instead of a table you scroll sideways.
+- **Checkout:** cleaner headings, no empty "payment details" box. Setup wording everywhere now matches the real install (a Pi plus a splitter at the front desk).
+
+# What's new (October 18, any front-desk screen)
+
+- **Check-in lists (scan logs):** systems that show scans as a list of check-ins instead of a pop-up are read too, with the newest row at the top or at the bottom (a list that scrolls by itself). Each new row is a scan. The teach step finds it from the one test scan and remembers the column (and its header), never a number or a name.
+- **Hand scrolling, other pages, a new day:** staff can scroll the list, scroll back, open other pages and come back, or reload: none of that counts as scans. Another table under the same header (a member directory) is told apart by its column names, and by its missing times. A list that empties at midnight starts fresh.
+- **Lists that show times:** the time on each row tells new scans from old rows, and scans that came in while another page was open are still counted when the list comes back. A list that refreshes late is timed by its rows; if it's late most of the time, the admin page says so (turn on the system's live view or auto-refresh).
+- **Names instead of numbers:** systems that only show "Welcome, Alex Rivera" (no member number) work. The name is read twice and scrambled on the Pi exactly like a member number: never sent or saved as text.
+- **Pop-up and list together:** both are read, and a scan both show is marked confirmed (like Ashbourne's pop-up and Visit Log).
+- **A row whose number can't be read is still a scan:** it counts, marked "uncertain", so a misread never turns into a false tailgate alert.
+- **Dark screens and member codes with letters** ("GX48210") work too. A code read in the wrong shape gets a close-up second look before it's marked unreadable.
+- **iPad front desks:** an HDMI adapter on the iPad goes straight into the capture stick (no splitter). The "Will it work?" page asks iPad or Android, and what the screen shows when a member scans.
+
+# What's new (October 18, ready for gym #2)
+
+- **Any check-in system:** the front-desk screen reader learns a new system from one test scan (`node screen-reader.js --teach` on the Pi). It shows the last 2 digits of the number it spotted and the label next to it; you confirm. Ashbourne reads exactly as before. Each number is read twice, at a size worked out from how big it is on screen; both reads must agree.
+- **"Will it work at your gym?"** (`/check`): gym owners tap their recorder brand, camera angle, check-in system and front desk, and see the answer straight away (ready / a quick check / a small change). You get an email, and it's on the admin page under **Gyms that checked**. Linked from the home page and checkout.
+- **Close a gym that cancelled** (admin page > the gym > Close this gym): switches off its sign-in code, staff logins, camera computer and reader; deletes photos, entries, alert list, logins and member data; archives the numbers only. **Open it again** gives it a new code. The Stripe "canceled" email links straight to it.
+- **Pi setup for new gyms:** no laptop needed (pairs and finds the camera), asks whether the desk is on Ashbourne and runs the teach step if not, protects against power cuts (logs in memory, card repaired at start, restarts itself if frozen), and offers **Tailscale** so you can fix any Pi from your phone.
+- **Practice a restore** (admin page > Backup): open a backup file with its password and see what's inside, without changing anything.
+- **EMAIL-AND-TEXT.md:** moving alerts to your own domain (Postmark or Resend) and registering for text messages (Twilio). Texts now say "Reply STOP to stop". The home page no longer promises texts until that's done.
+
+# What's new (October 18, admin page per gym)
+
+- **Gym switcher on the admin page:** a bar at the top with **All gyms** and one button per gym (colored dot = its status, red number = things to do). It stays at the top as you scroll.
+- **All gyms** shows a table: each gym's health score, camera computer, front-desk reader, last entry, AI checks today and billing, plus the website-wide cards (backup, self-repair, Render settings, add a gym).
+- **Tap a gym** and the page shows only that gym: its self-check, its card (settings, test alert, sign-in code, start fresh), connecting its camera computer, its member-number approvals and its technical details.
+- The page remembers which gym you were looking at, and the address (…/admin.html#gym=…) can be bookmarked.
+- After adding a gym, a button opens it straight away to connect its camera computer.
+
+# What's new (October 17, new look)
+
+- **The whole website has a new look:** concrete grey with weight-plate colors (red = likely got in without paying, yellow = worth a look, green = fine, blue = what you tap), tall gym-sign headlines and a new logo (three turnstile bars, the last one red). Fonts are stored on the website itself, so nothing loads from Google.
+- **Home page rebuilt:** "Two people. One scan." with a drawn camera still that plays once, a night strip you can tap, a phone shot of the owner's morning, and a bar on phones with the demo and price once you scroll.
+- **Gym page:** last night as a strip at the top; tap a red or yellow bar to jump to that entry. The big line is now "3 to look at". New icons in the phone tab bar.
+- **Admin page, checkout, sample report, monthly report, door sign, member notice, terms and the small confirm pages** all match. The front-desk screen and lobby TV stay dark (they're screens on display).
+- App icons redone with the new logo.
+
+# What's new (October 17)
+
+- **Start the pilot fresh** (admin page, under each gym): clears test walk-throughs so results start at zero: entries and their photos, staff answers, results, nightly counts, camera problems, this week's spot-check. A copy of the numbers (no photos) is kept on the website's disk. Settings, the alert list, staff logins and camera pairing stay. You type the gym's name to confirm.
+
 # What's new (October 16, cost saving)
 
 - **Skip people leaving (saves AI checks):** the camera computer already sees which way someone walks. Every crossing it sees going clearly OUT is now measured against the AI. After **200 in a row** where the AI agreed (nobody came in), the admin page lets you turn on **Skip clear exits** for that gym.

@@ -7,7 +7,7 @@
 //   node setup-camera.js --channels 32   (recorder has more than 16 channels)
 //
 // Non-interactive (for testing / scripting), e.g.:
-//   CAM_PASS='gymai24!' node setup-camera.js --ip 192.168.2.54 --user admin \
+//   CAM_PASS='YOUR-RECORDER-PASSWORD' node setup-camera.js --ip 192.168.2.54 --user admin \
 //       --pass-env CAM_PASS --channel 4 --crop full --no-server --yes
 //
 // Flags: --ip A  --port N  --user U  --pass-env VAR  --channel N  --channels N

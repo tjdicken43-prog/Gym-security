@@ -98,7 +98,7 @@ loadSavedFormats().reverse().forEach(f => FORMATS.unshift(f));
 // So we encode exactly the characters that would otherwise break the URL or
 // be mis-decoded: @ / : (URL structure), % (would be decoded), # ? (end the
 // address), and whitespace. Everything else — notably ! — stays literal,
-// which is the form proven to work on the gym's NVR ("gymai24!").
+// which is the form proven to work on the gym's NVR.
 function encodeCred(s) {
   return String(s).replace(/[@\/:%#?\s]/g, c => encodeURIComponent(c));
 }

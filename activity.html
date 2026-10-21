@@ -9,19 +9,23 @@
 <link rel="icon" type="image/svg+xml" href="logo.svg">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <link rel="manifest" href="manifest.webmanifest">
-<meta name="theme-color" content="#14171A">
+<link rel="preload" href="/fonts/BigShoulders-Bold.woff" as="font" type="font/woff" crossorigin>
+<link rel="preload" href="/fonts/InstrumentSans-Regular.woff" as="font" type="font/woff" crossorigin>
+<link rel="stylesheet" href="brand.css">
+<meta name="theme-color" content="#E4E6E3">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="apple-mobile-web-app-title" content="SecurityAI">
 <style>
-  :root{--bg:#14171A;--panel:#1C2124;--panel-2:#242B30;--line:#353D43;
-        --text:#EDEFF1;--muted:#A3ABB3;--green:#3FCF8E;--red:#FF6B6B;--amber:#FFB54A;--blue:#7FB2FF;}
+  :root{--bg:#E4E6E3;--panel:#F7F7F5;--panel-2:#ECEEEB;--line:#D3D6D3;
+        --text:#1E2124;--muted:#4E565B;--green:#23804A;--red:#C8281F;--amber:#7A5800;--blue:#1D4FB0;--yel:#E8A700;}
   .trendHead{margin:12px 0 4px;font-weight:600;}
+  .trendHead.waiting{font-weight:400;color:var(--muted);font-size:14px;}
   .chartT{font-size:13px;color:var(--muted);margin:12px 0 4px;}
   .bars{display:flex;align-items:flex-end;gap:3px;height:84px;padding-top:4px;border-bottom:1px solid var(--line);}
   .bars.hours{gap:2px;height:70px;}
-  .bars .b{flex:1;position:relative;background:#46525A;border-radius:3px 3px 0 0;min-height:2px;}
+  .bars .b{flex:1;position:relative;background:#AEB6BB;border-radius:3px 3px 0 0;min-height:2px;}
   .bars.weeks .b{background:var(--red);opacity:.85;}
   .bars .b i{position:absolute;left:0;right:0;bottom:0;background:var(--red);border-radius:3px 3px 0 0;}
   .bars .b em{position:absolute;top:-17px;left:0;right:0;text-align:center;font-style:normal;font-size:11px;color:var(--muted);}
@@ -31,7 +35,7 @@
   .guide li{display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-top:1px solid var(--line);}
   .guide li:first-child{border-top:0;}
   .guide .tick{flex:none;width:22px;height:22px;border-radius:50%;border:2px solid var(--line);display:grid;place-items:center;font-size:13px;margin-top:1px;}
-  .guide li.done .tick{background:var(--green);border-color:var(--green);color:#0d2b1e;}
+  .guide li.done .tick{background:var(--green);border-color:var(--green);color:#FFFFFF;}
   .guide li.done .gt{color:var(--muted);text-decoration:line-through;}
   .guide .gs{display:block;font-size:13px;color:var(--muted);}
   .guide a,.guide button.lnk{color:var(--blue);background:none;border:0;padding:0;font:inherit;font-size:13px;cursor:pointer;text-decoration:underline;}
@@ -39,6 +43,11 @@
   #rmView .rmBar{position:sticky;top:0;z-index:2;display:flex;align-items:center;gap:10px;padding:10px 16px;background:var(--panel);border-bottom:1px solid var(--line);}
   #rmView .rmBar b{flex:1;}
   #rmView .rmBody{max-width:720px;margin:0 auto;padding:12px 16px 40px;}
+  .spotSum{cursor:pointer;list-style:none;display:flex;align-items:center;min-height:32px;}
+  .spotSum::-webkit-details-marker{display:none;}
+  .spotSum::after{content:"";margin-left:auto;width:9px;height:9px;border-right:2px solid var(--muted);border-bottom:2px solid var(--muted);transform:rotate(45deg);transition:transform .15s;}
+  #spotBox[open] .spotSum::after{transform:rotate(-135deg);}
+  @media (pointer: coarse){ .keys{display:none;} }
   *{box-sizing:border-box;}
   html{-webkit-text-size-adjust:100%;}
   body{margin:0;background:var(--bg);color:var(--text);font:16px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
@@ -65,7 +74,7 @@
   /* status line */
   .status{display:flex;gap:12px;align-items:flex-start;}
   .dot{width:12px;height:12px;border-radius:50%;background:var(--muted);flex-shrink:0;margin-top:7px;}
-  .dot.ok{background:var(--green);box-shadow:0 0 0 4px rgba(63,207,142,.15);}
+  .dot.ok{background:var(--green);box-shadow:0 0 0 4px rgba(35,128,74,.15);}
   .dot.warn{background:var(--amber);}
   .dot.off{background:#6d767e;}
   .status .t{font-weight:600;font-size:17px;}
@@ -89,13 +98,13 @@
   .tier{display:flex;align-items:center;gap:10px;margin:24px 2px 10px;font-size:15px;font-weight:700;letter-spacing:.3px;text-transform:uppercase;}
   .tier .pip{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
   .tier .cnt{margin-left:auto;font-size:13px;font-weight:700;padding:2px 10px;border-radius:12px;letter-spacing:0;}
-  .tier.red{color:#FFB3B3;} .tier.red .pip{background:var(--red);box-shadow:0 0 0 4px rgba(255,107,107,.18);} .tier.red .cnt{background:rgba(255,107,107,.16);}
-  .tier.amber{color:var(--amber);} .tier.amber .pip{background:var(--amber);box-shadow:0 0 0 4px rgba(255,181,74,.16);} .tier.amber .cnt{background:rgba(255,181,74,.16);}
-  .tier.green{color:#8CE8BD;} .tier.green .pip{background:var(--green);box-shadow:0 0 0 4px rgba(63,207,142,.14);} .tier.green .cnt{background:rgba(63,207,142,.13);}
+  .tier.red{color:#A61F18;} .tier.red .pip{background:var(--red);box-shadow:0 0 0 4px rgba(200,40,31,.18);} .tier.red .cnt{background:rgba(200,40,31,.16);}
+  .tier.amber{color:var(--amber);} .tier.amber .pip{background:var(--amber);box-shadow:0 0 0 4px rgba(232,167,0,.16);} .tier.amber .cnt{background:rgba(232,167,0,.16);}
+  .tier.green{color:#1B6B3D;} .tier.green .pip{background:var(--green);box-shadow:0 0 0 4px rgba(35,128,74,.14);} .tier.green .cnt{background:rgba(35,128,74,.13);}
   .tier-empty{color:var(--muted);font-size:15px;margin:0 2px 6px;padding:12px 14px;border:1px dashed var(--line);border-radius:10px;}
   .tier-sub{color:var(--muted);font-size:14px;margin:-4px 2px 10px;}
-  details.group.passed{border-color:rgba(63,207,142,.35);border-left:4px solid var(--green);}
-  details.group.passed > summary{color:#8CE8BD;}
+  details.group.passed{border-color:rgba(35,128,74,.35);border-left:4px solid var(--green);}
+  details.group.passed > summary{color:#1B6B3D;}
   .inc.done.confirmed{border-left-color:var(--red);opacity:.85;}
 
   /* incident card */
@@ -115,12 +124,12 @@
   .kept{color:var(--muted);font-size:13px;margin-top:2px;}
   .ynote{margin:10px 0 0;font-size:15px;overflow-wrap:anywhere;}
   .ynote b{font-weight:600;color:var(--muted);font-size:14px;}
-  .noteIn{width:100%;min-height:46px;margin-top:12px;padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:#101315;color:var(--text);font-size:16px;}
+  .noteIn{width:100%;min-height:46px;margin-top:12px;padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:#FFFFFF;color:var(--text);font-size:16px;}
   .noteIn:focus{outline:2px solid var(--green);outline-offset:1px;}
   .inc.hl,.row.hl{outline:3px solid var(--blue);outline-offset:2px;}
   .from{font-size:14px;font-weight:700;color:var(--blue);margin:0 2px 8px;display:flex;justify-content:space-between;align-items:center;gap:8px;}
-  .row.gate{background:rgba(255,181,74,.06);border:1px dashed rgba(255,181,74,.35);margin-bottom:8px;}
-  .row.gate:hover{background:rgba(255,181,74,.1);}
+  .row.gate{background:rgba(232,167,0,.06);border:1px dashed rgba(232,167,0,.35);margin-bottom:8px;}
+  .row.gate:hover{background:rgba(232,167,0,.1);}
   .inc h3{font-size:19px;line-height:1.3;margin:0 0 4px;}
   .when{color:var(--muted);font-size:15px;}
   .said{margin:10px 0 0;font-size:16px;}
@@ -131,9 +140,9 @@
   .btn{min-height:48px;padding:10px 14px;border-radius:10px;border:1px solid var(--line);background:var(--panel-2);color:var(--text);
        font-weight:600;font-size:16px;cursor:pointer;text-align:center;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:6px;}
   .btn:active{transform:scale(.98);}
-  .btn.red{background:rgba(255,107,107,.14);border-color:rgba(255,107,107,.5);color:#FFB3B3;}
-  .btn.green{background:rgba(63,207,142,.12);border-color:rgba(63,207,142,.45);color:#8CE8BD;}
-  .btn.primary{background:var(--green);border-color:var(--green);color:#0b1f15;}
+  .btn.red{background:rgba(200,40,31,.14);border-color:rgba(200,40,31,.5);color:#A61F18;}
+  .btn.green{background:rgba(35,128,74,.12);border-color:rgba(35,128,74,.45);color:#1B6B3D;}
+  .btn.primary{background:var(--green);border-color:var(--green);color:#FFFFFF;}
   .btn.link{background:none;border:0;color:var(--muted);text-decoration:underline;font-weight:500;min-height:44px;padding:8px 4px;}
   .btn[disabled]{opacity:.6;}
   .verdict{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:12px;background:var(--panel-2);border-radius:8px;padding:6px 6px 6px 12px;font-size:15px;}
@@ -154,34 +163,34 @@
   .row .rt{font-weight:600;font-size:16px;}
   .row .rs{color:var(--muted);font-size:14px;}
   .row .tag{margin-left:auto;font-size:13px;font-weight:700;padding:3px 9px;border-radius:12px;flex-shrink:0;}
-  .tag.bad{background:rgba(255,107,107,.16);color:#FFB3B3;}
-  .tag.warn{background:rgba(255,181,74,.16);color:var(--amber);}
-  .tag.ok{background:rgba(63,207,142,.13);color:#8CE8BD;}
-  .tag.out{background:rgba(163,171,179,.14);color:var(--muted);}
+  .tag.bad{background:rgba(200,40,31,.16);color:#A61F18;}
+  .tag.warn{background:rgba(232,167,0,.16);color:var(--amber);}
+  .tag.ok{background:rgba(35,128,74,.13);color:#1B6B3D;}
+  .tag.out{background:rgba(78,86,91,.14);color:var(--muted);}
   .scanline{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 8px;}
-  .scanline span{font-size:13px;font-weight:700;padding:3px 10px;border-radius:12px;background:rgba(255,255,255,.06);}
-  .scanline .bad{background:rgba(255,107,107,.16);color:#FFB3B3;} .scanline .good{background:rgba(63,207,142,.13);color:#8CE8BD;}
+  .scanline span{font-size:13px;font-weight:700;padding:3px 10px;border-radius:12px;background:rgba(30,33,36,.06);}
+  .scanline .bad{background:rgba(200,40,31,.16);color:#A61F18;} .scanline .good{background:rgba(35,128,74,.13);color:#1B6B3D;}
 
   .empty{padding:22px 16px;text-align:center;color:var(--muted);}
   .empty .big{color:var(--text);font-size:18px;font-weight:600;margin-bottom:4px;}
 
   /* forms */
   label.f{display:block;font-weight:600;margin:10px 0 6px;}
-  textarea.in{width:100%;padding:12px 14px;border-radius:10px;border:1px solid var(--line);background:#101315;color:var(--text);font:16px/1.4 inherit;font-family:inherit;resize:vertical;}
-  input.in{width:100%;min-height:50px;padding:12px 14px;border-radius:10px;border:1px solid var(--line);background:#101315;color:var(--text);font-size:17px;}
+  textarea.in{width:100%;padding:12px 14px;border-radius:10px;border:1px solid var(--line);background:#FFFFFF;color:var(--text);font:16px/1.4 inherit;font-family:inherit;resize:vertical;}
+  input.in{width:100%;min-height:50px;padding:12px 14px;border-radius:10px;border:1px solid var(--line);background:#FFFFFF;color:var(--text);font-size:17px;}
   input.in:focus{outline:2px solid var(--green);outline-offset:1px;}
   .formrow{display:flex;gap:8px;margin-top:8px;}
   .formrow input{flex:1;min-width:0;}
   .msg{margin-top:10px;font-size:15px;min-height:0;}
-  .msg.bad{color:#FFB3B3;} .msg.good{color:#8CE8BD;}
+  .msg.bad{color:#A61F18;} .msg.good{color:#1B6B3D;}
   .sub{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:10px 0;border-bottom:1px solid var(--line);}
   .sub:last-child{border-bottom:0;}
   .sub .who{flex:1 1 100%;min-width:0;overflow-wrap:anywhere;font-weight:600;}
-  select.in{min-height:50px;padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:#101315;color:var(--text);font-size:16px;flex:1;}
+  select.in{min-height:50px;padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:#FFFFFF;color:var(--text);font-size:16px;flex:1;}
   .person .tag{margin-left:auto;font-size:13px;font-weight:700;padding:3px 9px;border-radius:12px;}
   .person{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:10px 0;border-bottom:1px solid var(--line);}
   .person .pn{flex:1 1 160px;min-width:0;overflow-wrap:anywhere;} .person .pn small{display:block;color:var(--muted);}
-  .person select{min-height:44px;border-radius:10px;border:1px solid var(--line);background:#101315;color:var(--text);padding:6px 8px;font-size:15px;}
+  .person select{min-height:44px;border-radius:10px;border:1px solid var(--line);background:#FFFFFF;color:var(--text);padding:6px 8px;font-size:15px;}
   .mine{display:flex;align-items:center;gap:10px;width:100%;padding:12px 4px;border:0;border-bottom:1px solid var(--line);background:none;color:inherit;text-align:left;cursor:pointer;min-height:56px;font-size:15px;}
   .mine b{flex:1;} .mine .cnt{font-size:13px;color:var(--muted);}
   .sub .choices3{flex:1 1 100%;display:flex;flex-wrap:wrap;gap:0 18px;}
@@ -230,7 +239,7 @@
   .sheet input{font-size:15px;}
 
   /* first-visit guide */
-  .welcome{border-color:rgba(127,178,255,.35);}
+  .welcome{border-color:rgba(29,79,176,.35);}
   .welcome h2{margin-bottom:2px;}
   .steps{list-style:none;padding:0;margin:12px 0 14px;counter-reset:s;display:grid;gap:12px;}
   .steps li{display:flex;gap:12px;align-items:flex-start;font-size:15px;}
@@ -254,15 +263,15 @@
   .seq li span{color:var(--muted);display:inline-block;min-width:1.6em;}
   .seq li small{color:var(--muted);font-size:13px;}
   .seq{counter-reset:q;} .seq li::before{counter-increment:q;content:counter(q) ".";color:var(--muted);display:inline-block;min-width:1.6em;}
-  .check{margin-top:8px;font-size:15px;padding:8px 10px;border-radius:8px;background:rgba(255,255,255,.04);}
+  .check{margin-top:8px;font-size:15px;padding:8px 10px;border-radius:8px;background:rgba(30,33,36,.04);}
   .check.yes{border-left:3px solid var(--green);} .check.no{border-left:3px solid var(--amber);}
-  .seq li.me{background:rgba(255,107,107,.14);}
-  .careful{margin:10px 0 0;padding:10px 12px;border-radius:8px;background:rgba(255,181,74,.1);border:1px solid rgba(255,181,74,.35);font-size:14px;}
+  .seq li.me{background:rgba(200,40,31,.14);}
+  .careful{margin:10px 0 0;padding:10px 12px;border-radius:8px;background:rgba(232,167,0,.1);border:1px solid rgba(232,167,0,.35);font-size:14px;}
   .careful b{color:var(--amber);}
   .choices{display:grid;gap:8px;margin-top:8px;}
   .btn.choice{flex-direction:column;align-items:flex-start;justify-content:center;text-align:left;gap:1px;padding:10px 14px;min-height:56px;}
   .btn.choice small{font-weight:500;font-size:14px;opacity:.8;}
-  .btn.redline{background:transparent;border-color:rgba(255,107,107,.5);color:#FFB3B3;}
+  .btn.redline{background:transparent;border-color:rgba(200,40,31,.5);color:#A61F18;}
   details.notebox{margin-top:10px;}
   details.notebox > summary{cursor:pointer;color:var(--muted);font-size:15px;min-height:40px;display:flex;align-items:center;list-style:none;text-decoration:underline;}
   details.notebox > summary::-webkit-details-marker{display:none;}
@@ -272,17 +281,17 @@
 
   /* "saved" message at the bottom of the screen */
   .toast{position:fixed;left:50%;bottom:max(20px,env(safe-area-inset-bottom));z-index:70;max-width:calc(100% - 32px);
-         background:#EDEFF1;color:#14171A;font-weight:600;font-size:15px;padding:12px 16px;border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,.45);
+         background:#1E2124;color:#F7F7F5;font-weight:600;font-size:15px;padding:12px 16px;border-radius:12px;box-shadow:0 12px 30px -10px rgba(0,0,0,.5);
          transform:translate(-50%,16px);opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;}
   .toast.show{opacity:1;transform:translate(-50%,0);}
 
   /* results so far */
-  .who{margin:10px 0 2px;padding:12px;border-radius:10px;background:rgba(63,207,142,.12);border:1px solid rgba(63,207,142,.45);}
-  .who .l{font-size:13px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:#8CE8BD;}
+  .who{margin:10px 0 2px;padding:12px;border-radius:10px;background:rgba(35,128,74,.12);border:1px solid rgba(35,128,74,.45);}
+  .who .l{font-size:13px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:#1B6B3D;}
   .who.maybe .l{color:var(--amber);}
   .who .m{font-size:26px;font-weight:800;line-height:1.2;font-variant-numeric:tabular-nums;}
   .who .q{font-size:14px;color:var(--muted);margin-top:2px;}
-  .who.maybe{background:rgba(255,181,74,.1);border-color:rgba(255,181,74,.45);}
+  .who.maybe{background:rgba(232,167,0,.1);border-color:rgba(232,167,0,.45);}
   details.manual{margin-top:8px;} details.manual > summary{cursor:pointer;color:var(--muted);font-size:14px;text-decoration:underline;list-style:none;min-height:36px;display:flex;align-items:center;}
   details.manual > summary::-webkit-details-marker{display:none;}
   .codebig{font-size:30px;font-weight:800;letter-spacing:2px;font-variant-numeric:tabular-nums;margin:6px 0;}
@@ -302,17 +311,17 @@
   .spot .sb{display:flex;gap:8px;flex:1 1 100%;}
   .spot .sb .btn{flex:1;min-height:46px;font-size:15px;}
   html.big body{font-size:19px;} html.big{zoom:1.12;}
-  .staffhint{margin:8px 0 0;padding:8px 10px;border-radius:8px;background:rgba(127,178,255,.1);border:1px solid rgba(127,178,255,.35);font-size:14px;}
+  .staffhint{margin:8px 0 0;padding:8px 10px;border-radius:8px;background:rgba(29,79,176,.1);border:1px solid rgba(29,79,176,.35);font-size:14px;}
   .heldtag{display:inline-block;margin-top:6px;font-size:13px;font-weight:700;color:var(--blue);}
-  .thanks{margin-top:8px;color:#8CE8BD;font-size:15px;font-weight:600;}
+  .thanks{margin-top:8px;color:#1B6B3D;font-size:15px;font-weight:600;}
   .legend{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:13px;color:var(--muted);margin:-6px 2px 12px;}
   .legend i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;vertical-align:0;}
   .legend .r{background:var(--red);} .legend .a{background:var(--amber);} .legend .g{background:var(--green);}
   /* suggested answer */
   .suggest{margin:4px 0 8px;font-size:14px;color:var(--muted);}
   .suggest b{color:var(--text);}
-  .btn.choice .sug{font-size:11px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;background:rgba(255,255,255,.14);border-radius:6px;padding:1px 6px;margin-left:6px;}
-  .btn.choice.is-sug{box-shadow:0 0 0 2px rgba(237,239,241,.55);}
+  .btn.choice .sug{font-size:11px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;background:rgba(30,33,36,.10);border-radius:6px;padding:1px 6px;margin-left:6px;}
+  .btn.choice.is-sug{box-shadow:0 0 0 2px rgba(30,33,36,.5);}
   .quick{font-size:15px;margin-top:6px;}
   /* what happened next */
   .follow{margin-top:10px;border:1px solid var(--line);border-radius:10px;padding:10px 12px;}
@@ -325,20 +334,20 @@
   .money{font-size:15px;margin:2px 0 12px;}
   .money b{color:var(--green);font-size:20px;}
   .pricebox{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:14px;color:var(--muted);margin:0 0 10px;}
-  .pricebox input{width:84px;min-height:40px;padding:6px 10px;border-radius:8px;border:1px solid var(--line);background:#101315;color:var(--text);font-size:16px;}
+  .pricebox input{width:84px;min-height:40px;padding:6px 10px;border-radius:8px;border:1px solid var(--line);background:#FFFFFF;color:var(--text);font-size:16px;}
   /* undo inside the saved message */
   .toast.act{pointer-events:auto;display:flex;align-items:center;gap:12px;}
-  .toast button{border:0;background:#14171A;color:#EDEFF1;font-weight:700;border-radius:8px;padding:8px 12px;min-height:40px;cursor:pointer;}
+  .toast button{border:0;background:#3A4146;color:#F7F7F5;font-weight:700;border-radius:8px;padding:8px 12px;min-height:40px;cursor:pointer;}
   /* jump to a time */
   .jump{display:flex;align-items:center;gap:8px;margin:0 2px 12px;font-size:15px;color:var(--muted);}
-  .jump input{min-height:44px;padding:6px 10px;border-radius:10px;border:1px solid var(--line);background:#101315;color:var(--text);font-size:16px;}
+  .jump input{min-height:44px;padding:6px 10px;border-radius:10px;border:1px solid var(--line);background:#FFFFFF;color:var(--text);font-size:16px;}
   /* add to home screen */
-  .install{display:flex;gap:10px;align-items:center;border-color:rgba(127,178,255,.35);}
+  .install{display:flex;gap:10px;align-items:center;border-color:rgba(29,79,176,.35);}
   .install p{margin:0;flex:1;font-size:15px;}
   /* phone tab bar */
   .tabbar{display:none;}
   @media (max-width:699px){
-    .tabbar{display:flex;position:fixed;left:0;right:0;bottom:0;z-index:40;background:rgba(28,33,36,.97);border-top:1px solid var(--line);
+    .tabbar{display:flex;position:fixed;left:0;right:0;bottom:0;z-index:40;background:rgba(30,33,36,.97);border-top:0;
             padding:4px 6px;padding-bottom:max(4px,env(safe-area-inset-bottom));backdrop-filter:blur(8px);}
     .tabbar button{flex:1;min-height:52px;border:0;background:none;color:var(--muted);font-size:13px;font-weight:600;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;border-radius:10px;}
     .tabbar button b{font-size:17px;line-height:1;color:var(--text);}
@@ -355,24 +364,141 @@
     .inc{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);}
     .inc .photo img{max-height:70vh;}
   }
+
+  /* ===== SecurityAI look: concrete, rubber and plate colors (appended last so it wins) ===== */
+  body{background-color:var(--bg);background-image:var(--grain);font-family:var(--body);color:var(--text);}
+  header{background:transparent;border-bottom:1px solid var(--line);}
+  header h1{font:800 26px/1.05 var(--display);letter-spacing:.01em;}
+  header .by{font-family:var(--body);font-size:13px;letter-spacing:0;}
+  .hbtn{background:transparent;border:2px solid var(--text);color:var(--text);border-radius:10px;}
+  .card{background:var(--panel);border:0;border-radius:16px;box-shadow:var(--lift);padding:18px;}
+  .card h2{font:800 26px/1.05 var(--display);letter-spacing:.01em;margin-bottom:8px;}
+  .welcome,.install{border:0;}
+  .status .t{font-weight:700;}
+  .dot.ok{box-shadow:0 0 0 4px rgba(35,128,74,.18);}
+  .dot.warn{background:var(--yel);}
+  .summary{padding:20px 18px 18px;}
+  .summary .big{font:800 46px/.95 var(--display);text-transform:uppercase;letter-spacing:.005em;}
+  .summary .lbl{font-size:15px;font-weight:600;color:var(--muted);margin-bottom:6px;}
+  .summary .big.bad{color:var(--text);}
+  .summary .big.bad::before{content:"";display:inline-block;width:12px;height:34px;border-radius:3px;background:var(--red);margin-right:12px;vertical-align:-1px;}
+  .summary .big.good{color:var(--green);}
+  .summary .s{margin-top:8px;color:var(--ink2,#3A4146);}
+  .summary .older{color:var(--amber);}
+  .nstrip{position:relative;height:78px;margin:16px 0 4px;border-bottom:2px solid var(--text);}
+  .nstrip i{position:absolute;bottom:0;width:3px;height:22px;margin-left:-1px;background:var(--text);opacity:.4;border-radius:1px 1px 0 0;}
+  .nstrip button{position:absolute;bottom:0;width:12px;margin-left:-6px;border:0;padding:0;border-radius:3px 3px 0 0;cursor:pointer;}
+  .nstrip button::after{content:"";position:absolute;inset:-8px -10px 0;}
+  .nstrip button.r{height:70px;background:var(--red);}
+  .nstrip button.y{height:46px;background:var(--yel);}
+  .nstrip button.done{opacity:.4;}
+  .naxis{display:flex;justify-content:space-between;font:800 15px var(--display);color:var(--muted);}
+  .seg{background:var(--panel-2);border:0;border-radius:12px;padding:4px;}
+  .seg button{color:var(--muted);}
+  .seg button[aria-pressed="true"]{background:var(--text);color:#fff;}
+  .legend i{border-radius:2px;width:8px;height:14px;vertical-align:-2px;}
+  .legend .a{background:var(--yel);}
+  .tier{font:800 24px/1 var(--display);letter-spacing:.02em;}
+  .tier.red{color:var(--red);} .tier.amber{color:var(--amber);} .tier.green{color:var(--green);}
+  .tier.amber .pip{background:var(--yel);}
+  .tier .pip{border-radius:2px;width:8px;height:16px;box-shadow:none !important;}
+  .tier .cnt{font-family:var(--body);font-size:14px;}
+  .tier-empty{border:1px dashed #BFC4C0;background:rgba(247,247,245,.6);}
+  .inc{background:var(--panel);border:0;border-top:6px solid var(--red);border-radius:16px;box-shadow:var(--lift);}
+  .inc.possible,.inc.unchecked,.inc.check{border-left:0;border-top-color:var(--yel);}
+  .inc.done{border-top-color:#BFC4C0;}
+  .inc.done.confirmed{border-top-color:var(--red);}
+  @media (min-width:700px){ .inc{border-top-width:6px;} .inc .media{border-right:1px solid var(--line);} }
+  .inc .photo,.inc .photo img,.row img,.row .noimg,.spot img{background:#2E3337;}
+  .inc h3{font:800 30px/1.02 var(--display);letter-spacing:.01em;margin-bottom:6px;}
+  .when{color:var(--muted);}
+  .clock{color:var(--amber);}
+  .todo,.verdict{background:var(--panel-2);}
+  .scan{border:1px solid var(--line);border-radius:12px;background:#fff;}
+  .scan .st.one{background:var(--panel-2);}
+  .scan .times{font:800 30px/1.1 var(--display);letter-spacing:.01em;}
+  .btn{background:#fff;border:1.5px solid #BFC4C0;color:var(--text);border-radius:10px;transition:background-color .15s,border-color .15s;}
+  .btn:hover{border-color:var(--text);}
+  .btn.primary{background:var(--blue);border-color:var(--blue);color:#fff;box-shadow:0 8px 18px -10px rgba(29,79,176,.8);}
+  .btn.primary:hover{background:#163C86;border-color:#163C86;}
+  .btn.red{background:var(--red);border-color:var(--red);color:#fff;}
+  .btn.red:hover{background:#A61F18;border-color:#A61F18;}
+  .btn.green{background:#fff;border-color:var(--green);color:var(--green);}
+  .btn.redline{background:#fff;border-color:var(--red);color:var(--red);}
+  .btn.link{background:none;border:0;color:var(--blue);}
+  .btn.choice.is-sug{box-shadow:0 0 0 3px rgba(29,79,176,.35);}
+  .btn.choice .sug{background:var(--text);color:#fff;}
+  .careful{background:#FFF6DB;border:1px solid #F0D27A;}
+  .careful b{color:var(--amber);}
+  details.group{background:var(--panel);border:0;border-radius:16px;box-shadow:var(--lift);}
+  details.group.passed{border-left:0;border-top:4px solid var(--green);}
+  details.group.passed > summary{color:var(--green);}
+  .row:hover{background:var(--panel-2);}
+  .tag.warn{color:var(--amber);background:#FFF1C7;}
+  .tag.bad{color:#fff;background:var(--red);}
+  .tag.ok{color:var(--green);background:#DDEFE3;}
+  .row.gate{background:#FFF8E3;border:1px dashed #E3C25C;}
+  input.in,textarea.in,select.in,.noteIn,.pricebox input,.jump input,.person select{background:#fff;border:2px solid var(--line);color:var(--text);}
+  input.in:focus,textarea.in:focus,.noteIn:focus{outline:none;border-color:var(--blue);}
+  .big3 div,.stats div{background:var(--panel-2);border-radius:12px;}
+  .big3 b{font:800 46px/1 var(--display);}
+  .stats b{font:800 32px/1.05 var(--display);}
+  .money b{font:800 30px/1 var(--display);color:var(--green);}
+  .who{background:#E3F1E8;border:1px solid #A9D3B8;}
+  .who .l{color:var(--green);}
+  .who.maybe{background:#FFF6DB;border-color:#F0D27A;}
+  .who .m{font:800 36px/1.05 var(--display);}
+  .codebig{font:800 40px/1.05 var(--display);letter-spacing:.06em;}
+  .bars .b{background:#C3CACE;}
+  .guide .tick{border-color:#BFC4C0;}
+  .staffhint{background:#E6EDF8;border:1px solid #B5C7EA;}
+  .heldtag{color:var(--blue);}
+  .thanks{color:var(--green);}
+  .follow{border:1px solid var(--line);background:#fff;}
+  .follow.done{background:var(--panel-2);}
+  .scanline span{background:var(--panel-2);}
+  .scanline .bad{background:var(--red);color:#fff;} .scanline .good{background:#DDEFE3;color:var(--green);}
+  .seq li.me{background:#F8DEDB;}
+  .check{background:var(--panel-2);}
+  .check.no{border-left-color:var(--yel);}
+  footer{color:var(--muted);}
+  footer a{color:var(--text);}
+  .viewer .btn{background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.3);color:#fff;}
+  .sheet{background:var(--panel);border-top:0;box-shadow:0 -20px 40px -10px rgba(30,33,36,.35);}
+  #rmView{background-color:var(--bg);background-image:var(--grain);}
+  #rmView .rmBar{background:rgba(228,230,227,.94);backdrop-filter:blur(8px);border-bottom:1px solid var(--line);}
+  #rmView .rmBar b{font:800 24px/1 var(--display);}
+  @media (max-width:699px){
+    .tabbar{background:rgba(30,33,36,.97);}
+    .tabbar button{color:#C9CDCA;}
+    .tabbar button b{color:#fff;}
+    .tabbar button[aria-current="true"],.tabbar button.on{background:#3A4146;color:#fff;}
+  }
+  @media print{ body{background:#fff;} .card,.inc{box-shadow:none;border:1px solid #ccc;} }
+  /* Polish (Oct 20): readable small print on the answer buttons, the gym's whole name,
+     sentence-case step labels, no keyboard hints on phones. */
+  .btn.choice small{opacity:1;}
+  .btn.red.choice small,.btn.choice.red small{color:#fff;}
+  .scanline .good{color:#1B6B3D;}
+  .scan .lbl{font-size:14px;font-weight:650;text-transform:none;letter-spacing:0;color:var(--ink2,#3A4146);}
+  header h1{white-space:normal;text-overflow:clip;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;}
+  @media(max-width:420px){header h1{font-size:22px;}}
+  @media(hover:none),(pointer:coarse){#keysHint{display:none!important;}}
+  @media(max-width:480px){#emailForm{flex-direction:column;align-items:stretch;} #emailForm .in,#emailForm .btn{width:100%;}}
 </style>
 </head>
 <body>
 
 <header><div class="wrap">
-  <svg width="30" height="30" viewBox="0 0 48 48" fill="none" aria-hidden="true">
-    <path d="M4 18V6a2 2 0 0 1 2-2h12M44 18V6a2 2 0 0 0-2-2H30M4 30v12a2 2 0 0 0 2 2h12M44 30v12a2 2 0 0 1-2 2H30" stroke="#EDEFF1" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
-    <line x1="10" y1="24" x2="38" y2="24" stroke="#3FCF8E" stroke-width="2.4" stroke-opacity=".4" stroke-linecap="round"/>
-    <circle cx="24" cy="24" r="5.5" fill="#3FCF8E"/>
-  </svg>
+  <svg width="32" height="32" viewBox="0 0 48 48" aria-hidden="true"><rect x="1" y="1" width="46" height="46" rx="9" fill="#1E2124"/><rect x="12" y="11" width="5" height="26" rx="1.5" fill="#E4E6E3"/><rect x="21.5" y="11" width="5" height="26" rx="1.5" fill="#E4E6E3"/><rect x="31" y="11" width="5" height="26" rx="1.5" fill="#C8281F"/></svg>
   <h1><img id="gymLogo" alt="" hidden style="height:28px;max-width:110px;object-fit:contain;vertical-align:-6px;margin-right:8px;border-radius:4px;"><span id="gymName">Entrance activity</span><span class="by">SecurityAI entrance watch</span></h1>
   <button class="hbtn" type="button" id="alertsLink" hidden aria-controls="alertsCard">Get alerts</button>
 </div></header>
 
-<div id="demoBar" hidden style="background:#3a2f12;color:#FFD699;font-size:15px;border-bottom:1px solid rgba(255,181,74,.4);">
+<div id="demoBar" hidden style="background:#FFF1C7;color:#4A3600;font-size:15px;border-bottom:1px solid #E3C25C;">
   <div class="wrap" style="display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;justify-content:space-between;padding-top:10px;padding-bottom:10px;">
     <span><b>Sample gym.</b> Nothing here is real. Tap around: answer an entry, mark what happened, add yourself to alerts.</span>
-    <a href="/#support" style="color:#FFD699;font-weight:700;white-space:nowrap;">Get it for your gym →</a>
+    <a href="/#support" style="color:#4A3600;font-weight:700;white-space:nowrap;">Get it for your gym</a>
   </div>
 </div>
 <main><div class="wrap">
@@ -421,14 +547,14 @@
       <h2>How this page works</h2>
       <p class="muted small" style="margin:0;">Takes about a minute each morning.</p>
       <ol class="steps">
-        <li><div><b>We watch your turnstile at night</b><span>Every entry is photographed and counted. People leaving are ignored.</span></div></li>
+        <li><div><b>We watch your turnstile</b><span>Every entry is photographed and counted. People leaving are ignored.</span></div></li>
         <li><div><b>Anything odd goes to the top</b><span>Red = looks like a tailgate or a shared code. Yellow = worth a quick look. Green = normal.</span></div></li>
         <li><div><b>Check the time in your scan system</b><span>Each entry shows exactly which seconds to look at. Tap what you found: that's it.</span></div></li>
       </ol>
       <button class="btn primary" type="button" id="welcomeOk" style="width:100%;">Got it</button>
     </div>
 
-    <div class="card" id="eventBar" hidden style="border-color:rgba(255,181,74,.5);">
+    <div class="card" id="eventBar" hidden style="border-top:6px solid #E8A700;">
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;"><span style="flex:1;min-width:180px;"><b>Event mode</b> <span id="eventText" class="muted"></span></span><button class="btn" type="button" id="eventEnd">End now</button></div>
     </div>
 
@@ -445,9 +571,10 @@
     </div>
 
     <div class="card" id="spotCard" hidden>
-      <h2>Weekly spot-check <span class="muted small" style="font-weight:400;">· about 2 minutes</span></h2>
-      <p class="muted small" style="margin:0 0 6px;">A few entries the camera called normal, picked at random. Glance at each photo: this is how we find out if the camera ever misses someone.</p>
+      <details id="spotBox"><summary class="spotSum"><span><b>Weekly spot-check</b> <span class="muted small" id="spotLeft"></span></span></summary>
+      <p class="muted small" style="margin:8px 0 6px;">A few entries the camera called normal, picked at random. Glance at each photo: this is how we find out if the camera ever misses someone.</p>
       <div id="spotList"></div>
+      </details>
     </div>
 
     <div class="card install" id="installCard" hidden>
@@ -573,9 +700,9 @@
       <p class="muted" style="margin:0;" id="alertsCopy">When something's flagged, we'll email or text these people with a photo.</p>
       <div id="subs" style="margin-top:8px;"></div>
       <form id="addForm" autocomplete="off">
-        <label class="f" for="addIn">Add an email, mobile number or chat channel</label>
+        <label class="f" for="addIn" id="addLabel">Add an email or a chat channel</label>
         <div class="formrow">
-          <input class="in" id="addIn" inputmode="email" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="Email, mobile number or chat webhook link" required>
+          <input class="in" id="addIn" inputmode="email" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="Email or chat link" required>
           <button class="btn primary" type="submit" id="addBtn">Add</button>
         </div>
         <div class="muted small" style="margin-top:6px;">They'll get a test message straight away, with a link to stop alerts any time.</div>
@@ -589,7 +716,7 @@
       <button class="btn link" type="button" id="howBtn">How this page works</button>
       <button class="btn link" type="button" id="bigBtn" aria-pressed="false">Larger text</button>
       <button class="btn link" type="button" id="msgBtn">Message TJ</button>
-      <details id="newsBox" style="margin:6px auto;max-width:520px;text-align:left;"><summary class="btn link" style="list-style:none;display:inline-flex;" id="newsSum">What's new</summary><ul id="newsList" class="small" style="margin:6px 0 0;padding-left:18px;"></ul></details>
+      <details id="newsBox" style="margin:6px auto;max-width:520px;text-align:center;"><summary class="btn link" style="list-style:none;display:inline-flex;" id="newsSum">What's new</summary><ul id="newsList" class="small" style="margin:6px 0 0;padding-left:18px;text-align:left;"></ul></details>
       <div id="whoami" class="small"></div>
       <button class="btn link" type="button" id="signOutBtn" hidden>Sign out on this device</button>
       <div><a href="/desk">Front-desk screen</a> · <a href="signage.html">Door sign and member notice</a></div>
@@ -602,10 +729,10 @@
 
 <!-- Phone tab bar -->
 <nav class="tabbar" id="tabbar" aria-label="Sections" hidden>
-  <button type="button" data-tab="list"><b>◉</b><span>To check<span class="n" id="tabN" hidden></span></span></button>
-  <button type="button" data-tab="resultsCard"><b>$</b><span>Results</span></button>
-  <button type="button" data-tab="alertsCard"><b>✉</b><span>Alerts</span></button>
-  <button type="button" data-tab="help"><b>?</b><span>Help</span></button>
+  <button type="button" data-tab="list"><b><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h2M4 12h2M4 18h2M9 6h11M9 12h11M9 18h11"/></svg></b><span>To check<span class="n" id="tabN" hidden></span></span></button>
+  <button type="button" data-tab="resultsCard"><b><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19h16M7 15l4-4 3 3 5-6"/></svg></b><span>Results</span></button>
+  <button type="button" data-tab="alertsCard"><b><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15zM10 21h4"/></svg></b><span>Alerts</span></button>
+  <button type="button" data-tab="help"><b><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.3 2.4c-.5.2-.8.6-.8 1.1v.5M12 17v.01"/></svg></b><span>Help</span></button>
 </nav>
 
 <!-- Full-screen photo viewer -->
@@ -681,8 +808,20 @@ const drafts = {};      // typed-but-unsent review notes, by event id
 // ---- time, in the gym's own zone --------------------------------------
 function fmt(iso, o){
   const d = new Date(iso); if(isNaN(d)) return '';
-  try{ return d.toLocaleString('en-US', Object.assign({ timeZone }, o)); }
-  catch(e){ return d.toLocaleString('en-US', o); }
+  let out;
+  try{ out = d.toLocaleString('en-US', Object.assign({ timeZone }, o)); }
+  catch(e){ out = d.toLocaleString('en-US', o); }
+  // The night the clocks go back, 1:00-1:59 AM happens twice: say which one,
+  // so staff look up the right one in the check-in log.
+  const r = o && o.hour && !o.plain ? repeatedHour(d) : null;
+  return r ? `${out} (${r === 1 ? 'first' : 'second'} time: clocks went back)` : out;
+}
+function repeatedHour(d){
+  const f = x => { try{ return x.toLocaleString('en-US', { timeZone, day:'numeric', hour:'numeric', minute:'2-digit', hour12:false }); } catch(e){ return null; } };
+  const a = f(d); if(!a) return 0;
+  if(f(new Date(d.getTime() - 3600e3)) === a) return 2;
+  if(f(new Date(d.getTime() + 3600e3)) === a) return 1;
+  return 0;
 }
 // Seconds matter: staff match these against the check-in log (G3).
 function timeOf(iso){ return fmt(iso, { hour:'numeric', minute:'2-digit', second:'2-digit' }); }
@@ -1144,12 +1283,29 @@ function memberFor(e){
 // used, and every answer stays in this browser tab.
 const DEMO = /[?&]demo(=|&|$)/.test(location.search);
 function demoPhoto(f){
-  // A simple drawing, not a photo: a turnstile and n people (f = "n-k").
+  // A drawing, not a photo: the overhead turnstile camera (as on the home
+  // page) with n people walking up through it. f = "n-k": photo k of 4.
   const [n, k] = String(f).split('-').map(Number);
-  const ppl = [];
-  for(let i = 0; i < n; i++){ const x = 120 + i * 62 + (k || 0) * 18, c = ['#7FB2FF','#E8C07A','#C792EA'][i % 3];
-    ppl.push(`<circle cx="${x}" cy="${118 - i * 4}" r="17" fill="${c}"/><rect x="${x - 22}" y="${138 - i * 4}" width="44" height="78" rx="18" fill="${c}"/>`); }
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300"><rect width="400" height="300" fill="#22282c"/><path d="M0 220h400" stroke="#3b444a" stroke-width="2"/><rect x="250" y="90" width="12" height="140" fill="#59646b"/><path d="M256 120l60-12M256 150l60 0M256 180l60 12" stroke="#59646b" stroke-width="6"/>${ppl.join('')}<text x="12" y="22" fill="#a3abb3" font-family="monospace" font-size="13">SAMPLE · CAM 1</text></svg>`;
+  const SH = [['#5E676E', '#4A5258', '#B98A6B'], ['#8A4F38', '#A87A5E', '#9C6E52'], ['#3E5A7A', '#2F465F', '#C49A7C']];
+  const person = (x, y, c, i) => `<g transform="translate(${x} ${y})"><ellipse cx="8" cy="8" rx="50" ry="24" fill="#000" opacity=".38" filter="url(#s)"/>
+    <ellipse cx="-41" cy="2" rx="9" ry="14" fill="${c[1]}"/><ellipse cx="41" cy="2" rx="9" ry="14" fill="${c[1]}"/><rect x="-38" y="-16" width="76" height="32" rx="16" fill="${c[0]}"/>
+    <ellipse cy="8" rx="18" ry="10" fill="${c[1]}"/><ellipse cy="-6" rx="14" ry="16" fill="#26201C"/><ellipse cy="-20" rx="8" ry="3.5" fill="${c[2]}" opacity=".85"/>
+    <g fill="none" stroke="#E8A700" stroke-width="3" stroke-linecap="round"><path d="M-54 -20 v-16 h16 M38 -36 h16 v16 M54 20 v16 h-16 M-38 36 h-16 v-16"/></g>
+    <rect x="-54" y="-60" width="22" height="20" rx="3" fill="#E8A700"/><text x="-43" y="-45" text-anchor="middle" font-family="monospace" font-size="15" font-weight="700" fill="#1E2124">${i + 1}</text></g>`;
+  const lead = 300 - ((k || 1) - 1) * 74, ppl = [];
+  for(let i = n - 1; i >= 0; i--) ppl.push(person(320 + (i % 2 ? 8 : 0), lead + i * 74, SH[i % 3], i));
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 400"><defs>
+    <pattern id="t" width="64" height="64" patternUnits="userSpaceOnUse"><path d="M64 0H0V64" fill="none" stroke="#24282B" stroke-width="2"/></pattern>
+    <linearGradient id="g" x1="0" x2="1"><stop offset="0" stop-color="#9AA3A8"/><stop offset=".5" stop-color="#C3CACE"/><stop offset="1" stop-color="#8A9398"/></linearGradient>
+    <filter id="s" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="5"/></filter>
+    <radialGradient id="v" cx="50%" cy="48%" r="70%"><stop offset=".45" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".7"/></radialGradient></defs>
+    <rect width="640" height="400" fill="#2E3337"/><rect width="640" height="400" fill="url(#t)"/><rect x="196" y="292" width="248" height="108" fill="#22262A"/>
+    <g stroke="#AEB6BB" stroke-width="5" stroke-linecap="round" opacity=".9"><path d="M254 212 L318 212"/></g>${ppl.join('')}
+    <rect x="214" y="146" width="44" height="148" rx="8" fill="#23272A"/><rect x="382" y="146" width="44" height="148" rx="8" fill="#23272A"/>
+    <rect x="218" y="148" width="36" height="142" rx="6" fill="url(#g)"/><rect x="386" y="148" width="36" height="142" rx="6" fill="url(#g)"/>
+    <rect x="226" y="262" width="20" height="14" rx="3" fill="#1E2124"/><circle cx="236" cy="269" r="3.5" fill="${k === 2 ? '#7DFFB9' : '#2F7A58'}"/>
+    <rect width="640" height="400" fill="url(#v)"/>
+    <g font-family="monospace" font-size="17" font-weight="700" fill="#F2F2EE"><text x="18" y="32">SAMPLE · CAM 01 FRONT DOOR</text><text x="622" y="32" text-anchor="end">${k || 1}/4</text></g></svg>`;
   return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
 }
 let demoState = null;
@@ -1166,8 +1322,8 @@ function demoData(){
   for(let i = 0; i < 9; i++) events.push(ev('n' + i, 30 + i * 37, 'ok', 1, { note: 'One person scans in and walks through.', scanCheck: { people: 1, scans: 1, matched: true, ids: [] } }));
   events.push(ev('o1', 140, 'out', 1, { note: 'Someone leaving.' }));
   events.sort((a, b) => Date.parse(b.at) - Date.parse(a.at));
-  demoState = { gymCode: 'demo', canManageAlerts: true, reviewNoteMax: 120, events, subs: [{ id: 's1', kind: 'email', to: 'owner@demo-fitness.example', morning: true }],
-    gym: { name: 'Demo Fitness (sample)', state: 'watching', timeZone: 'America/Chicago', schedule: null, checkinSystem: 'Ashbourne', checkinZone: 'Zone 1', zones: [{ label: 'Front Door', ok: true, picture: 'ok' }] },
+  demoState = { gymCode: 'demo', canManageAlerts: true, reviewNoteMax: 120, events, subs: [{ id: 's1', kind: 'email', to: 'owner@maplestreetfitness.example', morning: true }],
+    gym: { name: 'Maple Street Fitness', state: 'watching', timeZone: 'America/Chicago', schedule: null, checkinSystem: 'Ashbourne', checkinZone: 'Zone 1', zones: [{ label: 'Front Door', ok: true, picture: 'ok' }] },
     retention: { text: 'Sample gym: nothing here is real, and nothing you tap is saved anywhere.' },
     spot: { week: 'demo', total: 5, done: 2, waiting: ['n1', 'n4', 'n6'], missed: 0 },
     results: { since: new Date(now - 30 * 864e5).toISOString().slice(0, 10), nightsWatched: 30, entriesChecked: 1840, cameraFlagged: 41, reviewed: 38, confirmedTailgates: 27, confirmedShared: 6, extraPeople: 33, markedFine: 5,
@@ -1295,10 +1451,7 @@ function render(){
   $('welcome').hidden = !!store('sai:welcomed');
   $('alertsCard').hidden = !data.canManageAlerts;
   $('alertsLink').hidden = !data.canManageAlerts;
-  const sw = scheduleWords();
-  $('alertsCopy').textContent = sw
-    ? `We watch ${sw} each night. When something's flagged in those hours, we'll email or text these people with a photo. They're also told if the camera computer goes offline then.`
-    : `We watch all day and night. When something's flagged, we'll email or text these people with a photo. They're also told if the camera computer goes offline.`;
+  renderAlertsCopy();
   if(data.canManageAlerts && !alertsLoaded) loadAlerts();
   renderMe();
   renderGymSet();
@@ -1408,6 +1561,7 @@ setBig(store('sai:big') === '1');
 $('bigBtn').onclick = () => { const on = !document.documentElement.classList.contains('big'); store('sai:big', on ? '1' : '0'); setBig(on); };
 // What's new: newest first. The dot shows until opened once.
 const NEWS = [
+  ['2026-10-17', 'A new look: easier to read in daylight, bigger numbers, and last night as a strip at the top. Tap a red or yellow bar to jump to that entry.'],
   ['2026-10-16', 'Spanish for the gym page, repeat check on approved phones, day-pass message tied to certain entries, night mode, all-gyms view.'],
   ['2026-10-16', 'Trends and busiest hours, Review one by one, Getting started checklist, camera problems inbox, Slack/Teams/Google Chat alerts, works without signal, printable report, gym logo, shorter photo keep times, find a member, Spanish members page.'],
   ['2026-10-16', 'Phone notifications, a front-desk screen (/desk), personal logins, "Ask about your numbers", ▶ Play, answers saved without signal.'],
@@ -1415,6 +1569,7 @@ const NEWS = [
 ];
 $('newsList').innerHTML = NEWS.map(([d, t]) => `<li><b>${esc(fmt(d + 'T12:00:00Z', { month:'short', day:'numeric' }))}:</b> ${esc(t)}</li>`).join('');
 if(store('sai:newsSeen') !== NEWS[0][0] + NEWS.length) $('newsSum').textContent = 'What\'s new •';
+$('spotBox').addEventListener('click', ev => { if(ev.target.closest('summary')) spotTouched = true; });
 $('accessBox').addEventListener('toggle', () => { if($('accessBox').open) loadAccess(); });
 $('newsBox').addEventListener('toggle', () => { if($('newsBox').open){ store('sai:newsSeen', NEWS[0][0] + NEWS.length); $('newsSum').textContent = 'What\'s new'; } });
 $('msgBtn').onclick = () => { $('msgSheet').classList.add('open'); $('msgOut').textContent = ''; setTimeout(() => $('msgIn').focus(), 50); };
@@ -1433,7 +1588,7 @@ const can = what => !data.me || !data.me.rights || data.me.rights.includes(what)
 let peopleLoaded = false, mineLoaded = 0;
 function renderMe(){
   const me = data.me;
-  $('whoami').textContent = me && me.person ? `Signed in as ${me.person.name} (${me.role}).` : '';
+  $('whoami').textContent = me && me.person ? `Signed in as ${me.person.name}${String(me.person.name).toLowerCase() === String(me.role).toLowerCase() ? '' : ` (${me.role})`}.` : '';
   $('signOutBtn').hidden = !codeRequired && !(me && me.person);
   $('priceForm').hidden = !can('price');
   $('askForm').hidden = !can('price');
@@ -1551,11 +1706,15 @@ function renderStatus(g){
   }
 }
 
+let spotTouched = false;
 function renderSpot(){
   const sp = data.spot, card = $('spotCard');
   const list = sp ? (sp.waiting || []).map(id => byId(id, true)).filter(Boolean) : [];
   card.hidden = !list.length;
   if(!list.length) return;
+  $('spotLeft').textContent = `· ${list.length} left · about 2 minutes`;
+  // Folded while flagged entries are waiting (those come first); open when nothing else is.
+  if(!spotTouched) $('spotBox').open = !(data.events || []).some(e => needsLook(e) && !e.review);
   $('spotList').innerHTML = `<p class="small" style="margin:0 0 4px;">${esc(sp.done)} of ${esc(sp.total)} done this week.</p>` + list.map(e => `<div class="spot" id="spot-${esc(e.id)}">
       <img src="${esc(photoUrl(thumbOf(e)))}" alt="Entrance photo ${esc(timeOf(e.at))}" data-open="${esc(e.id)}" data-i="0" loading="lazy">
       <div class="st"><b>${esc(timeOf(e.at))}</b> <span class="muted small">${esc(dayWords(e.at))}</span><div class="muted small">${esc(headline(e))}</div></div>
@@ -1578,6 +1737,23 @@ function thanksLine(){
   const n = me && data.results && data.results.thanks7d ? data.results.thanks7d[me] : 0;
   return n ? `<div class="thanks">Thanks, ${esc(me)}: you checked ${esc(n)} ${n === 1 ? 'entry' : 'entries'} this week.</div>` : '';
 }
+// The night at a glance: one tick per entry across the watch window,
+// red and yellow ones stand up tall and jump to their entry.
+function nightStrip(winEv, w){
+  const now = Date.now();
+  const start = w ? w.start : now - 864e5, end = w ? Math.min(w.end, now) : now;
+  if(!(end > start)) return '';
+  const span = Math.max(1, (w ? w.end : now) - start);
+  const list = winEv.filter(e => e.kind !== 'out' && e.kind !== 'none').map(e => ({ e, t: Date.parse(e.at) })).filter(x => x.t >= start && x.t <= start + span);
+  if(!list.length) return '';
+  const pos = t => Math.max(0.4, Math.min(99.6, (t - start) / span * 100)).toFixed(2);
+  const ticks = list.filter(x => !needsLook(x.e)).map(x => `<i style="left:${pos(x.t)}%"></i>`).join('');
+  const flags = list.filter(x => needsLook(x.e)).map(x => `<button type="button" class="${x.e.kind === 'flag' ? 'r' : 'y'}${x.e.review ? ' done' : ''}" style="left:${pos(x.t)}%" data-goto="${esc(x.e.id)}" aria-label="${esc(timeOf(x.e.at))}: ${x.e.kind === 'flag' ? 'flagged' : 'worth a look'}${x.e.review ? ', answered' : ''}. Show it"></button>`).join('');
+  // Night hours: their clock times ("10 PM · 2 AM · 6 AM"). The last 24 hours: how long ago.
+  const axis = w && !w.always ? [start, start + span / 2, start + span].map(clockOf) : ['24 h ago', '12 h ago', 'Now'];
+  return `<div class="nstrip" aria-label="Entries across the night">${ticks}${flags}</div><div class="naxis" aria-hidden="true">${axis.map(a => `<span>${esc(a)}</span>`).join('')}</div>`;
+}
+function clockOf(ms){ const d = new Date(ms); return fmt(d.toISOString(), d.getMinutes() || d.getSeconds() ? { hour:'numeric', minute:'2-digit', plain: true } : { hour:'numeric', plain: true }); }
 function renderSummary(){
   const ev = data.events || [];
   const hours = (data.gym && data.gym.retentionHours) || 48;
@@ -1593,6 +1769,7 @@ function renderSummary(){
   const leaving = winEv.filter(e => e.kind === 'out').length;
   const gates = winEv.filter(e => e.kind === 'gate').length;
   const checked = winEv.filter(e => needsLook(e) && e.review).length;
+  const strip = nightStrip(winEv, w);
   if(!ev.length){
     el.innerHTML = `<div class="big">Nothing yet</div><div class="s">No entries in the last ${esc(hours)} hours.</div>`;
     return;
@@ -1604,16 +1781,16 @@ function renderSummary(){
   const older = earlier.length
     ? `<div class="older">${esc(plural(earlier.length, 'more', 'more'))} still open from ${w && !w.always ? 'earlier' : 'before that'}</div>` : '';
   if(openNow.length){
-    el.innerHTML = `<div class="big bad">${esc(label)}: ${openNow.length} ${openNow.length === 1 ? 'needs' : 'need'} a look</div>${older}
-      <div class="s">${esc(bits.join(' · '))}</div>${monthLine()}${thanksLine()}
+    el.innerHTML = `<div class="lbl">${esc(label)}</div><div class="big bad">${openNow.length} to look at</div>${older}
+      <div class="s">${esc(bits.join(' · '))}</div>${strip}${monthLine()}${thanksLine()}
       <button class="btn primary go" type="button" data-go="1">Check ${openNow.length === 1 ? 'it' : 'them'} now</button>`;
   } else if(earlier.length){
-    el.innerHTML = `<div class="big">${esc(label)}: nothing new</div>${older}
-      <div class="s">${esc(bits.join(' · '))}</div>${monthLine()}${thanksLine()}
+    el.innerHTML = `<div class="lbl">${esc(label)}</div><div class="big">Nothing new</div>${older}
+      <div class="s">${esc(bits.join(' · '))}</div>${strip}${monthLine()}${thanksLine()}
       <button class="btn go" type="button" data-go="1">Check the older ${earlier.length === 1 ? 'one' : 'ones'}</button>`;
   } else {
-    el.innerHTML = `<div class="big good">All clear</div>
-      <div class="s">${esc(label)}: ${esc(bits.join(' · '))}${checked ? '' : ' · nothing flagged'}</div>${monthLine()}${thanksLine()}`;
+    el.innerHTML = `<div class="lbl">${esc(label)}</div><div class="big good">All clear</div>
+      <div class="s">${esc(bits.join(' · '))}${checked ? '' : ' · nothing flagged'}</div>${strip}${monthLine()}${thanksLine()}`;
   }
 }
 
@@ -1765,7 +1942,7 @@ function card(e){
            <div class="lbl">${memberFor(e) ? 'Step 1 · Who they came in behind' : `Step 1 · ${esc(where())}, and look at`}</div>
            ${(() => {
              const w = memberFor(e);
-             if(!w) return `<div class="times">${esc(scanMinutes(e))}</div>${reviewsDone() >= 5 ? quickHelp(e) : matchHelp(e)}`;
+             if(!w) return `<div class="times">${esc(scanMinutes(e))}</div>${reviewsDone() >= 2 || (e.scanCheck && Number.isFinite(Number(e.scanCheck.scans))) ? quickHelp(e) : matchHelp(e)}`;
              return `<div class="who${w.sure ? '' : ' maybe'}"><div class="l">${e.phoneHandoff ? 'Code that was used' : 'Came in behind'}${w.sure ? '' : ' · likely'}</div><div class="m">Member #${esc(w.m)}</div>
                  <div class="q">Scanned ${esc(timeOf(w.t))}. ${w.sure ? 'Certain: the scans and the people coming in line up exactly, to the second.' : w.unsure ? 'Likely, not certain: the front-desk screen showed two slightly different numbers for this scan. Check the number in the Visit Log first.' : 'Likely, not certain: the scans around then don’t line up exactly. Check the photos first.'}</div></div>
                <details class="manual"><summary>Check it yourself in ${esc((data.gym && data.gym.checkinSystem) || 'your check-in system')}</summary>
@@ -1872,6 +2049,7 @@ async function loadTrends(force){
     $('tChange').textContent = `${what} per 100 entries: ${c.before} in the first two weeks, ${c.after} in the last two (${dir}).`;
   } else if(c){ $('tChange').textContent = `${c.measure === 'confirmed' ? 'Confirmed tailgates' : 'Flagged entries'} per 100 entries in the last two weeks: ${c.after}.`; }
   else $('tChange').textContent = `The before-and-after comparison shows up after two weeks with at least ${t.minEntries} entries.`;
+  $('tChange').classList.toggle('waiting', !c);
   const wmax = Math.max(1, ...t.weeks.map(w => w.confirmed));
   $('tWeeks').innerHTML = t.weeks.map(w => `<div class="b" style="height:${Math.max(2, w.confirmed / wmax * 100)}%;${w.confirmed ? '' : 'opacity:.25;'}" title="${esc(w.from)}: ${w.confirmed} confirmed of ${w.checked} entries">${w.confirmed ? `<em>${w.confirmed}</em>` : ''}</div>`).join('');
   $('tWeeks').setAttribute('aria-label', 'Confirmed tailgates per week, oldest first: ' + t.weeks.map(w => w.confirmed).join(', '));
@@ -1897,7 +2075,7 @@ function renderGuide(){
   const r = data.results || {}, mine = JSON.parse(store(key) || '{}');
   if(DEMO || mine.hidden){ card.hidden = true; return; }
   const steps = [
-    { id: 'alerts', t: 'Add yourself to alerts', s: 'Email, text or a team chat. You get a test straight away.', done: subsCount > 0, go: ['Open alerts', () => { const a = $('alertsCard'); if(a && !a.hidden) a.scrollIntoView({ behavior: 'smooth' }); }], show: data.canManageAlerts },
+    { id: 'alerts', t: 'Add yourself to alerts', s: textsOn ? 'Email, text or a team chat. You get a test straight away.' : 'Email or a team chat. You get a test straight away.', done: subsCount > 0, go: ['Open alerts', () => { const a = $('alertsCard'); if(a && !a.hidden) a.scrollIntoView({ behavior: 'smooth' }); }], show: data.canManageAlerts },
     { id: 'push', t: 'Turn on notifications on this phone', s: 'A buzz the moment something is flagged.', done: typeof Notification !== 'undefined' && Notification.permission === 'granted', show: 'Notification' in window },
     { id: 'sign', t: 'Put the sign up at the entrance', s: 'Members should know the door camera checks entries.', done: !!mine.sign, go: ['Print the sign', null, '/signage.html'], tick: true },
     { id: 'first', t: 'Answer your first flagged entry', s: 'Tap Tailgate, Shared code or It was fine. That’s how the counts and reports fill in.', done: (r.reviewed || 0) > 0 },
@@ -2334,10 +2512,21 @@ $('signOutBtn').onclick = async () => {
 
 // ---- alert list ---------------------------------------------------------------
 let alertsLoaded = false;
+// Text messages are only offered once the website can send them (Twilio set up).
+let textsOn = false;
+function renderAlertsCopy(){
+  const sw = scheduleWords(), how = textsOn ? 'email or text' : 'email';
+  $('alertsCopy').textContent = sw
+    ? `We watch ${sw} each night. When something's flagged in those hours, we'll ${how} these people with a photo. They're also told if the camera computer goes offline then.`
+    : `We watch all day and night. When something's flagged, we'll ${how} these people with a photo. They're also told if the camera computer goes offline.`;
+  $('addLabel').textContent = textsOn ? 'Add an email, mobile number or chat channel' : 'Add an email or a chat channel';
+  $('addIn').placeholder = textsOn ? 'Email, mobile number or chat link' : 'Email or chat link';
+}
 async function loadAlerts(){
   alertsLoaded = true;
   const r = await api('/gym/alerts').catch(() => null);
   if(!r || !r.ok){ $('alertsCard').hidden = true; $('alertsLink').hidden = true; alertsLoaded = false; return; }
+  if(textsOn !== !!r.body.textsAvailable){ textsOn = !!r.body.textsAvailable; renderAlertsCopy(); if(data) renderGuide(); }
   renderSubs(r.body.subscribers || []);
 }
 let subsCount = null;

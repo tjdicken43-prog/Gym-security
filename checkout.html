@@ -5,31 +5,30 @@
 <link rel="icon" type="image/svg+xml" href="logo.svg">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Checkout — SecurityAI</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+<link rel="preload" href="/fonts/BigShoulders-Bold.woff" as="font" type="font/woff" crossorigin>
+<link rel="stylesheet" href="brand.css">
 <style>
-  :root{
-    --bg:#14171A; --panel:#1C2124; --panel-2:#22282C; --line:#31383D;
-    --text:#EDEFF1; --muted:#8B939B; --green:#3FCF8E; --red:#FF5A5A; --amber:#FFB020;
+  :root{--yel:#E8A700;
+    --bg:#E4E6E3; --panel:#F7F7F5; --panel-2:#ECEEEB; --line:#D3D6D3;
+    --text:#1E2124; --muted:#4E565B; --green:#23804A; --red:#C8281F; --amber:#7A5800;
   }
   *{box-sizing:border-box;}
-  body{margin:0;background:var(--bg);color:var(--text);font-family:'IBM Plex Sans',sans-serif;line-height:1.55;}
-  h1,h2,h3{font-family:'Oswald',sans-serif;font-weight:600;margin:0;}
-  .mono{font-family:'IBM Plex Mono',monospace;}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:var(--body);line-height:1.55;}
+  h1,h2,h3{font-family:var(--display);font-weight:600;margin:0;}
+  .mono{font-family:ui-monospace,Menlo,Consolas,monospace;}
   a{color:inherit;}
   .wrap{max-width:1000px;margin:0 auto;padding:0 28px;}
 
   nav{border-bottom:1px solid var(--line);}
   nav .wrap{display:flex;align-items:center;justify-content:space-between;height:64px;}
-  .brand{display:flex;align-items:center;gap:10px;font-family:'Oswald';font-size:19px;font-weight:600;text-decoration:none;}
+  .brand{display:flex;align-items:center;gap:10px;font-family:var(--display);font-size:19px;font-weight:600;text-decoration:none;}
   
   .back{color:var(--muted);font-size:14px;text-decoration:none;}
   .back:hover{color:var(--text);}
 
   main{padding:52px 0 90px;}
   .head{margin-bottom:36px;}
-  .head .tag{color:var(--green);font-size:13px;font-family:'IBM Plex Mono';margin-bottom:10px;}
+  .head .tag{color:var(--muted);font-size:16px;font-weight:600;margin-bottom:8px;}
   .head h1{font-size:30px;}
 
   .layout{display:grid;grid-template-columns:1fr 380px;gap:40px;align-items:start;}
@@ -37,17 +36,18 @@
 
   .card{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:28px;}
   .card + .card{margin-top:20px;}
-  .card h3{font-size:15px;color:var(--muted);font-weight:500;font-family:'IBM Plex Sans';margin-bottom:18px;letter-spacing:0.2px;}
+  .card h3{font-size:15px;color:var(--muted);font-weight:500;font-family:var(--body);margin-bottom:18px;letter-spacing:0.2px;}
 
   label{display:block;font-size:13px;color:var(--muted);margin-bottom:6px;}
   input[type=text], input[type=email]{
-    width:100%;background:#0F1214;border:1px solid var(--line);border-radius:4px;
-    color:var(--text);font-size:14.5px;padding:11px 12px;font-family:'IBM Plex Sans';
+    width:100%;background:#FFFFFF;border:1px solid var(--line);border-radius:4px;
+    color:var(--text);font-size:14.5px;padding:11px 12px;font-family:var(--body);
     margin-bottom:16px;
   }
   input:focus{outline:none;border-color:var(--green);}
   .row2{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
   .row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;}
+  @media(max-width:560px){.row2,.row3{grid-template-columns:1fr;gap:0;}}
 
   .consent{display:flex;gap:12px;align-items:flex-start;padding:14px 0;border-top:1px solid var(--line);}
   .consent:first-of-type{border-top:none;}
@@ -56,52 +56,68 @@
   }
   .consent p{margin:0;font-size:13.5px;color:var(--muted);}
   .consent p a{color:var(--text);text-decoration:underline;}
-  .consent.optional p{color:#767e85;}
+  .consent.optional p{color:#4E565B;}
 
   .summary-line{display:flex;justify-content:space-between;font-size:14px;color:var(--muted);padding:9px 0;border-bottom:1px solid var(--line);}
   .summary-line:last-of-type{border-bottom:none;}
-  .summary-total{display:flex;justify-content:space-between;font-family:'Oswald';font-size:22px;padding-top:14px;margin-top:6px;border-top:1px solid var(--line);}
+  .summary-total{display:flex;justify-content:space-between;font-family:var(--display);font-size:22px;padding-top:14px;margin-top:6px;border-top:1px solid var(--line);}
   .summary-total span:last-child{color:var(--green);}
 
   .btn-primary{
-    width:100%;background:var(--green);color:#0C1512;font-weight:600;font-size:15px;
+    width:100%;background:var(--green);color:#FFFFFF;font-weight:600;font-size:15px;
     padding:14px 22px;border-radius:4px;border:none;cursor:pointer;margin-top:22px;
   }
-  .btn-primary:disabled{background:#31383D;color:#6b7278;cursor:not-allowed;}
-  .fineprint{font-size:12px;color:#6b7278;margin-top:12px;text-align:center;}
+  .btn-primary:disabled{background:#C9CDCA;color:#4E565B;cursor:not-allowed;}
+  .fineprint{font-size:12px;color:#4E565B;margin-top:12px;text-align:center;}
 
   .disclosure{
     background:var(--panel-2);border:1px solid var(--line);border-radius:6px;
     padding:16px 18px;display:flex;gap:12px;margin-bottom:28px;
   }
-  .disclosure .mark{font-family:'IBM Plex Mono';color:var(--amber);font-size:12px;flex-shrink:0;margin-top:2px;}
+  .disclosure .mark{font-family:ui-monospace,Menlo,Consolas,monospace;color:var(--amber);font-size:12px;flex-shrink:0;margin-top:2px;}
+  @media(max-width:560px){.disclosure{flex-direction:column;gap:6px;}}
   .disclosure p{margin:0;font-size:13.5px;color:var(--muted);}
 
   .success{display:none;text-align:center;padding:60px 20px;}
   .success.show{display:block;}
   .success .check{
-    width:56px;height:56px;border-radius:50%;background:rgba(63,207,142,0.14);
+    width:56px;height:56px;border-radius:50%;background:rgba(35,128,74,0.14);
     display:flex;align-items:center;justify-content:center;margin:0 auto 22px;
-    color:var(--green);font-size:26px;font-family:'IBM Plex Mono';
+    color:var(--green);font-size:26px;font-family:ui-monospace,Menlo,Consolas,monospace;
   }
   .success h2{font-size:26px;margin-bottom:10px;}
   .success p{color:var(--muted);font-size:14.5px;max-width:420px;margin:0 auto;}
   .formstate{display:block;}
   .formstate.hide{display:none;}
+
+  /* ===== SecurityAI look (appended last so it wins) ===== */
+  .head h1{font-size:clamp(48px,7vw,72px);line-height:.92;text-transform:uppercase;}
+  h1,h2,h3{font-family:var(--display);font-weight:800;letter-spacing:.01em;}
+  body{background-color:var(--bg);background-image:var(--grain);}
+  .card{background:var(--panel);border:0;border-radius:16px;box-shadow:var(--lift);}
+  .disclosure{background:#FFF6DB;border:1px solid #F0D27A;}
+  .disclosure .mark{color:var(--amber);font-family:var(--body);font-weight:700;letter-spacing:0;}
+  button[type=submit],#payBtn,.pay{background:var(--blue)!important;border-color:var(--blue)!important;color:#fff!important;border-radius:10px;font-weight:700;}
+  button[type=submit]:disabled{background:#AEB6BB!important;border-color:#AEB6BB!important;}
+  .summary-total b,.tot{font-family:var(--display);font-weight:800;}
+  .card h3{font:600 18px/1.25 var(--body);color:var(--text);text-transform:none;letter-spacing:0;margin-bottom:16px;}
+  .disclosure .mark{color:#7A5800;}
+  /* Polish (Oct 20): the page people pay on reads like the rest of the site. */
+  .card h2{font:600 19px/1.25 var(--body);color:var(--text);text-transform:none;letter-spacing:0;margin:0 0 16px;}
+  label{font-size:15px;}
+  input,select{font-size:16px;}
+  .consent p,.disclosure p{font-size:15px;line-height:1.55;}
+  .summary-line{font-size:15px;}
+  .fineprint{font-size:13px;}
+  .back{font-size:15px;padding:10px 0;}
+  .disclosure p{max-width:58ch;}
 </style>
 </head>
 <body>
 
 <nav>
   <div class="wrap">
-    <a class="brand" href="securityai.html"><svg class="logo-mark" width="22" height="22" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" style="flex-shrink:0;">
-        <path d="M4 18V6a2 2 0 0 1 2-2h12" stroke="currentColor" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/>
-        <path d="M44 18V6a2 2 0 0 0-2-2H30" stroke="currentColor" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/>
-        <path d="M4 30v12a2 2 0 0 0 2 2h12" stroke="currentColor" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/>
-        <path d="M44 30v12a2 2 0 0 1-2 2H30" stroke="currentColor" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/>
-        <line x1="10" y1="24" x2="38" y2="24" stroke="#3FCF8E" stroke-width="2.4" stroke-opacity="0.4" stroke-linecap="round"/>
-        <circle cx="24" cy="24" r="5.5" fill="#3FCF8E"/>
-      </svg>SecurityAI</a>
+    <a class="brand" href="securityai.html"><svg width="22" height="22" viewBox="0 0 48 48" aria-hidden="true" style="flex-shrink:0;"><rect x="1" y="1" width="46" height="46" rx="9" fill="#1E2124"/><rect x="12" y="11" width="5" height="26" rx="1.5" fill="#E4E6E3"/><rect x="21.5" y="11" width="5" height="26" rx="1.5" fill="#E4E6E3"/><rect x="31" y="11" width="5" height="26" rx="1.5" fill="#C8281F"/></svg>SecurityAI</a>
     <a class="back" href="securityai.html#pricing">← Back to pricing</a>
   </div>
 </nav>
@@ -111,19 +127,19 @@
 
     <div class="formstate" id="formstate">
       <div class="head">
-        <div class="tag mono">CHECKOUT</div>
+        <div class="tag">Checkout</div>
         <h1>Set up your subscription</h1>
       </div>
 
       <div class="disclosure">
-        <div class="mark">HOW THIS WORKS</div>
-        <p><strong style="color:var(--text);">You don't enter your card on this page.</strong> "Continue to payment" takes you to Stripe's secure checkout page, where you enter your card. After that we'll contact you to set up the camera computer at your gym.</p>
+        <div class="mark">How this works</div>
+        <p><strong style="color:var(--text);">You don't enter your card on this page.</strong> "Continue to payment" takes you to Stripe's secure checkout page, where you enter your card. After that we'll contact you to set up the camera computer at your gym. Not sure your cameras and check-in system work with it? <a href="/check">Check first</a> (two minutes).</p>
       </div>
 
       <div class="layout">
         <div>
           <div class="card">
-            <h3>CONTACT</h3>
+            <h2>Your details</h2>
             <div class="row2">
               <div><label for="name">Full name</label><input type="text" id="name" autocomplete="name" placeholder="Jordan Lee"></div>
               <div><label for="email">Email</label><input type="email" id="email" autocomplete="email" placeholder="jordan@yourgym.com"></div>
@@ -133,12 +149,7 @@
           </div>
 
           <div class="card">
-            <h3>PAYMENT DETAILS</h3>
-            <p style="font-size:13.5px;color:var(--muted);margin:0;">You'll enter your card on Stripe's secure checkout page after this step — nothing to fill in here.</p>
-          </div>
-
-          <div class="card">
-            <h3>REQUIRED CONSENT</h3>
+            <h2>Before you continue</h2>
             <div class="consent">
               <input type="checkbox" id="c1" class="required-consent">
               <p>I agree to SecurityAI's <a href="terms.html#terms" target="_blank" rel="noopener">Terms of Service</a> and <a href="terms.html#privacy" target="_blank" rel="noopener">Privacy Policy</a>.</p>
@@ -153,18 +164,18 @@
             </div>
             <div class="consent optional">
               <input type="checkbox" id="c4">
-              <p>Send me occasional product updates. Optional — unchecked by default.</p>
+              <p>Send me occasional product updates (optional).</p>
             </div>
           </div>
         </div>
 
         <div class="card" style="position:sticky;top:24px;">
-          <h3>ORDER SUMMARY</h3>
+          <h2>Your order</h2>
           <div class="summary-line"><span class="plan-name-line">One entrance</span><span>$<span class="pr">200</span>/month</span></div>
           <div class="summary-line" id="qtyLine"><span>Entrances (all locations)</span><span id="qtyFixed">1</span>
             <span id="qtyEdit" style="display:none;align-items:center;gap:8px;">
               <label for="qty" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);">Number of entrances</label>
-              <input type="number" id="qty" min="2" max="50" step="1" value="2" inputmode="numeric" style="width:76px;margin:0;padding:7px 9px;background:#0F1214;border:1px solid var(--line);border-radius:4px;color:var(--text);font-size:15px;">
+              <input type="number" id="qty" min="2" max="50" step="1" value="2" inputmode="numeric" style="width:76px;margin:0;padding:7px 9px;background:#fff;border:2px solid var(--line);border-radius:8px;color:var(--text);font-size:15px;">
             </span></div>
           <div class="summary-line"><span>Billing cycle</span><span>Monthly</span></div>
           <div class="summary-total"><span>Due today</span><span>$<span class="tot">200</span></span></div>

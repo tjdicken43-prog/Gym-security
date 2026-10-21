@@ -194,7 +194,9 @@ class ReaderCore {
     return null;
   }
   async status(h) {
-    await this.api('POST', '/reader/status', { host: os.hostname(), version: this.version, problem: h ? h.text : null, problemCode: h ? h.code : null, watching: true, counts: this.counts, queued: this.queue().length });
+    await this.api('POST', '/reader/status', { host: os.hostname(), version: this.version, problem: h ? h.text : null, problemCode: h ? h.code : null, watching: true, counts: this.counts, queued: this.queue().length,
+      blindSince: h && h.since ? new Date(h.since).toISOString() : null,                         // stopped seeing the check-in screen at
+      note: this.note ? { code: this.note.code, text: this.note.text, since: new Date(this.note.since).toISOString() } : null });
   }
 }
 

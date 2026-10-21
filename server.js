@@ -116,9 +116,9 @@ function isPrivateStaticPath(p) {
   let s;
   try { s = decodeURIComponent(p); } catch (e) { return true; }
   s = path.posix.normalize('/' + s.replace(/\\/g, '/')).toLowerCase();   // Mac disks ignore case
-  return /^\/+(rtsp-zones|ingest-zones|gyms|report-sends|self-review-sends|auto-update|incidents|self-repair|login-links-used|vapid|runner-pairings|pair-codes|admin-pending|handoffs)\.json/.test(s)
+  return /^\/+(rtsp-zones|ingest-zones|gyms|leads|report-sends|self-review-sends|auto-update|incidents|self-repair|login-links-used|vapid|runner-pairings|pair-codes|admin-pending|handoffs)\.json/.test(s)
     || /^\/+(alert-log-|summary-|mail-progress-|gym-reviews-|gym-alerts-|gym-settings-|gym-nights-|gym-tally-|gym-devices-|gym-scans-|gym-meta-|gym-people-|gym-push-|gym-[a-z]+-|owner-delegates|owner-key|screen-reader)[^/]*\.json/.test(s)
-    || /^\/+(runner-queue|camera-check|ashbourne-reports|frames-[^/]*|tests-[^/]*|selftest-[^/]*|logos|data|node_modules)(\/|$)/.test(s);
+    || /^\/+(runner-queue|camera-check|ashbourne-reports|frames-[^/]*|tests-[^/]*|selftest-[^/]*|archive-[^/]*|logos|data|node_modules)(\/|$)/.test(s);
 }
 app.use((req, res, next) => {
   if ((req.method === 'GET' || req.method === 'HEAD') && isPrivateStaticPath(req.path)) return res.status(404).send('Not found');
@@ -131,18 +131,82 @@ app.use((req, res, next) => {
 const SEO_PLACEHOLDER = 'https://your-domain-goes-here.com';
 const SEO_FILES = { '/': 'securityai.html', '/securityai.html': 'securityai.html', '/robots.txt': 'robots.txt', '/sitemap.xml': 'sitemap.xml' };
 const SEO_TYPES = { html: 'text/html; charset=utf-8', txt: 'text/plain; charset=utf-8', xml: 'application/xml; charset=utf-8' };
+// Pages, scripts and styles go out compressed (brotli, or gzip: a page is
+// 4 to 6 times smaller, which matters on a phone's data at the front desk)
+// with an ETag, so a repeat visit is a tiny "not changed" answer. Each file
+// is compressed once and kept in memory until it changes on disk. Fonts and
+// images, which never change under the same name, are cached for a year.
+const zlib = require('zlib');
+const TEXT_TYPES = { html: 'text/html; charset=utf-8', css: 'text/css; charset=utf-8', js: 'application/javascript; charset=utf-8', svg: 'image/svg+xml', txt: 'text/plain; charset=utf-8', xml: 'application/xml; charset=utf-8', webmanifest: 'application/manifest+json' };
+const LONG_CACHE = { woff: 'font/woff', woff2: 'font/woff2', png: 'image/png', jpg: 'image/jpeg', ico: 'image/x-icon' };
+const packed = new Map();   // file -> { mtime, size, etag, raw, br, gz }
+function pack(file, text) {
+  const raw = Buffer.from(text);
+  return { etag: '"' + require('crypto').createHash('sha1').update(raw).digest('base64url').slice(0, 22) + '"', raw,
+    br: raw.length > 1024 ? zlib.brotliCompressSync(raw, { params: { [zlib.constants.BROTLI_PARAM_QUALITY]: 10, [zlib.constants.BROTLI_PARAM_SIZE_HINT]: raw.length } }) : null,
+    gz: raw.length > 1024 ? zlib.gzipSync(raw, { level: 9 }) : null };
+}
+function sendPacked(req, res, p, type, cache) {
+  res.setHeader('Content-Type', type);
+  res.setHeader('Cache-Control', cache);
+  res.setHeader('ETag', p.etag);
+  res.setHeader('Vary', 'Accept-Encoding');
+  if (String(req.headers['if-none-match'] || '') === p.etag) { res.statusCode = 304; return res.end(); }
+  const ae = String(req.headers['accept-encoding'] || '');
+  const body = p.br && /\bbr\b/.test(ae) ? (res.setHeader('Content-Encoding', 'br'), p.br) : p.gz && /\bgzip\b/.test(ae) ? (res.setHeader('Content-Encoding', 'gzip'), p.gz) : p.raw;
+  res.setHeader('Content-Length', body.length);
+  res.end(req.method === 'HEAD' ? undefined : body);
+}
+function packedFile(file, transform, cb) {
+  const fs = require('fs');
+  fs.stat(file, (err, st) => {
+    if (err || !st.isFile()) return cb(null);
+    const have = packed.get(file);
+    if (have && have.mtime === st.mtimeMs && have.size === st.size) return cb(have);
+    fs.readFile(file, (e2, buf) => {
+      if (e2) return cb(null);
+      const p = Object.assign(pack(file, transform ? transform(buf.toString('utf8')) : buf), { mtime: st.mtimeMs, size: st.size });
+      if (packed.size > 200) packed.clear();
+      packed.set(file, p); cb(p);
+    });
+  });
+}
 app.use((req, res, next) => {
   if (req.method !== 'GET' && req.method !== 'HEAD') return next();
   const file = SEO_FILES[req.path];
   if (!file) return next();
   let origin;
   try { origin = new URL(DOMAIN).origin; } catch (e) { return next(); }
-  require('fs').readFile(path.join(__dirname, file), 'utf8', (err, text) => {
-    if (err) return next();
-    res.type(SEO_TYPES[file.split('.').pop()]).send(text.split(SEO_PLACEHOLDER).join(origin));
+  packedFile(path.join(__dirname, file), text => text.split(SEO_PLACEHOLDER).join(origin), p => {
+    if (!p) return next();
+    sendPacked(req, res, p, SEO_TYPES[file.split('.').pop()], 'no-cache');
   });
 });
-app.use(express.static(__dirname)); // serves securityai.html / checkout.html / monitor.html directly
+app.use((req, res, next) => {
+  if (req.method !== 'GET' && req.method !== 'HEAD') return next();
+  let rel;
+  try { rel = decodeURIComponent(req.path); } catch (e) { return next(); }
+  if (rel.includes('\0') || /(^|\/)\.\.?(\/|$)/.test(rel) || /\/\./.test(rel)) return next();   // no dot-files, no "..": express.static decides those
+  const ext = (rel.match(/\.([a-z0-9]+)$/i) || [])[1];
+  const type = ext && TEXT_TYPES[ext.toLowerCase()], long = ext && LONG_CACHE[ext.toLowerCase()];
+  if (!type && !long) return next();
+  const file = path.join(__dirname, path.posix.normalize(rel));
+  if (!file.startsWith(__dirname + path.sep)) return next();
+  if (long) {
+    return require('fs').stat(file, (err, st) => {
+      if (err || !st.isFile()) return next();
+      // Fonts never change under the same name; icons and pictures might, so a week.
+      res.setHeader('Cache-Control', /^font\//.test(long) ? 'public, max-age=31536000, immutable' : 'public, max-age=604800');
+      res.setHeader('Content-Type', long);
+      res.setHeader('Content-Length', st.size);
+      if (req.method === 'HEAD') return res.end();
+      require('fs').createReadStream(file).on('error', () => res.destroy()).pipe(res);
+    });
+  }
+  // sw.js must always be checked (a new version takes over the phone straight away).
+  packedFile(file, null, p => (p ? sendPacked(req, res, p, type, 'no-cache') : next()));
+});
+app.use(express.static(__dirname)); // everything else (and anything the layer above passed on)
 
 // Without this, visiting the bare domain (just "/") 404s with "Cannot GET /",
 // because the homepage is named securityai.html, not index.html — the one
@@ -155,7 +219,7 @@ app.get('/', (req, res) => {
 // gym-security.onrender.com/gym  -> the gym page (sign-in if needed)
 // gym-security.onrender.com/admin -> the admin page
 // Query strings (e.g. ?code=) are kept.
-for (const [short, page] of [['/gym', 'activity.html'], ['/signin', 'activity.html'], ['/sign-in', 'activity.html'], ['/admin', 'admin.html'], ['/demo', 'activity.html?demo=1'], ['/desk', 'desk.html'], ['/lobby', 'lobby.html'], ['/members', 'members.html']]) {
+for (const [short, page] of [['/gym', 'activity.html'], ['/signin', 'activity.html'], ['/sign-in', 'activity.html'], ['/admin', 'admin.html'], ['/demo', 'activity.html?demo=1'], ['/desk', 'desk.html'], ['/lobby', 'lobby.html'], ['/members', 'members.html'], ['/check', 'check.html']]) {
   app.get(short, (req, res) => {
     const u = String(req.originalUrl || req.url || ''), q = u.indexOf('?');
     res.statusCode = 302;
@@ -254,7 +318,7 @@ function keyHasData(key) {
   return monitor.getLog(key).length > 0 || monitor.loadSummary(key).length > 0;
 }
 function adminGymView(g) {
-  return { code: g.code, key: g.key, gymName: g.gymName, email: g.email, createdAt: g.createdAt, timeZone: g.timeZone || null, codeIssuedAt: g.codeIssuedAt || null, billing: g.billing || null };
+  return { code: g.code, key: g.key, gymName: g.gymName, email: g.email, createdAt: g.createdAt, timeZone: g.timeZone || null, codeIssuedAt: g.codeIssuedAt || null, billing: g.billing || null, closedAt: g.closedAt || null };
 }
 
 app.post('/admin/gyms', (req, res) => {
@@ -380,6 +444,54 @@ app.post('/admin/gyms/:gym/skip-exits', (req, res) => {
   if (on && !r.ready) return res.status(400).json({ ok: false, error: `Not yet: ${r.agree} of ${r.need} clear exits checked with the AI agreeing every time${r.disagree ? ` (the run restarted after the AI disagreed on ${new Date(r.lastDisagreeAt).toLocaleDateString('en-US')})` : ''}.` });
   const st = store.getSettings(key); st.skipExits = on; store.saveSettings(key, st);
   res.json({ ok: true, exits: monitor.exitReadiness(key) });
+});
+
+// Start the pilot fresh: test numbers are archived (no photos) and the
+// gym's results start from zero. The gym's name must be typed to confirm.
+app.post('/admin/gyms/:gym/fresh-start', (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const key = adminGymKey(req, res);
+  if (!key) return;
+  const want = String(gyms.gymNameFor(key) || key).trim().toLowerCase();
+  const typed = String((req.body || {}).confirm || '').trim().toLowerCase();
+  if (!typed || (typed !== want && typed !== key)) return res.status(400).json({ ok: false, error: `Type the gym's name exactly (${gyms.gymNameFor(key) || key}) to confirm.` });
+  try {
+    const entries = monitor.clearEntries(key);
+    const r = store.startFresh(key);
+    console.log(`Fresh start for ${key}: ${entries} entries cleared, ${r.archived} files archived in ${r.folder}.`);
+    res.json({ ok: true, message: `${gyms.gymNameFor(key) || key} starts fresh: ${r.cleared.reviewed} answers, ${r.cleared.confirmed} confirmed and ${r.cleared.nights} nights of test data archived; ${entries} test entries and their photos removed. Settings, alert list, staff logins and pairing are unchanged.` });
+  } catch (err) { res.status(500).json({ ok: false, error: err.message }); }
+});
+
+// A gym that cancelled: switch everything off and delete what's personal.
+// Numbers only (no photos, no names) are archived for your records.
+app.post('/admin/gyms/:gym/close', (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const key = adminGymKey(req, res);
+  if (!key) return;
+  const name = gyms.gymNameFor(key) || key;
+  const typed = String((req.body || {}).confirm || '').trim().toLowerCase();
+  if (!typed || (typed !== String(name).trim().toLowerCase() && typed !== key)) return res.status(400).json({ ok: false, error: `Type the gym's name exactly (${name}) to confirm.` });
+  try {
+    store.bumpRunnerGen(key);                      // camera computers cut off
+    store.bumpReaderGen(key);                      // front-desk reader cut off
+    const rec = runners.get(key); if (rec) rec.lastSeen = 0;
+    const entries = monitor.clearEntries(key, { all: true });
+    const r = store.closeData(key);
+    gyms.closeGym(key, (req.body || {}).reason);
+    console.log(`Closed ${key}: ${entries} entries and photos deleted, ${r.deleted} files deleted, numbers archived in ${r.folder}.`);
+    res.json({ ok: true, message: `${name} is closed. Its sign-in code, staff logins, camera computer and front-desk reader no longer work. ${entries} entries with their photos, the alert list, staff logins, member-number data and notes are deleted. The results (numbers only) are archived on the website's disk for your records.` });
+  } catch (err) { res.status(500).json({ ok: false, error: err.message }); }
+});
+app.post('/admin/gyms/:gym/reopen', (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const key = adminGymKey(req, res);
+  if (!key) return;
+  try {
+    const g = gyms.reopenGym(key);
+    store.setPaused(key, false);
+    res.json({ ok: true, code: g.code, message: `${g.gymName} is open again with a new sign-in code: ${g.code}. Pair its camera computer and front-desk reader again, and add its people and alert list.` });
+  } catch (err) { res.status(400).json({ ok: false, error: err.message }); }
 });
 
 app.post('/admin/gyms/:gym/unpair', (req, res) => {
@@ -1827,7 +1939,7 @@ app.get('/monitor/runner/alive', (req, res) => {
 // updates FROM the website: no GitHub login, no zip, settings untouched.
 // Only plain code/doc files at the top level are offered — never data,
 // settings, logs or anything private — and only to a paired computer.
-const UPDATE_FILE_RE = /^[A-Za-z0-9][A-Za-z0-9._-]*\.(js|html|md|svg|txt|xml|yaml)$/;
+const UPDATE_FILE_RE = /^[A-Za-z0-9][A-Za-z0-9._-]*\.(js|html|md|svg|txt|xml|yaml|sh)$/;
 function updateFiles() {
   const fsx = require('fs');
   const out = [];
@@ -2030,13 +2142,14 @@ app.post('/reader/scans', readerAuth, express.json({ limit: '1mb' }), (req, res)
 // What each reader problem means, and how to fix it (the email says both).
 const READER_FIX = {
   'ashbourne-closed': ['Ashbourne isn\'t open on the front-desk PC', 'Open Ashbourne on the Visit Log screen and leave it open (it\'s fine to use other screens, then come back). The reader picks it up again by itself.'],
-  'labels-changed': ['the reader can see Ashbourne\'s Live Entry pop-up but can\'t read the member number from it', 'Ashbourne may have changed its screen in an update. Run the Ashbourne screen check again (admin page > Ashbourne screen check) and send the report to Claude to adjust the reader.'],
+  'labels-changed': ['the reader can see Ashbourne\'s Live Entry pop-up but can\'t read the member number from it', 'Ashbourne may have changed its screen in an update. On the Pi at the front desk run: cd ~/securityai && node screen-reader.js --check, and send what it prints to Claude to adjust the reader.'],
   'offline': ['the front-desk PC can\'t reach the website, so scans are waiting on that PC', 'Check that PC\'s internet / Wi-Fi. Nothing is lost: the waiting scans send by themselves when it\'s back.'],
-  'owner-mismatch': ['the owner device on the website is not the one the reader was set up with', 'If you replaced your owner device on purpose, set the reader up again (admin page > Front-desk reader > Set up). If you did NOT, someone may have changed it: change ADMIN_TOKEN on Render and tell Claude.'],
+  'owner-mismatch': ['the owner device on the website is not the one the reader was set up with', 'If you replaced your owner device on purpose, set the reader up again (on the Pi: node screen-reader.js --setup). If you did NOT, someone may have changed it: change ADMIN_TOKEN on Render and tell Claude.'],
   'no-devices': ['no devices are approved to read member numbers, so they aren\'t being kept', 'On your own phone: admin page > Protected member numbers > Make this my owner device.'],
   'no-signal': ['the screen reader gets no picture from the front-desk screen', 'At the front desk: is the PC on, and the small HDMI splitter\'s power plugged in? Check the cable from the splitter to the capture stick, and that the capture stick is in the Raspberry Pi. On the PC, Windows must never turn the screen off (Settings > System > Power > Screen and sleep > turn off my screen after: Never). Turning just the monitor off is fine.'],
-  'popup-hidden': ['the screen reader can\'t see Ashbourne\'s Live Entry pop-up on the front-desk screen', 'On the front-desk PC, open Ashbourne (MVSv4) and leave its Live Entry pop-up showing (it can sit anywhere on the screen, just not covered or minimized). The reader finds it again by itself.'],
-  'unpaired': ['the reader was unpaired on the website', 'Set it up again: admin page > Front-desk reader > Set up, and run the line on the Ashbourne PC.'],
+  'popup-hidden': ['the screen reader can\'t see the check-in screen at the front desk (the PC may be locked or logged off, or the check-in program closed or covered)', 'Ask whoever is at the gym to unlock the front-desk PC and open the check-in screen: on Ashbourne, Home with the Visit Log, and the Live Entry pop-up allowed to show (an open member account is fine during the day, but close it before leaving). The reader finds it again by itself. If the screen IS open and this stays, the check-in program may have changed its look in an update: teach the reader again (node screen-reader.js --teach on the Pi, over remote access). Until then, entries are judged by the camera only and are never called "no scan".'],
+  'list-late': ['the check-in list at the front desk shows scans late', 'In the check-in program, turn on its live view or auto-refresh (or leave its pop-up open). Scans are still timed by the times on each row.'],
+  'unpaired': ['the reader was unpaired on the website', 'Pair it again: admin page > Protected member numbers > your gym > "Reader: new code", then on the Pi at the front desk run: cd ~/securityai && node screen-reader.js --setup'],
 };
 const readerAlerted = new Map();   // gym|code -> time emailed
 // The reader version the website hands out (the reader updates itself to it).
@@ -2052,8 +2165,10 @@ app.post('/reader/status', readerAuth, express.json({ limit: '8kb' }), (req, res
   const before = memberKeys.loadDevices(key).reader || {};
   const code = READER_FIX[b.problemCode] ? b.problemCode : null;
   const c = b.counts && typeof b.counts === 'object' ? b.counts : {};
+  const note = b.note && typeof b.note === 'object' && /^[a-z-]{2,30}$/.test(String(b.note.code || '')) ? { code: String(b.note.code), text: cleanText(b.note.text, 300), since: cleanText(b.note.since, 40) } : null;
   memberKeys.noteReader(key, { host: cleanText(b.host, 80), version: cleanText(b.version, 20), problem: cleanText(b.problem, 300), problemCode: code, watching: b.watching === true,
-    counts: { scans: Number(c.scans) || 0, otherZone: Number(c.otherZone) || 0, doubles: Number(c.doubles) || 0, fromList: Number(c.fromList) || 0, confirmed: Number(c.confirmed) || 0, conflicts: Number(c.conflicts) || 0 }, queued: Number(b.queued) || 0 });
+    blindSince: cleanText(b.blindSince, 40), note, noteText: note ? note.text : null,
+    counts: { scans: Number(c.scans) || 0, otherZone: Number(c.otherZone) || 0, doubles: Number(c.doubles) || 0, fromList: Number(c.fromList) || 0, confirmed: Number(c.confirmed) || 0, conflicts: Number(c.conflicts) || 0, listResets: Number(c.listResets) || 0, oldRows: Number(c.oldRows) || 0, denied: Number(c.denied) || 0 }, queued: Number(b.queued) || 0 });
   // Email TJ when a problem starts (again after 6 h if it lasts), and when it's fixed.
   // Ashbourne closed outside watch hours (the PC restarted overnight) is normal: no email.
   const k = key + '|' + code;
@@ -2356,6 +2471,35 @@ app.post('/support/contact', async (req, res) => {
   res.json({ ok: true, delivered: result.delivered });
 });
 
+// "Will it work at your gym?" (check.html): the answers, the verdict and
+// how to reach them, saved for the admin page and emailed to TJ.
+app.post('/check/submit', async (req, res) => {
+  const b = req.body || {};
+  const email = store.normalizeEmail(b.email);
+  const gymName = cleanText(b.gym, 100);
+  if (!email || !gymName) return res.status(400).json({ error: 'Add your gym name and email.' });
+  if (store.limited(`check:${callerKey(req)}`, 5, 3600e3) || store.limited('check:all', 40, 864e5)) return res.status(429).json({ error: 'We have your earlier answers. Please call or email instead.' });
+  const answers = {};
+  for (const k of ['recorder', 'brand', 'angle', 'checkin', 'desk', 'shows', 'video', 'wired']) answers[k] = cleanText(b[k], 60);
+  const v = require('./compat').verdict(answers);
+  const lead = store.addLead({ gym: gymName, city: cleanText(b.city, 80), name: cleanText(b.name, 80), email, phone: cleanText(b.phone, 30), note: cleanText(b.note, 500), answers, verdict: v.overall.title, level: v.overall.level });
+  const to = process.env.SUPPORT_EMAIL || process.env.SMTP_USER;
+  const text = [`${lead.gym}${lead.city ? ' (' + lead.city + ')' : ''} checked whether SecurityAI works for them.`, '', `Verdict: ${v.overall.title}`, ...v.items.map(x => `- ${x.title}: ${x.text}`), '',
+    `Their answers: recorder ${answers.recorder || '?'} ${answers.brand || ''} · entrance camera ${answers.angle || '?'} · check-in ${answers.checkin || '?'} · front desk ${answers.desk || '?'} ${answers.video || ''} (shows ${answers.shows || '?'}) · cable ${answers.wired || '?'}`,
+    `Contact: ${lead.name || '(no name)'} <${email}>${lead.phone ? ' · ' + lead.phone : ''}`, lead.note ? `Note: ${lead.note}` : '', '', 'Reply to this email to answer them. It is also on the admin page under Gyms that checked.'].filter(x => x !== null).join('\n');
+  let delivered = false;
+  if (to) { const r = await mailer.sendMail({ to, subject: `${v.overall.level === 'ok' ? 'Ready' : 'Check'}: ${lead.gym} asked if SecurityAI works for them`, text, replyTo: email }).catch(() => ({})); delivered = !!(r && r.delivered); }
+  res.json({ ok: true, delivered, verdict: v.overall });
+});
+app.get('/admin/leads', (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  res.json({ ok: true, leads: store.loadLeads().slice(0, 100) });
+});
+app.post('/admin/leads/:id', (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  res.json({ ok: store.markLead(String(req.params.id), !!(req.body || {}).done) });
+});
+
 // Creates a real Stripe Checkout Session for a subscription.
 // The front end redirects the browser to the returned URL — Stripe hosts
 // the actual card form there, so this server never sees a card number.
@@ -2495,7 +2639,7 @@ async function handleStripeEvent(event) {
     const status = event.type === 'invoice.payment_failed' ? 'payment-failed' : 'canceled';
     if (g) gyms.setBilling(g.key || g.code, { status });
     await tell(`SecurityAI billing: ${g ? g.gymName : 'unknown gym'} ${status === 'canceled' ? 'canceled' : 'payment failed'}`,
-      `${g ? g.gymName + ' (' + (g.key || g.code) + ')' : 'A subscription not matched to a gym'}: ${status === 'canceled' ? 'the subscription was canceled.' : 'a payment failed. Stripe retries by itself; check the Stripe dashboard.'}\nStripe ${event.type === 'invoice.payment_failed' ? 'invoice' : 'subscription'}: ${o.id}\n\nNothing was switched off. Decide on the admin page.`);
+      `${g ? g.gymName + ' (' + (g.key || g.code) + ')' : 'A subscription not matched to a gym'}: ${status === 'canceled' ? 'the subscription was canceled.' : 'a payment failed. Stripe retries by itself; check the Stripe dashboard.'}\nStripe ${event.type === 'invoice.payment_failed' ? 'invoice' : 'subscription'}: ${o.id}\n\nNothing was switched off. ${status === 'canceled' && g ? `When their last paid day is over, close it out: ${(gyms.publicBaseUrl() || '')}/admin.html#gym=${encodeURIComponent(g.key || g.code)} > Close this gym. That switches it off and deletes their photos, logins and member data.` : 'Decide on the admin page.'}`);
     return;
   }
   if (event.type === 'invoice.paid' && o.subscription) {
@@ -2540,6 +2684,28 @@ app.post('/admin/backup', (req, res) => {
       .set('Content-Disposition', `attachment; filename="securityai-backup-${new Date().toISOString().slice(0, 10)}.sabak"`).send(b.text);
   } catch (e) { res.status(400).json({ error: e.message }); }
 });
+// A practice restore: opens a backup file with its password and says what
+// is inside, compared with the website now. Nothing is written or changed.
+function rawText(limit) {
+  return (req, res, next) => {
+    if (typeof req.body === 'string') return next();
+    let size = 0; const parts = [];
+    req.on('data', d => { size += d.length; if (size > limit) { res.status(413).json({ error: 'That file is too big.' }); req.destroy(); return; } parts.push(d); });
+    req.on('end', () => { if (res.headersSent) return; req.body = Buffer.concat(parts).toString('utf8'); next(); });
+    req.on('error', () => { if (!res.headersSent) res.status(400).json({ error: 'Could not read the file.' }); });
+  };
+}
+app.post('/admin/backup/check', (req, res, next) => { if (requireAdmin(req, res)) next(); }, rawText(60 * 1024 * 1024), (req, res) => {
+  if (store.limited(`backupcheck:${callerKey(req)}`, 10, 3600e3)) return res.status(429).json({ error: 'Too many checks — try again in an hour.' });
+  try {
+    const b = backup.open(String(req.body || ''), req.get('X-Backup-Password') || '');
+    const files = b.files || {};
+    let gymList = []; try { gymList = JSON.parse(files['gyms.json'] || '[]'); } catch (e) { /* none */ }
+    const entries = Object.entries(files).filter(([n]) => /^alert-log-/.test(n)).reduce((sum, [, t]) => { try { return sum + JSON.parse(t).length; } catch (e) { return sum; } }, 0);
+    const nowGyms = gyms.listGymsForAdmin().length;
+    res.json({ ok: true, at: b.at, files: Object.keys(files).length, gyms: (Array.isArray(gymList) ? gymList : []).map(g => g.gymName || g.key || '?'), entries, nowGyms });
+  } catch (e) { res.status(400).json({ ok: false, error: e.message }); }
+});
 // Nightly copy by email (3 AM Central) when BACKUP_PASSWORD is set.
 async function nightlyBackupTick() {
   const pw = String(process.env.BACKUP_PASSWORD || ''), to = String(process.env.SUPPORT_EMAIL || '').trim();
@@ -2555,11 +2721,11 @@ async function nightlyBackupTick() {
 
 // Email links and the admin page: approve, reject, keep, undo.
 const repairPage = (title, body) => `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><meta name="referrer" content="no-referrer"><title>${escHtmlS(title)}</title>
-<style>body{margin:0;background:#14171A;color:#EDEFF1;font:17px/1.5 -apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;padding:24px 16px;}
-.c{max-width:520px;margin:6vh auto;background:#1C2124;border:1px solid #353D43;border-radius:14px;padding:22px;}
-h1{font-size:21px;margin:0 0 8px;} p{color:#A3ABB3;margin:6px 0;} b{color:#EDEFF1;} pre{white-space:pre-wrap;background:#101315;border:1px solid #353D43;border-radius:8px;padding:10px;font-size:12px;color:#EDEFF1;max-height:50vh;overflow:auto;}
-button{width:100%;min-height:52px;margin-top:16px;border:0;border-radius:10px;font:inherit;font-weight:700;cursor:pointer;background:#3FCF8E;color:#0b1f15;}
-button.warn{background:#FF6B6B;color:#2a0b0b;} a{color:#EDEFF1;}</style></head><body><div class="c">${body}</div></body></html>`;
+<link rel="stylesheet" href="/brand.css"><style>body{margin:0;background:#E4E6E3;color:#1E2124;font:17px/1.55 var(--body);padding:24px 16px;}
+.c{max-width:520px;margin:6vh auto;background:#F7F7F5;border-radius:16px;padding:24px;box-shadow:var(--lift-hi);}
+h1{font:800 34px/1 var(--display);text-transform:uppercase;margin:0 0 10px;} p{color:#3A4146;margin:6px 0;} b{color:#1E2124;} pre{white-space:pre-wrap;background:#fff;border:1px solid #D3D6D3;border-radius:8px;padding:10px;font-size:12px;color:#1E2124;max-height:50vh;overflow:auto;}
+button{width:100%;min-height:52px;margin-top:16px;border:0;border-radius:10px;font:inherit;font-weight:700;cursor:pointer;background:#1D4FB0;color:#fff;}
+button.warn{background:#C8281F;color:#fff;} a{color:#1D4FB0;}</style></head><body><div class="c">${body}</div></body></html>`;
 function escHtmlS(v) { return String(v == null ? '' : v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
 const REPAIR_WORDS = { approve: ['Approve and deploy this change?', 'It merges on GitHub, and Render deploys it in a few minutes. It is watched for 30 minutes and put back by itself if anything goes wrong.', 'Approve and deploy', ''],
   reject: ['Reject this change?', 'Nothing on the website changes.', 'Reject', 'warn'],

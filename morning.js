@@ -29,6 +29,20 @@ function create({ monitor, store, gyms, mailer, kindOf, send, log, onError }) {
     return { start, end, sendAt: end + 3600e3, always: false, day: p.day };
   }
 
+  // The front desk overnight: when its screen couldn't be read (entries then
+  // were checked by the camera only, never called "no scan"), and when an
+  // account or another page was left open over the check-in list.
+  function deskLines(key, w) {
+    let night; try { night = require('./member-keys').readerNight(key, w.start, w.end); } catch (e) { return []; }
+    if (!night) return [];
+    const span = ([a, b]) => `${fmtT(key, a)} – ${fmtT(key, b)}`;
+    const out = [];
+    if (night.blind.length) out.push(`The front-desk screen couldn't be read ${night.blind.map(span).join(', ')} (the PC was locked or off, or the check-in screen wasn't showing). Entries then were checked by the camera only. Please leave the check-in screen open when you leave.`);
+    const hidden = night.notes.filter(n => n[2] === 'list-hidden' && n[1] - n[0] >= 10 * 60e3);
+    if (hidden.length) out.push(`The check-in list was hidden at the front desk ${hidden.map(span).join(', ')} (a member account or another page left open). Scans were still read from the pop-ups, but please close accounts and go back to the list before leaving.`);
+    return out;
+  }
+
   function build(key, now) {
     const w = lastWindow(key, now);
     const name = gyms.gymNameFor(key) || 'your gym';
@@ -57,6 +71,7 @@ function create({ monitor, store, gyms, mailer, kindOf, send, log, onError }) {
       (() => { const sp = store.getSpot ? store.getSpot(key) : null; if (!sp || !sp.ids || !sp.ids.length) return null; const done = Object.keys(sp.answers || {}).length; return done < sp.ids.length ? `Weekly spot-check: ${done} of ${sp.ids.length} done (about 2 minutes).` : null; })(),
       (() => { const n = Object.values(reviews).filter(r => r && r.verdict === 'fine' && r.override && !r.ownerChecked).length; return n ? `${n} ${n === 1 ? 'answer needs' : 'answers need'} the owner's second look: marked "It was fine" though the camera and the front-desk scans both showed an extra person.` : null; })(),
       !entries && st.heartbeatLost ? 'The camera computer was offline, so nothing was watched.' : null,
+      ...deskLines(key, w),
     ].filter(Boolean);
     const base = gyms.publicBaseUrl();
     const link = base ? `${base}/gym` : null;

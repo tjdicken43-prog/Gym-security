@@ -357,6 +357,23 @@ function holdForDispute(code, id, on) {
   }
   return { held: false };
 }
+// Start fresh: the entries list and the kept (35-day) entries are emptied;
+// their photos are deleted on the next save (nothing refers to them).
+function clearEntries(code, opts) {
+  const s = stateFor(safeCode(code));
+  const n = s.log.length;
+  s.log = [];
+  writeSummary(s.key, []);
+  try { writeFileAtomic(logFileFor(s.key), '[]'); } catch (e) { /* saved below */ }
+  saveLogToDisk(s);
+  // The test photos go now (the usual cleanup spares recent ones). Only a
+  // photo from the last minute stays: it may belong to a check in progress.
+  try {
+    const dir = framesDirFor(s.key), cut = Date.now() - (opts && opts.all ? -1 : 60e3);   // closing a gym: every photo
+    for (const f of fs.readdirSync(dir)) { const full = path.join(dir, f); try { if (fs.statSync(full).mtimeMs < cut) fs.unlinkSync(full); } catch (e) { /* next */ } }
+  } catch (e) { /* no photos */ }
+  return n;
+}
 function heldIds(code) { return new Set(loadSummary(safeCode(code)).filter(e => e.held).map(e => gymStore.eventId(e))); }
 
 // --- Log -------------------------------------------------------------------
@@ -906,7 +923,7 @@ async function sendToSubscriber(code, sub, { subject, text, html, attachments, s
     noteDelivery(code, r.ok, kind || 'gym-alert', 'chat', sub.service || 'chat', r.reason);
     return r.ok ? { ok: true } : { ok: false, reason: 'chat', detail: r.reason };
   }
-  const r = await sendSms(sub.to, sms + (unsub ? ` Stop: ${unsub}` : ''));
+  const r = await sendSms(sub.to, sms + (unsub ? ` Reply STOP to stop, or: ${unsub}` : ' Reply STOP to stop.'));
   if (r.off) { noteDelivery(code, false, kind || 'gym-alert', 'sms', sub.to, r.reason); return { ok: false, reason: 'sms-off', detail: r.reason }; }
   noteDelivery(code, r.ok, kind || 'gym-alert', 'sms', sub.to, r.reason);
   if (!r.ok) console.warn('Gym SMS failed:', r.reason);
@@ -966,7 +983,7 @@ async function sendGymTestAlert(code, sub) {
     subject: `SecurityAI test alert for ${gymName}`,
     text,
     html: `<div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;max-width:520px;color:#14171A;font-size:15px;">${escHtml(text)}</div>`,
-    sms: `SecurityAI test for ${gymName}: alerts are working.`,
+    sms: `SecurityAI for ${gymName}: you'll get a text like this when someone gets in without their own scan, with a link to the photo. This one is a test.`,
   });
 }
 
@@ -1833,6 +1850,6 @@ module.exports = {
   localMinutes, buildReport, loadSummary, recordHeartbeat, sendTestAlert, sendSystemAlert, checkNoPicture,
   applySettings, effectiveRunnerConfig, retainForReview, purgeAt, todayUsage, listStates, defaultKey, checkHeartbeat,
   zonedAt, zonedMidnightUtc, monthRange, nightKeyFor, stampFor, fmtWhen, operatorTargets, rearmFromDisk, flushLogs, sweepRetention,
-  LOG_RETENTION_HOURS, SUMMARY_RETENTION_MS, logMsFor, summaryMsFor, inNightHours, exitReadiness, isClearExit, ENV_MAX_TOTAL_DAILY_BURSTS, alertOperator, watchingNow,
+  LOG_RETENTION_HOURS, SUMMARY_RETENTION_MS, logMsFor, summaryMsFor, inNightHours, exitReadiness, isClearExit, clearEntries, ENV_MAX_TOTAL_DAILY_BURSTS, alertOperator, watchingNow,
   platform: os.platform(),
 };

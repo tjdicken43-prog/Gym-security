@@ -710,6 +710,49 @@ function noteExit(key, what, audited) {
   saveSettings(key, st);
 }
 
+// --- Start fresh (before a pilot) --------------------------------------
+// Test walk-throughs shouldn't count toward a gym's real results. This
+// keeps a copy of the numbers (no photos) in DATA_DIR/archive-<gym>-<time>/
+// and starts the results, staff answers, nightly counts, answer history,
+// camera problems and this week's spot-check again from zero.
+function startFresh(key) {
+  const k = safeCode(key);
+  // Pending delayed writes would put the old numbers back.
+  for (const m of [nightsTimers, tallyTimers]) { const t = m.get(k); if (t) { clearTimeout(t); m.delete(k); } }
+  const files = [tallyFile(k), reviewsFile(k), nightsFile(k), answersFile(k), problemsFile(k)];
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const dir = path.join(DATA_DIR, `archive-${k}-${stamp}`);
+  fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
+  let kept = 0;
+  for (const f of files) { try { if (fs.existsSync(f)) { fs.copyFileSync(f, path.join(dir, path.basename(f))); kept++; } } catch (e) { /* copy what we can */ } }
+  const before = tallySummary(k);
+  writeJson(tallyFile(k), { since: null, nights: [], checked: 0, flagged: 0, outcomes: {}, freshStart: new Date().toISOString() });
+  writeJson(reviewsFile(k), {});
+  writeJson(nightsFile(k), {});
+  writeJson(answersFile(k), []);
+  writeJson(problemsFile(k), []);
+  tallyCache.delete(k); nightsCache.delete(k);
+  const m = loadMeta(k); delete m.spot; saveMeta(k, m);
+  return { archived: kept, folder: path.basename(dir), cleared: { reviewed: before.reviewed, confirmed: (before.confirmedTailgates || 0) + (before.confirmedShared || 0), nights: before.nightsWatched } };
+}
+
+// A gym that cancelled: its numbers are archived (no photos, no names),
+// then everything personal is deleted: staff logins, the alert list, phone
+// notifications, approved devices, scrambled member numbers, who read them,
+// answers and notes, the logo. Photos and entries go in monitor.clearEntries.
+function closeData(key) {
+  const k = safeCode(key);
+  const r = startFresh(k);
+  let deleted = 0;
+  for (const n of ['alerts', 'people', 'push', 'devices', 'scans', 'access', 'reviews', 'answers', 'problems', 'nights']) {
+    try { fs.unlinkSync(path.join(DATA_DIR, `gym-${n}-${k}.json`)); deleted++; } catch (e) { /* not there */ }
+  }
+  for (const ext of ['png', 'jpg']) try { fs.unlinkSync(path.join(DATA_DIR, 'logos', `${k}.${ext}`)); deleted++; } catch (e) { /* none */ }
+  try { fs.rmSync(path.join(DATA_DIR, `selftest-${k}`), { recursive: true, force: true }); } catch (e) { /* none */ }
+  const m = loadMeta(k); m.paused = true; delete m.spot; saveMeta(k, m);
+  return Object.assign(r, { deleted });
+}
+
 // --- Results tally (kept for good) -------------------------------------
 // Running totals since the camera started, and what the gym decided about
 // each checked entry — times, counts and the camera's words, never photos.
@@ -928,8 +971,26 @@ function fmtLocal(iso, timeZone, opts) {
   catch (e) { return d.toLocaleString('en-US', Object.assign({ timeZone: 'UTC', timeZoneName: 'short' }, o)); }
 }
 
+// --- Leads: gyms that used "Will it work at your gym?" ----------------------
+// Contact details and their answers, for TJ to reply to. Kept a year, at
+// most 300; never served as a file (server.js blocks leads.json).
+function leadsFile() { return path.join(DATA_DIR, 'leads.json'); }
+function loadLeads() { const l = readJson(leadsFile(), []); return Array.isArray(l) ? l : []; }
+function addLead(lead) {
+  const cut = Date.now() - 365 * 864e5;
+  const list = loadLeads().filter(x => Date.parse(x.at) > cut);
+  const rec = Object.assign({ id: crypto.randomBytes(6).toString('hex'), at: new Date().toISOString(), done: false }, lead);
+  list.unshift(rec);
+  writeJson(leadsFile(), list.slice(0, 300));
+  return rec;
+}
+function markLead(id, done) {
+  const list = loadLeads(); const x = list.find(l => l.id === id); if (!x) return false;
+  x.done = !!done; writeJson(leadsFile(), list); return true;
+}
+
 module.exports = {
-  safeCode, signToken, readToken,
+  safeCode, signToken, readToken, loadLeads, addLead, markLead, closeData,
   COOKIE, parseCookies, codeFromRequest, setSessionCookie, clearSessionCookie,
   limited, count,
   eventId, newEventId,
@@ -937,7 +998,7 @@ module.exports = {
   loadTally, tallyReview, tallySummary, tallyRows,
   normalizeSettings, getSettings, saveSettings, runnerGen, bumpRunnerGen, readerGen, bumpReaderGen,
   isPaused, setPaused, noteRunnerSeen, runnerSeen, markOfflineAlerted, knownMetaKeys,
-  recordDelivery, deliveryStatus, loadNights, noteNight, flushNights, trends, normalizeChatHook, loadAccess, noteMemberAccess, loadProblems, openProblem, fixProblem, loadAnswers, ownerAgrees, noteExit,
+  recordDelivery, deliveryStatus, loadNights, noteNight, flushNights, trends, normalizeChatHook, loadAccess, noteMemberAccess, loadProblems, openProblem, fixProblem, loadAnswers, ownerAgrees, noteExit, startFresh,
   MAX_SUBSCRIBERS, loadSubscribers, addSubscriber, removeSubscriber, normalizeEmail, normalizePhone, getMarker, setMarker, setSubscriberMorning, setSubscriberChoice, getSpot, setSpot, tallySpot,
   unsubscribeToken, readUnsubscribeToken,
   shareToken, readShareToken, SHARE_TTL_MS,

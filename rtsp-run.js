@@ -32,6 +32,8 @@ const { spawn } = require('child_process');
 const detect = require('./detect');
 const rtsp = require('./rtsp');
 const { loadConfig, maskUrl, maskText, secretsOf, resolveConfigPath, statePath, ensureStateDir, tildify, tooWide, runningMonitor } = require('./runner-config');
+let finderOne = null;
+const recorderFinder = () => finderOne || (finderOne = require('./recorder-finder').create({ stateDir: path.dirname(statePath('x')), configFile: CONFIG, log: m => say(m) }));
 
 const args = process.argv.slice(2);
 const FLAG = {
@@ -880,6 +882,7 @@ async function main() {
         beatSoon();
       },
       onFlowing: () => {
+        recorderFinder().noteWorking(z.cameraUrl).catch(() => {});
         sayAt(`${z.label}  ✓ picture is coming through.`);
         beatSoon();          // tell the website straight away, not in 30 s
       },
@@ -965,6 +968,12 @@ async function main() {
       },
       onClose: (code, info, tail, retryIn) => {
         warn(`${z.label}: ${info.message}${info.fix ? ` Do this: ${info.fix}` : ''} (retrying in ${Math.round(retryIn / 1000)} s)`);
+        // The recorder may have a new address (a power cut, a new router): find it and start again on it.
+        recorderFinder().noteFailing(z.cameraUrl, info.kind).then(moved => {
+          if (!moved) return;
+          loud([`${z.label}: the recorder moved to ${moved} on the gym network (same recorder). Settings updated; starting again.`]);
+          setTimeout(() => process.exit(0), 1500);     // the background service starts it again on the new address
+        }).catch(() => {});
         if (FLAG.verbose && tail) say(`    ffmpeg said: ${tail}`);
       },
       onFatal: (info, tail) => {

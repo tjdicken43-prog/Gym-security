@@ -1,0 +1,44 @@
+# Real secrets — never commit
+.env
+.env.local
+
+# Runtime data written by monitor.js (alert logs + evidence frames)
+alert-log-*.json
+summary-*.json
+frames-*/
+data/
+
+node_modules/
+.DS_Store
+Thumbs.db
+*.log
+
+# Local RTSP config — contains camera passwords
+rtsp-zones.json
+
+# Local ingest config — contains FTP credentials
+ingest-zones.json
+
+# Camera snapshots from setup-camera.js / --snapshot (pictures of the gym)
+camera-check/
+# Runner retry queue (unsent crossings)
+runner-queue/
+# Config backups can contain camera passwords
+rtsp-zones.json.bak
+# Agent working notes
+.agent-brief.md
+# Per-gym reviews, alert subscribers, session secret (only land here if DATA_DIR is unset)
+gym-reviews-*.json
+gym-alerts-*.json
+.gym-session-secret
+
+# Accuracy test runs stored by the website (photos of test walks)
+tests-*/
+# Copies of the camera settings kept when the recorder moved address (contain camera passwords)
+rtsp-zones.json.before-*
+# What this Pi remembers about the gym network and the front-desk screen
+recorder-mac.json
+screen-reader-spot.json
+# Test copies of the reader
+runv-*-test.js
+suite-*-test.js

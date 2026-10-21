@@ -6,13 +6,15 @@
 <meta name="robots" content="noindex, nofollow">
 <title>Lobby screen — SecurityAI</title>
 <link rel="icon" type="image/svg+xml" href="logo.svg">
+<link rel="preload" href="/fonts/BigShoulders-Bold.woff" as="font" type="font/woff" crossorigin>
+<link rel="stylesheet" href="brand.css">
 <style>
-  :root{--bg:#0f1214;--text:#EDEFF1;--muted:#A3ABB3;--green:#3FCF8E;}
+  :root{--yel:#E8A700;--bg:#1E2124;--text:#F7F7F5;--muted:#C9CDCA;--green:#4CC38A;}
   *{box-sizing:border-box;}
   html,body{height:100%;margin:0;}
-  body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;display:flex;align-items:center;justify-content:center;text-align:center;padding:4vh 4vw;}
+  body{background:var(--bg);color:var(--text);font-family:var(--body);display:flex;align-items:center;justify-content:center;text-align:center;padding:4vh 4vw;}
   [hidden]{display:none !important;}
-  .eye{width:14vmin;height:14vmin;border-radius:50%;border:1.4vmin solid var(--green);display:flex;align-items:center;justify-content:center;margin:0 auto 4vh;}
+  .eye{width:14vmin;height:14vmin;margin:0 auto 4vh;}
   .eye span{width:5vmin;height:5vmin;border-radius:50%;background:var(--green);animation:pulse 2.4s ease-in-out infinite;}
   @keyframes pulse{50%{transform:scale(.7);opacity:.6;}}
   @media (prefers-reduced-motion:reduce){ .eye span{animation:none;} }
@@ -22,11 +24,15 @@
   .gym{position:fixed;left:3vw;bottom:3vh;font-size:2.6vmin;color:var(--muted);}
   .gate{font-size:20px;}
   .gate a{display:inline-block;margin-top:14px;background:var(--green);color:#0b1f15;font-weight:700;padding:14px 22px;border-radius:12px;text-decoration:none;}
+
+  /* ===== SecurityAI look (appended last so it wins) ===== */
+  h1,h2,h3{font-family:var(--display);font-weight:800;letter-spacing:.01em;}
+  .n{font-family:var(--display);font-weight:800;}
 </style>
 </head>
 <body>
 <main id="screen">
-  <div class="eye" aria-hidden="true"><span></span></div>
+  <div class="eye" aria-hidden="true"><svg width="100%" height="100%" viewBox="0 0 48 48"><rect x="1" y="1" width="46" height="46" rx="9" fill="#F7F7F5"/><rect x="12" y="11" width="5" height="26" rx="1.5" fill="#1E2124"/><rect x="21.5" y="11" width="5" height="26" rx="1.5" fill="#1E2124"/><rect x="31" y="11" width="5" height="26" rx="1.5" fill="#C8281F"/></svg></div>
   <h1>Everyone checks in.</h1>
   <p>This entrance is watched by camera so every visitor scans. Guests are welcome: ask at the front desk for a day pass.</p>
   <div class="n" id="count"></div>

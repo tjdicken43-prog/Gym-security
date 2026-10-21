@@ -116,7 +116,7 @@ function isValidCode(code) {
   const c = normalize(code);
   if (!c) return false;
   if (envCodes().includes(c)) return true;
-  return load().some(g => normalize(g.code) === c);
+  return load().some(g => normalize(g.code) === c && !g.closedAt);
 }
 
 // Code or key -> the gym's data key, or null if no such gym.
@@ -229,6 +229,28 @@ function newCode(codeOrKey) {
   return g;
 }
 
+// A gym that cancelled: closed (its code stops working), or opened again
+// with a brand-new code if it comes back.
+function closeGym(codeOrKey, reason) {
+  const list = load();
+  const g = list.find(x => keyOf(x) === resolveKey(codeOrKey));
+  if (!g) return null;
+  if (!g.key) g.key = keyOf(g);
+  g.closedAt = new Date().toISOString();
+  g.closedReason = String(reason || '').slice(0, 200);
+  if (!save(list)) throw new Error('Could not save.');
+  return g;
+}
+function reopenGym(codeOrKey) {
+  const list = load();
+  const g = list.find(x => keyOf(x) === resolveKey(codeOrKey));
+  if (!g) return null;
+  delete g.closedAt; delete g.closedReason;
+  if (!save(list)) throw new Error('Could not save.');
+  return newCode(codeOrKey);
+}
+function isClosed(codeOrKey) { const g = findByCode(codeOrKey); return !!(g && g.closedAt); }
+
 function setTimeZone(codeOrKey, tz) {
   const list = load();
   const k = resolveKey(codeOrKey);
@@ -248,7 +270,7 @@ function listGyms() {
 // Operator-only (the admin routes check ADMIN_TOKEN before calling this):
 // includes the codes, which the operator needs to hand a gym its link.
 function listGymsForAdmin() {
-  return load().map(g => ({ code: g.code, key: keyOf(g), gymName: g.gymName, email: g.email, createdAt: g.createdAt, timeZone: g.timeZone || null, codeIssuedAt: g.codeIssuedAt || null, billing: g.billing || null }));
+  return load().map(g => ({ code: g.code, key: keyOf(g), gymName: g.gymName, email: g.email, createdAt: g.createdAt, timeZone: g.timeZone || null, codeIssuedAt: g.codeIssuedAt || null, billing: g.billing || null, closedAt: g.closedAt || null }));
 }
 
 // --- Recovery ---------------------------------------------------------
@@ -336,6 +358,6 @@ module.exports = {
   createGym, listGyms, listGymsForAdmin, isValidCode, anyCodesConfigured,
   findByCode, recoverCode, generateCode, normalize, timeZoneFor, gymNameFor,
   validTimeZone, publicBaseUrl, keyOf, resolveKey, isKnownKey, envCodes,
-  adoptKey, newCode, setTimeZone, setBilling, findBySubscription,
+  adoptKey, newCode, setTimeZone, setBilling, findBySubscription, closeGym, reopenGym, isClosed,
   isDamaged: () => { load(); return damaged; },
 };

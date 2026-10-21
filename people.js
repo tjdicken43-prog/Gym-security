@@ -48,7 +48,7 @@ function create({ dataDir, store, gyms }) {
   // Every gym where this email is a person (for sign-in and switching).
   function gymsFor(email) {
     const e = cleanEmail(email); if (!e) return [];
-    return gymKeys().map(k => ({ key: k, person: list(k).find(p => p.email === e) })).filter(x => x.person);
+    return gymKeys().filter(k => { try { return !gyms.isClosed(k); } catch (x) { return true; } }).map(k => ({ key: k, person: list(k).find(p => p.email === e) })).filter(x => x.person);
   }
 
   function add(key, { name, email, role }, by) {

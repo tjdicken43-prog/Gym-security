@@ -7,36 +7,41 @@
 <title>Terms and Privacy | SecurityAI</title>
 <meta name="description" content="SecurityAI's terms of service and privacy notice in plain language: what is collected, how long photos are kept, and what SecurityAI does not do.">
 <link rel="icon" type="image/svg+xml" href="logo.svg">
-<meta name="theme-color" content="#14171A">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+<meta name="theme-color" content="#E4E6E3">
+<link rel="preload" href="/fonts/BigShoulders-Bold.woff" as="font" type="font/woff" crossorigin>
+<link rel="stylesheet" href="brand.css">
 <style>
-  :root{--bg:#14171A;--panel:#1C2124;--line:#31383D;--text:#EDEFF1;--muted:#8B939B;--green:#3FCF8E;}
+  :root{--yel:#E8A700;--bg:#E4E6E3;--panel:#F7F7F5;--line:#D3D6D3;--text:#1E2124;--muted:#4E565B;--green:#23804A;}
   *{box-sizing:border-box;}
-  body{margin:0;background:var(--bg);color:var(--text);font-family:'IBM Plex Sans',sans-serif;line-height:1.6;}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:var(--body);line-height:1.6;}
   a{color:inherit;}
   .wrap{max-width:760px;margin:0 auto;padding:0 20px;}
   nav{border-bottom:1px solid var(--line);}
   nav .wrap{display:flex;align-items:center;justify-content:space-between;height:60px;gap:12px;}
-  .brand{font-family:'Oswald';font-size:19px;text-decoration:none;}
+  .brand{display:flex;align-items:center;gap:9px;font-family:var(--display);font-weight:800;font-size:26px;text-decoration:none;color:var(--text);}
   .back{color:var(--muted);font-size:14px;text-decoration:none;}
   main{padding:40px 0 70px;}
-  .tag{color:var(--green);font-size:13px;font-family:'IBM Plex Mono';margin-bottom:8px;}
-  h1,h2{font-family:'Oswald';font-weight:600;margin:0;}
-  h1{font-size:30px;margin-bottom:8px;}
-  h2{font-size:21px;margin:36px 0 10px;padding-top:6px;}
-  p,li{color:#C3C9CE;font-size:15px;}
+  .tag{color:var(--muted);font-size:15px;font-weight:600;margin-bottom:8px;}
+  h1,h2{font-family:var(--display);font-weight:600;margin:0;}
+  h1{font-size:52px;line-height:.95;text-transform:uppercase;margin-bottom:12px;}
+  h2{font-size:30px;margin:40px 0 10px;padding-top:14px;border-top:3px solid var(--text);}
+  p,li{color:#3A4146;font-size:16px;}
   ul{padding-left:20px;}
   li{margin-bottom:6px;}
   strong{color:var(--text);}
   .muted{color:var(--muted);font-size:14px;}
   section{scroll-margin-top:16px;}
+
+  /* ===== SecurityAI look (appended last so it wins) ===== */
+  h1,h2,h3{font-family:var(--display);font-weight:800;letter-spacing:.01em;}
+  body{background-color:var(--bg);background-image:var(--grain);}
+  /* Polish (Oct 20): comfortable line length on wide screens. */
+  li,p{max-width:58ch;}
 </style>
 </head>
 <body>
 <nav><div class="wrap">
-  <a class="brand" href="securityai.html">SecurityAI</a>
+  <a class="brand" href="securityai.html"><svg width="28" height="28" viewBox="0 0 48 48" aria-hidden="true"><rect x="1" y="1" width="46" height="46" rx="9" fill="#1E2124"/><rect x="12" y="11" width="5" height="26" rx="1.5" fill="#E4E6E3"/><rect x="21.5" y="11" width="5" height="26" rx="1.5" fill="#E4E6E3"/><rect x="31" y="11" width="5" height="26" rx="1.5" fill="#C8281F"/></svg>SecurityAI</a>
   <a class="back" href="securityai.html">← Back to SecurityAI</a>
 </div></nav>
 <main><div class="wrap">
@@ -47,7 +52,7 @@
   <section id="terms">
     <h2>Terms of service</h2>
     <ul>
-      <li><strong>What you're buying.</strong> A hosted service that watches the entrance camera you choose during the hours you choose, and tells you by email or text message when more people come through than expected. It includes your gym's activity page and a monthly summary.</li>
+      <li><strong>What you're buying.</strong> A hosted service that watches the entrance camera you choose during the hours you choose, and tells you (by email, phone notification, team chat or, where available, text message) when more people come through than expected. It includes your gym's activity page and a monthly summary.</li>
       <li><strong>What's at your gym.</strong> A small computer (a laptop or a Raspberry Pi) on your network next to your camera recorder. It needs power and an internet connection.</li>
       <li><strong>Billing.</strong> Charged monthly by card through Stripe until you cancel. To cancel, email or call us; it stops at the end of the month you've paid for.</li>
       <li><strong>No guarantee.</strong> SecurityAI will sometimes miss an entry or flag one that was fine, and it stops watching if the internet, power or camera goes down. It's a tool to help your staff check, not a security guarantee, and it isn't a replacement for your access control.</li>

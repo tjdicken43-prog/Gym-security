@@ -5,10 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Door sign and member notice — SecurityAI</title>
 <link rel="icon" type="image/svg+xml" href="logo.svg">
+<link rel="preload" href="/fonts/BigShoulders-Bold.woff" as="font" type="font/woff" crossorigin>
+<link rel="stylesheet" href="brand.css">
 <style>
-  :root{--text:#14171A;--muted:#5b636b;--line:#d8dbdf;}
+  :root{--yel:#E8A700;--text:#1E2124;--muted:#4E565B;--line:#D3D6D3;}
   *{box-sizing:border-box;}
-  body{margin:0;background:#f4f6f8;color:var(--text);font:16px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;padding:16px;}
+  body{margin:0;background:#E4E6E3;color:var(--text);font:16px/1.55 var(--body);padding:16px;}
   .wrap{max-width:760px;margin:0 auto;}
   .bar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;margin:0 0 14px;}
   .bar a,.bar button{font:inherit;font-weight:600;min-height:44px;padding:8px 14px;border-radius:10px;border:1px solid var(--text);background:#fff;color:var(--text);text-decoration:none;cursor:pointer;}
@@ -19,8 +21,12 @@
   .sign p{font-size:21px;margin:8px auto;max-width:560px;}
   .sign .small{font-size:15px;color:var(--muted);}
   h2{font-size:20px;margin:0 0 8px;} .muted{color:var(--muted);}
-  [contenteditable]{outline:1px dashed transparent;} [contenteditable]:focus{outline-color:#3FCF8E;}
+  [contenteditable]{outline:1px dashed transparent;} [contenteditable]:focus{outline-color:var(--green);}
   @media print{ body{background:#fff;padding:0;} .bar,.noprint{display:none;} .page{border:0;border-radius:0;page-break-after:always;margin:0;} }
+
+  /* ===== SecurityAI look (appended last so it wins) ===== */
+  h1,h2,h3{font-family:var(--display);font-weight:800;letter-spacing:.01em;}
+  body{background-color:var(--bg);background-image:var(--grain);}
 </style>
 </head>
 <body>
@@ -29,14 +35,14 @@
   <p class="noprint muted">Tap any text to change it (your gym's name, the price) before printing. Check your state's rules on camera signs with your lawyer: this is a starting point, not legal advice.</p>
 
   <div class="page"><div class="sign">
-    <div class="eye" aria-hidden="true">◉</div>
+    <div class="eye" aria-hidden="true"><svg width="64" height="64" viewBox="0 0 48 48"><rect x="1" y="1" width="46" height="46" rx="9" fill="#1E2124"/><rect x="12" y="11" width="5" height="26" rx="1.5" fill="#E4E6E3"/><rect x="21.5" y="11" width="5" height="26" rx="1.5" fill="#E4E6E3"/><rect x="31" y="11" width="5" height="26" rx="1.5" fill="#C8281F"/></svg></div>
     <h1 contenteditable="true">Everyone checks in</h1>
     <p contenteditable="true">This entrance is watched by camera so every visitor scans in. Guests are welcome: ask at the front desk for a day pass.</p>
     <p class="small" contenteditable="true">Photos of each entry are kept for 48 hours, longer only if needed for a membership issue. No facial recognition. Details: <b id="memUrl">gym-security.onrender.com/members</b></p>
   </div></div>
 
   <div class="page"><div class="sign" lang="es">
-    <div class="eye" aria-hidden="true">◉</div>
+    <div class="eye" aria-hidden="true"><svg width="64" height="64" viewBox="0 0 48 48"><rect x="1" y="1" width="46" height="46" rx="9" fill="#1E2124"/><rect x="12" y="11" width="5" height="26" rx="1.5" fill="#E4E6E3"/><rect x="21.5" y="11" width="5" height="26" rx="1.5" fill="#E4E6E3"/><rect x="31" y="11" width="5" height="26" rx="1.5" fill="#C8281F"/></svg></div>
     <h1 contenteditable="true">Todos registran su entrada</h1>
     <p contenteditable="true">Esta entrada está vigilada por cámara para que cada visitante registre su entrada. Los invitados son bienvenidos: pida un pase de día en la recepción.</p>
     <p class="small" contenteditable="true">Las fotos de cada entrada se guardan 48 horas, más tiempo solo si se necesitan para un asunto de membresía. Sin reconocimiento facial. Detalles: <b class="memUrl">gym-security.onrender.com/members?lang=es</b></p>
