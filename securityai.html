@@ -295,21 +295,14 @@
   .row p{max-width:58ch;}
 
   /* Premium pass (Oct 21). The camera still reads as live footage (a REC light
-     and a slow scan line), the hero sits under a soft ceiling light, and
-     sections ease in as they scroll into view. */
+     and a slow scan line) and the hero sits under a soft ceiling light;
+     the hero's own drawing is the one animated moment on the page. */
   .hero{background:radial-gradient(60% 70% at 72% 30%,rgba(255,255,255,.55),rgba(255,255,255,0) 70%);}
-  .still{transition:transform .5s var(--ease-out),box-shadow .5s ease;}
-  @media(hover:hover){.still:hover{transform:translateY(-3px);box-shadow:0 1px 0 rgba(255,255,255,.7) inset,0 2px 4px rgba(30,33,36,.06),0 40px 70px -32px rgba(30,33,36,.6);}}
   .cam .rec{animation:rec 1.6s steps(1,end) infinite;}
   .cam .scan{animation:scan 6s linear infinite;}
   @keyframes rec{50%{opacity:.15;}}
   @keyframes scan{from{transform:translateY(-60px);}to{transform:translateY(420px);}}
   @media(prefers-reduced-motion:reduce){.cam .scan{display:none;}}
-  @supports (animation-timeline:view()){
-    @media(prefers-reduced-motion:no-preference){
-      main > section:not(.hero):not(.closing) .wrap > *{animation:sai-rise linear both;animation-timeline:view();animation-range:entry 0% entry 30%;}
-    }
-  }
 </style>
 <script type="application/ld+json">
 {

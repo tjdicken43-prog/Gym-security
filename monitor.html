@@ -113,6 +113,14 @@
   .startbar{background:rgba(247,247,245,.97);border-top:1px solid var(--line);box-shadow:0 -12px 30px -18px rgba(30,33,36,.35);}
   .consent p{font-size:14px;color:var(--ink2,#3A4146);}
   .tip{max-width:66ch;}
+  /* Audit (Oct 21): buttons are finger-sized (44px), small status labels meet
+     4.5:1 contrast, and tips are a tinted box instead of a colored side stripe. */
+  .btn-ghost-sm{min-height:44px;border-radius:10px;transition:border-color .15s ease,background-color .15s ease,transform .16s var(--ease-out);}
+  .btn-ghost-sm:active{transform:scale(.97);}
+  .badge.ok{color:#1B6B3D;} .badge.bad{color:#A61F18;}
+  p.fineprint[style*="--red"]{color:#A61F18!important;}
+  input[type=checkbox]{width:20px;height:20px;flex-shrink:0;}
+  .tip{border-left:0;border:1px solid rgba(232,167,0,.38);background:rgba(232,167,0,.08);border-radius:10px;color:var(--ink2,#3A4146);}
 </style>
 </head>
 <body>
