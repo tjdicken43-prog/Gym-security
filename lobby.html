@@ -28,6 +28,23 @@
   /* ===== SecurityAI look (appended last so it wins) ===== */
   h1,h2,h3{font-family:var(--display);font-weight:800;letter-spacing:.01em;}
   .n{font-family:var(--display);font-weight:800;}
+
+  /* Premium pass (Oct 21). A soft overhead light on the dark screen and two
+     slow rings around the mark, like a lens that is quietly on. Never flashy:
+     this hangs in a lobby all day. */
+  body{background:radial-gradient(70% 60% at 50% 32%,#2B3034 0%,var(--bg) 70%);}
+  .eye{position:relative;}
+  .eye svg{position:relative;filter:drop-shadow(0 2vmin 5vmin rgba(0,0,0,.5));}
+  .eye::before,.eye::after{content:"";position:absolute;inset:-3vmin;border-radius:28%;border:.3vmin solid rgba(247,247,245,.16);}
+  .eye::after{inset:-3vmin;border-color:rgba(200,40,31,.35);}
+  @media(prefers-reduced-motion:no-preference){
+    .eye::before{animation:halo 5s cubic-bezier(.23,1,.32,1) infinite;}
+    .eye::after{animation:halo 5s cubic-bezier(.23,1,.32,1) 2.5s infinite;}
+  }
+  @keyframes halo{0%{transform:scale(.9);opacity:0;}20%{opacity:1;}100%{transform:scale(1.3);opacity:0;}}
+  h1{letter-spacing:.015em;}
+  .n{display:inline-block;padding:1.6vmin 3.2vmin;border-radius:999px;background:rgba(247,247,245,.06);box-shadow:0 0 0 1px rgba(247,247,245,.1) inset;}
+  .n:empty{display:none;}
 </style>
 </head>
 <body>
