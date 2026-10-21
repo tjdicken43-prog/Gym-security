@@ -46,6 +46,30 @@
   h1,h2,h3{font-family:var(--display);font-weight:800;letter-spacing:.01em;}
   .btn.primary{background:#2F6FE0;border-color:#2F6FE0;color:#fff;}
   .big{font-family:var(--display);font-weight:800;letter-spacing:.01em;}
+
+  /* Premium pass (Oct 21). The calm screen gets a status orb that breathes in
+     the header dot's color (green watching, amber needs a look, grey otherwise)
+     and a big clock, so a glance from across the desk says "all good, it's on". */
+  header{background:linear-gradient(#24282B,var(--bg));}
+  .orb{position:relative;width:132px;height:132px;margin:0 auto 22px;border-radius:50%;--c:#6d767e;
+       background:radial-gradient(circle at 50% 45%,color-mix(in srgb,var(--c) 38%,transparent),transparent 62%);}
+  .orb::before,.orb::after{content:"";position:absolute;inset:0;border-radius:50%;border:1.5px solid color-mix(in srgb,var(--c) 55%,transparent);}
+  .orb::after{inset:-18px;border-color:color-mix(in srgb,var(--c) 22%,transparent);}
+  .orb i{position:absolute;inset:46px;border-radius:50%;background:var(--c);box-shadow:0 0 28px 4px color-mix(in srgb,var(--c) 55%,transparent);}
+  body:has(#dot.ok) .orb{--c:var(--green);}
+  body:has(#dot.warn) .orb{--c:var(--amber);}
+  @media(prefers-reduced-motion:no-preference){
+    .orb::before{animation:ring 3.2s var(--ease-out,ease-out) infinite;}
+    .orb i{animation:breathe 3.2s ease-in-out infinite;}
+  }
+  @keyframes ring{0%{transform:scale(.55);opacity:1;}100%{transform:scale(1.35);opacity:0;}}
+  @keyframes breathe{50%{transform:scale(.86);}}
+  .calm .big{font-size:40px;letter-spacing:.015em;}
+  .calm .s{margin:6px auto 0;}
+  .clock{margin-top:26px;font:800 64px/1 var(--display);letter-spacing:.02em;color:#F7F7F5;opacity:.9;font-variant-numeric:tabular-nums;}
+  .clock small{display:block;margin-top:8px;font:500 15px/1 var(--body);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);}
+  .alert{box-shadow:0 30px 80px -30px rgba(240,84,74,.45);}
+  .gate{box-shadow:0 30px 60px -30px rgba(0,0,0,.7);}
 </style>
 </head>
 <body>
@@ -56,8 +80,10 @@
 </header>
 <main id="main">
   <div class="calm" id="calm">
+    <div class="orb" aria-hidden="true"><i></i></div>
     <div class="big" id="calmBig">Connecting…</div>
     <div class="s" id="calmS">Leave this screen open at the front desk. When someone gets in without their own scan, it shows here within seconds of the AI check, with a sound.</div>
+    <div class="clock num" id="clock" aria-hidden="true"></div>
   </div>
   <div id="alerts"></div>
   <div class="gate" id="gate" hidden>
@@ -131,6 +157,9 @@ document.addEventListener('click', ev => {
 let lock = null;
 async function wake(){ try{ if('wakeLock' in navigator && !document.hidden) lock = await navigator.wakeLock.request('screen'); }catch(e){} }
 document.addEventListener('visibilitychange', () => { if(!document.hidden){ wake(); tick(); } });
+// A big clock under the calm message (display only).
+function clock(){ const d = new Date(); $('clock').innerHTML = esc(d.toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit' })) + '<small>' + esc(d.toLocaleDateString('en-US', { weekday:'long', month:'short', day:'numeric' })) + '</small>'; }
+clock(); setInterval(clock, 15000);
 wake(); tick(); setInterval(tick, 5000);
 </script>
 </body>

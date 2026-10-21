@@ -55,3 +55,18 @@ h1,h2,h3,h4{text-wrap:balance;}
   input:not([type=checkbox]):not([type=radio]),select,textarea{font-size:16px!important;}
 }
 @media(pointer:coarse){footer a{display:inline-block;padding:10px 0;margin:-10px 0;}}
+
+/* Premium pass (Oct 21). Small, shared touches every page picks up:
+   brand-colored text selection, a button that lifts a hair on hover,
+   a "live" pulse for status dots, and the rise-in motion pages use as
+   sections scroll into view (only where the browser can do it without script). */
+:root{color-scheme:light;--ease-out:cubic-bezier(.23,1,.32,1);}
+::selection{background:rgba(29,79,176,.18);color:inherit;}
+.btn{transition:background-color .15s ease,color .15s ease,border-color .15s ease,transform .18s var(--ease-out),box-shadow .18s ease;}
+@media(hover:hover){
+  .btn-blue:hover,.btn-red:hover{transform:translateY(-1px);}
+  .btn-blue:hover{box-shadow:0 1px 0 rgba(255,255,255,.18) inset,0 14px 28px -12px rgba(29,79,176,.85);}
+}
+.btn:active{transform:translateY(1px);transition-duration:.06s;}
+@keyframes sai-live{0%{box-shadow:0 0 0 0 var(--live,rgba(35,128,74,.45));}70%,100%{box-shadow:0 0 0 10px rgba(35,128,74,0);}}
+@keyframes sai-rise{from{opacity:0;transform:translateY(18px);}to{opacity:1;transform:none;}}
