@@ -52,7 +52,7 @@ function loadCheck(files) {
   const Module = require('module');
   const orig = Module._load;
   const stubs = {
-    express: (() => { const f = () => { const app = () => {}; ['get','post','use','listen'].forEach(m => app[m] = () => ({ close(){} })); return app; };
+    express: (() => { const f = () => { const app = () => {}; ['get','post','use','listen','disable'].forEach(m => app[m] = () => ({ close(){} })); return app; };
       f.json = () => () => {}; f.raw = () => () => {}; f.static = () => () => {}; return f; })(),
     cors: () => () => {},
     stripe: () => ({}),
@@ -82,7 +82,7 @@ function routeCheck() {
   const routes = []; let listened = 0;
   const express = () => {
     const app = () => {};
-    app.use = () => {};
+    app.use = () => {}; app.disable = () => {};
     app.get = (p) => { routes.push('GET ' + p); };
     app.post = (p) => { routes.push('POST ' + p); };
     app.listen = () => { listened++; return { close() {} }; };
