@@ -1,0 +1,28 @@
+# Runs on every push and pull request: the page/route checks and the
+# smoke test (starts the website with an empty data folder, no keys).
+# A red X on a pull request means don't merge it yet.
+name: checks
+on:
+  push:
+    branches: [main]
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --no-audit --no-fund
+      - name: Every JavaScript file parses
+        run: for f in *.js; do node --check "$f" || exit 1; done
+      - name: Page and route checks
+        run: node qa_check.js
+      - name: Smoke test
+        run: node smoke-test.js
+      - name: Known security holes in packages
+        run: npm audit --omit=dev --audit-level=high

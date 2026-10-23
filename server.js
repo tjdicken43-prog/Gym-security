@@ -62,6 +62,44 @@ for (const m of ['get', 'post', 'put', 'patch', 'delete', 'all']) {
 const DOMAIN = process.env.DOMAIN || process.env.RENDER_EXTERNAL_URL || 'http://localhost:4242';
 
 app.use(cors());
+// Standard safety headers, the ones every hosted security product sends.
+// The front-desk, lobby and signage screens may be shown inside a signage
+// player's frame, so only those pages can be framed by another site;
+// everything else (admin, the gym page, sign-in) can't be, which stops a
+// page elsewhere from dressing up our buttons as its own (clickjacking).
+app.disable('x-powered-by');
+const FRAMEABLE = /^\/(desk|lobby|signage)(\.html)?$/;
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Permissions-Policy', 'geolocation=(), microphone=(), usb=()');
+  if (!FRAMEABLE.test(req.path)) {
+    res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+    res.setHeader('Content-Security-Policy', "frame-ancestors 'self'");
+  }
+  // Only over https (Render): tells browsers never to try plain http here.
+  if (req.secure || String(req.headers['x-forwarded-proto'] || '').split(',')[0].trim() === 'https') {
+    res.setHeader('Strict-Transport-Security', 'max-age=15552000');
+  }
+  next();
+});
+// Health check for Render (render.yaml healthCheckPath) and any uptime
+// monitor: 200 while the server answers and can write its data folder.
+// A deploy that can't write its records (disk not mounted) never goes live.
+// Says nothing about any gym.
+const STARTED_AT = Date.now();
+app.get('/healthz', (req, res) => {
+  const fs = require('fs');
+  const dir = process.env.DATA_DIR || __dirname;
+  let writable = true;
+  try {
+    const probe = path.join(dir, `.healthz-${process.pid}`);
+    fs.writeFileSync(probe, String(Date.now()));
+    fs.unlinkSync(probe);
+  } catch (e) { writable = false; }
+  res.set('Cache-Control', 'no-store').status(writable ? 200 : 503)
+    .json({ ok: writable, uptimeSec: Math.round((Date.now() - STARTED_AT) / 1000), data: writable ? 'writable' : 'not writable' });
+});
 // Big JSON answers (the gym's activity list refreshes every 30 s, often on
 // a phone's data) go out gzip-compressed: about 10x smaller. No extra
 // package needed.
@@ -121,9 +159,19 @@ function isPrivateStaticPath(p) {
     || /^\/+(runner-queue|camera-check|ashbourne-reports|frames-[^/]*|tests-[^/]*|selftest-[^/]*|archive-[^/]*|logos|data|node_modules)(\/|$)/.test(s);
 }
 app.use((req, res, next) => {
-  if ((req.method === 'GET' || req.method === 'HEAD') && isPrivateStaticPath(req.path)) return res.status(404).send('Not found');
+  if ((req.method === 'GET' || req.method === 'HEAD') && (isPrivateStaticPath(req.path) || isInternalDocPath(req.path))) return res.status(404).send('Not found');
   next();
 });
+// The setup notes (*.md), package.json and render.yaml are for TJ and the
+// camera computers (which get them through /monitor/runner/files, signed
+// in), not for anyone who types the address. Kept apart from
+// isPrivateStaticPath so camera computers still receive them on update.
+function isInternalDocPath(p) {
+  let s;
+  try { s = decodeURIComponent(p); } catch (e) { return true; }
+  s = path.posix.normalize('/' + s.replace(/\\/g, '/')).toLowerCase();
+  return /\.md$/.test(s) || /^\/+(package\.json|render\.yaml)$/.test(s);
+}
 // SEO: the home page's canonical link, robots.txt and sitemap.xml are
 // written with a placeholder domain. Fill in this website's real address
 // (DOMAIN, or the one Render sets in RENDER_EXTERNAL_URL) so search engines

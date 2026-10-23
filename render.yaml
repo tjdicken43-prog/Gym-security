@@ -17,6 +17,9 @@ services:
     plan: starter          # free tier cannot mount a disk
     buildCommand: npm install
     startCommand: node server.js
+    # Render waits for this to answer 200 before switching traffic to a new
+    # deploy (and restarts the service if it stops answering).
+    healthCheckPath: /healthz
     disk:
       name: securityai-data
       mountPath: /var/data
