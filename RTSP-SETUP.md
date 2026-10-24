@@ -206,12 +206,24 @@ look like software faults.
 | Case | Official case, the version that fits the cooler | $10 |
 | Ethernet cable | Any length that reaches | $5 |
 
-**Around $100.** A "Pi 5 starter kit" from CanaKit or Vilros bundles most
-of this and is often cheaper than buying separately — just check it
-includes the **official 27W supply** and **active cooling**.
+**Around $185 in 2026** (memory prices went up): the CanaKit Pi 5 4GB
+Starter Kit bundles all of it (official supply, case with fan, 64GB card,
+card reader). Check any kit includes the **official 27W supply** and
+**active cooling**.
 
-Also fine instead of a Pi: any used mini PC with an Intel N100. Around
-$120–150, more headroom, and x86 makes ffmpeg simpler. Bigger and noisier.
+**Cheaper instead of a Pi: an Intel N100 mini PC** (Beelink S12 Pro / EQ13
+or similar, about $130 used, $170–200 new; comes with an SSD, case and
+power). The same program runs on it unchanged, with two rules:
+- **Put Ubuntu 24.04 (or Debian 12) on it, wiping Windows.** The background
+  service is set up only on Linux or a Mac, and the setup script uses
+  apt. Then run `pi-setup.sh` exactly as on a Pi. Checked 2026-10-24 on
+  Ubuntu 24.04 x86-64: every package it installs is there, and Node is
+  18.19 (it needs 18+). Ubuntu 22.04's Node is too old: don't use 22.04.
+- Plug it into the router with a cable, like the Pi.
+
+It has more headroom than a Pi (the N100 can decode the camera picture in
+hardware) and an SSD survives power cuts better than a memory card. You
+don't need a spare memory card for it.
 
 ---
 
