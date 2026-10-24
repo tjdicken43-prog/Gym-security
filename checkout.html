@@ -156,7 +156,7 @@
             </div>
             <div class="consent">
               <input type="checkbox" id="c2" class="required-consent">
-              <p>I authorize SecurityAI to charge the card I enter on the next page <strong>$<span class="tot">200</span> per month</strong><span class="qtyWords"></span>, starting 30 days from today (the first month is free), on a recurring basis, until I cancel.</p>
+              <p>I authorize SecurityAI to charge the card I enter on the next page <strong>$<span class="tot">149</span> per month</strong><span class="qtyWords"></span>, starting 30 days from today (the first month is free), on a recurring basis, until I cancel.</p>
             </div>
             <div class="consent">
               <input type="checkbox" id="c3" class="required-consent">
@@ -171,7 +171,7 @@
 
         <div class="card" style="position:sticky;top:24px;">
           <h2>Your order</h2>
-          <div class="summary-line"><span class="plan-name-line">One entrance</span><span>$<span class="pr">200</span>/month</span></div>
+          <div class="summary-line"><span class="plan-name-line">One entrance</span><span>$<span class="pr">149</span>/month</span></div>
           <div class="summary-line" id="qtyLine"><span>Entrances (all locations)</span><span id="qtyFixed">1</span>
             <span id="qtyEdit" style="display:none;align-items:center;gap:8px;">
               <label for="qty" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);">Number of entrances</label>
@@ -180,9 +180,9 @@
           <div class="summary-line"><span>Billing cycle</span><span>Monthly</span></div>
           <div class="summary-line"><span>First month</span><span><b>Free</b></span></div>
           <div class="summary-total"><span>Due today</span><span>$0</span></div>
-          <div class="fineprint" style="text-align:left;margin-top:6px;">Then $<span class="tot">200</span> a month from day 31. The hardware kit for each location (camera computer, splitter, cables: about $275, at cost, no markup) is paid once at setup, and it's yours. That is why the first month is on us.</div>
+          <div class="fineprint" style="text-align:left;margin-top:6px;">Then $<span class="tot">149</span> a month from day 31. The hardware kit for each location (camera computer, splitter, cables: about $275, at cost, no markup) is paid once at setup, and it's yours. That is why the first month is on us.</div>
           <div class="fineprint" style="text-align:left;margin-top:6px;">Founding gyms: the first 5 to sign up keep this monthly price for as long as they stay, even if it goes up later.</div>
-          <div class="fineprint" id="qtyNote" style="display:none;text-align:left;margin-top:6px;">$200 for the first entrance, $100 a month for each extra entrance or location (2 to 50).</div>
+          <div class="fineprint" id="qtyNote" style="display:none;text-align:left;margin-top:6px;">$149 for the first entrance, $79 a month for each extra entrance or location (2 to 50).</div>
           <button class="btn-primary" id="submitBtn" disabled onclick="submitCheckout()">Continue to payment</button>
           <div class="fineprint" id="checkoutStatus" style="display:none;color:var(--red);"></div>
           <div class="fineprint">You'll enter your card on Stripe's secure checkout page next. To cancel any time, email or call us.</div>
@@ -198,8 +198,8 @@
   // The server works out the real price from the plan name.
   const params = new URLSearchParams(window.location.search);
   const PLANS = {
-    'single-door': { name: 'One entrance', price: 200, extra: 0 },
-    'gym':         { name: 'Several entrances or locations', price: 200, extra: 100 },
+    'single-door': { name: 'One entrance', price: 149, extra: 0 },
+    'gym':         { name: 'Several entrances or locations', price: 149, extra: 79 },
   };
   PLANS.multi = PLANS.gym;   // older links
   const planKey = PLANS[params.get('plan')] ? params.get('plan') : 'single-door';
@@ -207,7 +207,7 @@
   document.querySelectorAll('.pr').forEach(el => el.textContent = plan.price);
   document.querySelector('.plan-name-line').textContent = plan.name;
 
-  // Several entrances: $200 for the first, $100 for each extra (2 to 50,
+  // Several entrances: $149 for the first, $79 for each extra (2 to 50,
   // same limits as the server). The page asks how many and shows the total.
   const isMulti = !!plan.extra;
   const qtyIn = document.getElementById('qty');

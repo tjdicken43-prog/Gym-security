@@ -2558,7 +2558,7 @@ app.post('/admin/leads/:id', (req, res) => {
 // to send unitAmountCents from ?price= in its URL, so ?price=1 bought the
 // plan for $1. The browser names a plan; anything else it sends about
 // money is ignored.
-// $200 a month for the first entrance, $100 for each extra entrance or
+// $149 a month for the first entrance, $79 for each extra entrance or
 // location. 'gym' and 'multi' are the same plan (older links use either):
 // the quantity is the number of entrances, the first billed at the full
 // price and the rest at the extra price.
@@ -2567,8 +2567,8 @@ app.post('/admin/leads/:id', (req, res) => {
 // billing 30 days after checkout; nothing is charged on the day.
 const FIRST_MONTH_FREE_DAYS = 30;
 const PLANS = {
-  'single-door': { name: 'One entrance', cents: 20000, maxQty: 1 },
-  gym: { name: 'Several entrances or locations', aliases: ['Whole gym — every entrance', 'Whole gym — unlimited entrances', 'Multi-gym contract (per gym)'], cents: 20000, extraCents: 10000, minQty: 2, maxQty: 50 },
+  'single-door': { name: 'One entrance', cents: 14900, maxQty: 1 },
+  gym: { name: 'Several entrances or locations', aliases: ['Whole gym — every entrance', 'Whole gym — unlimited entrances', 'Multi-gym contract (per gym)'], cents: 14900, extraCents: 7900, minQty: 2, maxQty: 50 },
 };
 PLANS.multi = PLANS.gym;
 function planFrom(body) {
