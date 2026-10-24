@@ -12,6 +12,11 @@
 // The session is signed with a key derived from ADMIN_TOKEN: changing
 // ADMIN_TOKEN on Render signs every browser out. ADMIN_EMAIL_CONFIRM=off
 // turns the email step off (the way back in if email ever breaks).
+//
+// Authenticator app (2FA): set ADMIN_TOTP_SECRET on Render (make one with
+// `node admin-totp.js`). Then a new browser needs the token AND the
+// 6-digit code from the app, instead of the email. Removing the variable
+// turns it off. Changing it signs every browser out.
 'use strict';
 const crypto = require('crypto');
 
@@ -50,8 +55,58 @@ function emailConfirmOn() {
   if (String(process.env.ADMIN_EMAIL_CONFIRM || '').toLowerCase() === 'off') return false;
   return !!(process.env.ADMIN_TOKEN && adminEmail() && mailerOk());
 }
+// --- Authenticator codes (RFC 6238: SHA-1, 30 s, 6 digits) ---------------
+const B32 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+function base32Decode(s) {
+  const clean = String(s || '').toUpperCase().replace(/[\s=-]/g, '');
+  let bits = 0, val = 0; const out = [];
+  for (const ch of clean) {
+    const i = B32.indexOf(ch);
+    if (i < 0) return null;
+    val = (val << 5) | i; bits += 5;
+    if (bits >= 8) { out.push((val >>> (bits - 8)) & 255); bits -= 8; }
+  }
+  return Buffer.from(out);
+}
+function base32Encode(buf) {
+  let bits = 0, val = 0, out = '';
+  for (const b of buf) { val = (val << 8) | b; bits += 8; while (bits >= 5) { out += B32[(val >>> (bits - 5)) & 31]; bits -= 5; } }
+  if (bits > 0) out += B32[(val << (5 - bits)) & 31];
+  return out;
+}
+function totpSecret() {
+  const key = base32Decode(process.env.ADMIN_TOTP_SECRET);
+  return key && key.length >= 10 ? key : null;     // 80+ bits, or treat as unset
+}
+function totpOn() { return !!(process.env.ADMIN_TOKEN && totpSecret()); }
+function totpAt(key, counter) {
+  const msg = Buffer.alloc(8);
+  msg.writeUInt32BE(Math.floor(counter / 2 ** 32), 0);
+  msg.writeUInt32BE(counter >>> 0, 4);
+  const h = crypto.createHmac('sha1', key).update(msg).digest();
+  const o = h[h.length - 1] & 15;
+  return String((h.readUInt32BE(o) & 0x7fffffff) % 1e6).padStart(6, '0');
+}
+// One step either side (phone clock drift). A code works once: replays of
+// the same or an older step are refused.
+let lastTotpStep = 0;
+function checkTotp(code, now) {
+  const key = totpSecret();
+  const c = String(code || '').replace(/\s/g, '');
+  if (!key || !/^\d{6}$/.test(c)) return false;
+  const step = Math.floor((now || Date.now()) / 30e3);
+  for (const d of [0, -1, 1]) {
+    if (step + d <= lastTotpStep) continue;
+    if (sameSecret(totpAt(key, step + d), c)) { lastTotpStep = step + d; return true; }
+  }
+  return false;
+}
+
 function sessionKey() {
-  return crypto.createHmac('sha256', String(process.env.ADMIN_TOKEN || '')).update('securityai-admin-session-v1').digest();
+  // Turning the authenticator on (or changing it) signs every browser out.
+  const key = totpSecret();
+  const tag = key ? '|totp:' + crypto.createHash('sha256').update(key).digest('hex').slice(0, 16) : '';
+  return crypto.createHmac('sha256', String(process.env.ADMIN_TOKEN || '')).update('securityai-admin-session-v1' + tag).digest();
 }
 function signSession(days) {
   const body = Buffer.from(JSON.stringify({ v: 1, exp: Date.now() + (days || SESSION_DAYS) * 864e5, n: crypto.randomBytes(8).toString('hex') })).toString('base64url');
@@ -66,15 +121,22 @@ function verifySession(s) {
   try { const b = JSON.parse(Buffer.from(m[1], 'base64url').toString()); return b && b.v === 1 && b.exp > Date.now(); } catch (e) { return false; }
 }
 
-// { ok } | { ok:false, needEmail:true } | { ok:false }
+// { ok } | { ok:false, needCode:true } | { ok:false, needEmail:true } | { ok:false }
 function check(req) {
   const token = process.env.ADMIN_TOKEN;
   if (!token || !sameSecret(req.get('X-Admin-Token') || '', token)) return { ok: false };
+  if (totpOn()) return verifySession(req.get('X-Admin-Session')) ? { ok: true } : { ok: false, needCode: true };
   if (!emailConfirmOn()) return { ok: true };
   if (verifySession(req.get('X-Admin-Session'))) return { ok: true };
   return { ok: false, needEmail: true };
 }
 function isAdmin(req) { return check(req).ok; }
+// The 403 body for a failed check(): tells the admin page which step is next.
+function denyBody(c) {
+  if (c && c.needCode) return { error: 'Enter the 6-digit code from your authenticator app.', needCode: true };
+  if (c && c.needEmail) return { error: 'Approve this browser from the email we send you.', needEmail: true };
+  return { error: 'Not authorized.' };
+}
 
 function prune() {
   const now = Date.now();
@@ -107,10 +169,22 @@ function mount(app, deps) {
   const { publicBaseUrl } = deps || {};
   const limited = (() => { const hits = new Map(); return (k, n, ms) => { const now = Date.now(); const a = (hits.get(k) || []).filter(t => now - t < ms); a.push(now); hits.set(k, a); return a.length > n; }; })();
 
+  // Authenticator sign-in: token + 6-digit code -> 30-day session.
+  app.post('/admin/login/code', require('express').json({ limit: '1kb' }), (req, res) => {
+    res.set('Cache-Control', 'no-store');
+    const token = process.env.ADMIN_TOKEN;
+    if (!token || !sameSecret(req.get('X-Admin-Token') || '', token)) return res.status(403).json({ error: 'Not authorized.' });
+    if (!totpOn()) return res.status(400).json({ error: 'The authenticator app is not set up (ADMIN_TOTP_SECRET).' });
+    if (limited('login-code', 5, 15 * 60e3)) return res.status(429).json({ error: 'Too many tries. Wait 15 minutes.' });
+    if (!checkTotp(req.body && req.body.code)) return res.status(401).json({ error: 'That code did not work. Use the newest code in the app.' });
+    res.json({ ok: true, session: signSession() });
+  });
+
   // Step 2: send the Approve link. Needs the right token first.
   app.post('/admin/login/start', async (req, res) => {
     const token = process.env.ADMIN_TOKEN;
     if (!token || !sameSecret(req.get('X-Admin-Token') || '', token)) return res.status(403).json({ error: 'Not authorized.' });
+    if (totpOn()) return res.status(400).json({ error: 'Use the code from your authenticator app.', needCode: true });
     if (!emailConfirmOn()) return res.json({ ok: true, session: signSession(), emailOff: true });
     if (limited('login-start', 6, 15 * 60e3)) return res.status(429).json({ error: 'Too many sign-in emails. Wait 15 minutes.' });
     prune();
@@ -185,4 +259,4 @@ function mount(app, deps) {
   });
 }
 
-module.exports = { mount, check, isAdmin, emailConfirmOn, adminEmail, signSession, verifySession, sameSecret };
+module.exports = { mount, check, isAdmin, denyBody, emailConfirmOn, totpOn, checkTotp, totpAt, base32Encode, base32Decode, adminEmail, signSession, verifySession, sameSecret };

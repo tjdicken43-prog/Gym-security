@@ -483,8 +483,8 @@ async function call(path, opts){
   const r = await fetch(path, o);
   if(r.status === 403){
     const e = new Error('Token rejected.'); e.status = 403;
-    try{ const b = await r.json(); e.noAdminToken = b.adminTokenSet === false; e.needEmail = !!b.needEmail; }catch(x){}
-    if(e.needEmail && adminSession){ adminSession = ''; try{ localStorage.removeItem('securityai:adminSession'); }catch(x){} }   // expired or signed out: ask again
+    try{ const b = await r.json(); e.noAdminToken = b.adminTokenSet === false; e.needEmail = !!b.needEmail; e.needCode = !!b.needCode; }catch(x){}
+    if((e.needEmail || e.needCode) && adminSession){ adminSession = ''; try{ localStorage.removeItem('securityai:adminSession'); }catch(x){} }   // expired or signed out: ask again
     throw e;
   }
   let body = {}; try{ body = await r.json(); }catch(e){}
@@ -526,6 +526,21 @@ async function emailApproval(){
   if(r.body.session){ saveSession(r.body.session); return unlock(); }      // email check is off
   waitForApproval({ id: r.body.id, until: Date.now() + r.body.minutes * 60e3, sentTo: r.body.sentTo, minutes: r.body.minutes });
 }
+// Right token, new browser, authenticator app on: ask for the 6-digit code.
+function codeStep(){
+  const msg = $('gateMsg');
+  msg.innerHTML = `<b>Enter the 6-digit code</b> from your authenticator app.<input id="totp" inputmode="numeric" autocomplete="one-time-code" maxlength="7" placeholder="123 456" style="width:100%;margin-top:10px;font-size:22px;letter-spacing:.2em;text-align:center;" onkeydown="if(event.key==='Enter')sendCode()"><button class="btn" type="button" style="width:100%;margin-top:10px;" onclick="sendCode()">Confirm code</button><span id="totpMsg" style="display:block;margin-top:8px;"></span>`;
+  setTimeout(() => { const i = $('totp'); if(i) i.focus(); }, 0);
+}
+async function sendCode(){
+  const code = ($('totp').value || '').replace(/\s/g, '');
+  const out = $('totpMsg');
+  if(!/^\d{6}$/.test(code)){ out.textContent = 'The code is 6 numbers.'; return; }
+  out.textContent = 'Checking…';
+  const r = await call('/admin/login/code', { json: { code } }).catch(e => ({ ok:false, body:{ error: e.message } }));
+  if(!r.ok){ out.textContent = r.body.error || 'That code did not work.'; $('totp').value = ''; return; }
+  saveSession(r.body.session); unlock();
+}
 function saveSession(s){ adminSession = s; try{ localStorage.setItem('securityai:adminSession', s); }catch(e){} }
 
 let refreshTimer = null;
@@ -554,6 +569,7 @@ async function unlock(){
     loadCheckReports();
     if(!refreshTimer) refreshTimer = setInterval(() => { if(!document.hidden) refresh(); }, 15000);
   } catch(err){
+    if(err.needCode){ try{ sessionStorage.setItem('securityai:admin', token); }catch(e){} return codeStep(); }
     if(err.needEmail){ try{ sessionStorage.setItem('securityai:admin', token); }catch(e){} return emailApproval(); }
     msg.textContent = err.status === 403
       ? (err.noAdminToken ? 'ADMIN_TOKEN is not set on Render. Add it (Generate), Save, wait until it says Live.' : 'That is not the ADMIN_TOKEN. Copy it again from Render > Environment.')

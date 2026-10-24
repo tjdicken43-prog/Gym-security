@@ -26,5 +26,7 @@ jobs:
         run: node smoke-test.js
       - name: Reminder email rules
         run: node nudge-test.js
+      - name: Admin 2FA (authenticator code)
+        run: node admin-2fa-test.js
       - name: Known security holes in packages
         run: npm audit --omit=dev --audit-level=high

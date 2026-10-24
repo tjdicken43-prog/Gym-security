@@ -296,7 +296,7 @@ function requireAdmin(req, res) {
   const token = process.env.ADMIN_TOKEN;
   if (!token) { res.status(404).json({ error: 'Not enabled.' }); return false; }
   const c = adminAuth.check(req);
-  if (!c.ok) { res.status(403).json(c.needEmail ? { error: 'Approve this browser from the email we send you.', needEmail: true } : { error: 'Not authorized.' }); return false; }
+  if (!c.ok) { res.status(403).json(adminAuth.denyBody(c)); return false; }
   return true;
 }
 // Constant-time compare of two secrets of any length (hash both first, so
@@ -847,7 +847,7 @@ function requireOperator(req, res) {
   }
   const c = adminAuth.check(req);
   if (c.ok) return true;
-  res.status(403).json(c.needEmail ? { error: 'Approve this browser from the email we send you.', needEmail: true } : { error: 'Not authorized.' });
+  res.status(403).json(adminAuth.denyBody(c));
   return false;
 }
 
