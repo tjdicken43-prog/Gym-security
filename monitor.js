@@ -904,9 +904,9 @@ async function postChat(sub, message) {
 }
 async function sendToSubscriber(code, sub, { subject, text, html, attachments, sms, kind, chat }) {
   const base = gyms.publicBaseUrl();
-  const morning = kind === 'morning';
+  const morning = kind === 'morning' || kind === 'nudge';   // the "still waiting" reminder stops with the summary
   const unsub = base ? `${base}/gym/unsubscribe?t=${encodeURIComponent(gymStore.unsubscribeToken(code, sub))}${morning ? '&only=morning' : ''}` : null;
-  const stopWords = morning ? 'Stop morning summaries (alerts keep coming)' : 'Stop these alerts';
+  const stopWords = kind === 'nudge' ? 'Stop reminders and morning summaries (alerts keep coming)' : morning ? 'Stop morning summaries (alerts keep coming)' : 'Stop these alerts';
   if (sub.kind === 'email') {
     const r = await mailer.sendMail({
       to: sub.to,
@@ -938,7 +938,7 @@ function incidentMessage(code, entry) {
   const attachments = (photo && fs.existsSync(photo)) ? [{ filename: 'entrance.jpg', path: photo, cid: 'entrance@securityai' }] : undefined;
   const subject = `${gymName}: ${entry.nightAlert ? 'worth a look (night mode)' : entry.phone_handoff ? 'possible shared code' : 'possible tailgate'} at ${where}, ${when}`;
   const text = `${what} at ${where} (${when}).\n\n"${entry.note || ''}"\n\n`
-    + (links.share ? `See the photos: ${links.share}\n` : '')
+    + (links.share ? `Watch it play (all the photos, in order): ${links.share}\n` : '')
     + (links.activity ? `Mark it on your activity page: ${links.activity}\n` : 'Mark it on your activity page once you\'ve checked the membership log.\n');
   const chat = `${subject}.` + (links.activity ? `\nCheck it on the gym page: ${links.activity}` : '\nCheck it on the gym page.');
   const html = `<div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;max-width:520px;color:#14171A;">
@@ -946,7 +946,7 @@ function incidentMessage(code, entry) {
     <p style="font-size:14px;color:#5b636b;margin:0 0 12px;">${escHtml(where)} · ${escHtml(when)}</p>
     ${attachments ? '<img src="cid:entrance@securityai" width="480" style="max-width:100%;border-radius:6px;display:block;" alt="Entrance photo">' : ''}
     <p style="font-size:14px;color:#3a4148;font-style:italic;">"${escHtml(entry.note || '')}"</p>
-    ${links.share ? `<p><a href="${escHtml(links.share)}" style="display:inline-block;background:#14171A;color:#fff;padding:10px 16px;border-radius:6px;text-decoration:none;font-size:14px;">See all photos</a></p>` : ''}
+    ${links.share ? `<p><a href="${escHtml(links.share)}" style="display:inline-block;background:#14171A;color:#fff;padding:10px 16px;border-radius:6px;text-decoration:none;font-size:14px;">▶ Watch it play</a></p>` : ''}
     ${links.activity ? `<p style="font-size:14px;"><a href="${escHtml(links.activity)}" style="color:#14171A;">Mark it on your activity page</a></p>` : ''}
   </div>`;
   const sms = `${gymName}: ${what} at ${where}, ${when}.${links.share ? ' Photos: ' + links.share : ''}${links.activity ? ' Mark it: ' + links.activity : ''}`;
