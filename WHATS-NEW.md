@@ -196,3 +196,6 @@ Everything here is about the gym running on its own, so you don't have to drive 
 ## For sales
 - `/demo` is a live sample gym. Tap around; nothing is real and nothing is saved.
 - The home page has the $200 + $100 pricing and a "Sign in" button on every screen.
+
+## 2026-10-24: new price
+- $149 a month for the first entrance, $79 for each extra entrance or location (was $200 and $100). Home page, checkout and the server's Stripe price table all match. Founding gyms keep the new price. (Tj's choice: undercuts Kisi's tailgating setup and keeps about $104 a gym after taxes.)
