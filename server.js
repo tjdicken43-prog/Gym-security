@@ -2562,6 +2562,10 @@ app.post('/admin/leads/:id', (req, res) => {
 // location. 'gym' and 'multi' are the same plan (older links use either):
 // the quantity is the number of entrances, the first billed at the full
 // price and the rest at the extra price.
+// First month free: the gym buys its hardware kit at cost at setup, and
+// that is traded for the first month (Tj, 2026-10-24). Stripe starts
+// billing 30 days after checkout; nothing is charged on the day.
+const FIRST_MONTH_FREE_DAYS = 30;
 const PLANS = {
   'single-door': { name: 'One entrance', cents: 20000, maxQty: 1 },
   gym: { name: 'Several entrances or locations', aliases: ['Whole gym — every entrance', 'Whole gym — unlimited entrances', 'Multi-gym contract (per gym)'], cents: 20000, extraCents: 10000, minQty: 2, maxQty: 50 },
@@ -2629,12 +2633,12 @@ app.post('/create-checkout-session', async (req, res) => {
         customer_email: email || '',
         gym_name: meta(b.gymName || b.gym),
       },
-      subscription_data: { metadata: { plan: planId, gym_name: meta(b.gymName || b.gym) } },
+      subscription_data: { trial_period_days: FIRST_MONTH_FREE_DAYS, metadata: { plan: planId, gym_name: meta(b.gymName || b.gym) } },
       success_url: `${DOMAIN}/success.html?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${DOMAIN}/checkout.html?plan=${encodeURIComponent(planId)}`,
     });
 
-    res.json({ url: session.url, plan: planId, monthlyUsd: (plan.cents + (plan.extraCents ? plan.extraCents * (qty - 1) : plan.cents * (qty - 1))) / 100, quantity: qty });
+    res.json({ url: session.url, plan: planId, freeDays: FIRST_MONTH_FREE_DAYS, monthlyUsd: (plan.cents + (plan.extraCents ? plan.extraCents * (qty - 1) : plan.cents * (qty - 1))) / 100, quantity: qty });
   } catch (err) {
     console.error('Stripe checkout failed:', err.message);
     res.status(500).json({ error: 'The payment page could not be opened just now. Please try again in a minute.' });

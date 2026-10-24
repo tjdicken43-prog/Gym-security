@@ -156,7 +156,7 @@
             </div>
             <div class="consent">
               <input type="checkbox" id="c2" class="required-consent">
-              <p>I authorize SecurityAI to charge the card I enter on the next page <strong>$<span class="tot">200</span> per month</strong><span class="qtyWords"></span>, on a recurring basis, until I cancel.</p>
+              <p>I authorize SecurityAI to charge the card I enter on the next page <strong>$<span class="tot">200</span> per month</strong><span class="qtyWords"></span>, starting 30 days from today (the first month is free), on a recurring basis, until I cancel.</p>
             </div>
             <div class="consent">
               <input type="checkbox" id="c3" class="required-consent">
@@ -178,7 +178,9 @@
               <input type="number" id="qty" min="2" max="50" step="1" value="2" inputmode="numeric" style="width:76px;margin:0;padding:7px 9px;background:#fff;border:2px solid var(--line);border-radius:8px;color:var(--text);font-size:15px;">
             </span></div>
           <div class="summary-line"><span>Billing cycle</span><span>Monthly</span></div>
-          <div class="summary-total"><span>Due today</span><span>$<span class="tot">200</span></span></div>
+          <div class="summary-line"><span>First month</span><span><b>Free</b></span></div>
+          <div class="summary-total"><span>Due today</span><span>$0</span></div>
+          <div class="fineprint" style="text-align:left;margin-top:6px;">Then $<span class="tot">200</span> a month from day 31. The hardware kit for each location (camera computer, splitter, cables: about $275, at cost, no markup) is paid once at setup, and it's yours. That is why the first month is on us.</div>
           <div class="fineprint" id="qtyNote" style="display:none;text-align:left;margin-top:6px;">$200 for the first entrance, $100 a month for each extra entrance or location (2 to 50).</div>
           <button class="btn-primary" id="submitBtn" disabled onclick="submitCheckout()">Continue to payment</button>
           <div class="fineprint" id="checkoutStatus" style="display:none;color:var(--red);"></div>
