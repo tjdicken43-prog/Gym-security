@@ -2307,6 +2307,8 @@ const selfTest = require('./self-test').create({
 });
 // Morning summary email, an hour after each gym's watch hours.
 const morning = require('./morning').create({ monitor, store, gyms, mailer, kindOf: e => selfReview.kindOf(e), send: (k, sub, m) => monitor.sendToSubscriber(k, sub, m), log: m => console.log(m), onError: e => { try { incidents.record('morning', e); } catch (x) { /* later */ } } });
+// One reminder for a flagged entry nobody has answered (nudge.js), daytime only.
+const nudge = require('./nudge').create({ monitor, store, gyms, mailer, kindOf: e => selfReview.kindOf(e), send: (k, sub, m) => monitor.sendToSubscriber(k, sub, m), log: m => console.log(m), onError: e => { try { incidents.record('nudge', e); } catch (x) { /* later */ } } });
 require('./gym-routes').mount(app, {
   runnerFor: code => runners.get(monitor.safeCode(code)) || null,
   zonePicture,
@@ -2842,6 +2844,7 @@ setInterval(extra('backup', () => nightlyBackupTick()), 3600e3).unref();
 setInterval(extra('self-test', () => selfTest.tick([...knownGymKeys().keys()])), 3600e3).unref();
 // The morning summary is checked every 15 minutes so it lands close to its time.
 setInterval(extra('morning', () => morning.tick([...knownGymKeys().keys()])), 15 * 60e3).unref();
+setInterval(extra('nudge', () => nudge.tick([...knownGymKeys().keys()])), 15 * 60e3).unref();
 // A camera computer that is already off when the website restarts must
 // still trigger the "offline" alert.
 try { const re = monitor.rearmFromDisk(); if (re.length) console.log(`Watching for check-ins from: ${re.join(', ')} (offline alert armed).`); } catch (e) { console.warn('Could not re-arm offline alerts:', e.message); }

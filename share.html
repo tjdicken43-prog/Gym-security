@@ -28,6 +28,11 @@
   .foot{color:var(--muted);font-size:14px;margin-top:14px;}
   .clock{font-size:13px;color:var(--muted);padding:6px 10px 8px;background:#0c0e10;}
   .open{display:inline-flex;align-items:center;justify-content:center;min-height:48px;padding:10px 16px;margin-top:14px;border-radius:10px;border:1px solid var(--line);background:var(--blue);border-color:var(--blue);color:#fff;font-weight:600;text-decoration:none;}
+  .clip{position:relative;}
+  .clip .bar{display:flex;align-items:center;gap:10px;padding:8px 10px;background:#0c0e10;color:#C9CED2;font-size:14px;}
+  .clip button{min-height:44px;min-width:96px;padding:8px 14px;border:0;border-radius:10px;background:var(--blue);color:#fff;font:inherit;font-weight:700;cursor:pointer;}
+  .clip button:active{transform:scale(.97);}
+  .clip button:disabled{opacity:.7;cursor:default;}
   .msg{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:22px 16px;text-align:center;}
 
   /* ===== SecurityAI look (appended last so it wins) ===== */
@@ -82,15 +87,31 @@ function headline(e){
   const act = (typeof d.activityUrl === 'string' && /^\/activity\.html#ev-[A-Za-z0-9_%-]+$/.test(d.activityUrl)) ? d.activityUrl : null;
   if(d.gymName) document.getElementById('who').textContent = `Shared by ${d.gymName}`;
   document.title = `${d.gymName ? d.gymName + ': ' : ''}entrance, ${when}`;
+  // The crossing as a short clip: the photos in order, a little under 3 a second.
+  const clip = (Array.isArray(d.clip) ? d.clip : []).filter(i => Number.isInteger(i) && e.photos[i]);
   out.innerHTML = `<div class="card">
     <div class="b"><h1>${esc(headline(e))}</h1>
       <div class="when">${esc(when)}${e.zone ? ' · ' + esc(e.zone) : ''}</div>
       ${e.note ? `<p class="said"><b>What the camera saw</b>${esc(e.note)}</p>` : ''}
     </div>
+    ${clip.length >= 3 ? `<figure class="clip"><img id="clipImg" src="${esc(e.photos[clip[0]])}" alt="The crossing, photo 1 of ${clip.length}"><div class="bar"><button type="button" id="clipPlay" aria-label="Play the photos in order, like a short video">▶ Play</button><span id="clipN" aria-live="polite">1 of ${clip.length}</span></div></figure>` : ''}
     ${e.photos.map((u, i) => `<figure><img src="${esc(u)}" alt="Entrance photo ${i + 1} of ${e.photos.length}" loading="${i ? 'lazy' : 'eager'}">${i === 0 ? clock : ''}${e.photos.length > 1 ? `<figcaption>Photo ${i + 1} of ${e.photos.length}</figcaption>` : ''}</figure>`).join('')}
     </div>
     ${act ? `<a class="open" href="${esc(act)}">Open in your activity page</a>` : ''}
     <p class="foot">This link shows only this one entry and stops working ${exp ? 'on ' + esc(exp) : 'within 7 days'}, when ${d.expiresAt ? 'the link or the photos expire' : 'it expires'}. Press and hold a photo to save it.${act ? ' “Open in your activity page” needs your gym code.' : ''}</p>`;
+  const play = document.getElementById('clipPlay');
+  if(play){
+    clip.forEach(i => { const im = new Image(); im.src = e.photos[i]; });
+    const img = document.getElementById('clipImg'), n = document.getElementById('clipN');
+    play.addEventListener('click', () => {
+      let k = 0, loops = 0; play.disabled = true; play.textContent = '▶ Playing';
+      const t = setInterval(() => {
+        k = (k + 1) % clip.length;
+        img.src = e.photos[clip[k]]; img.alt = `The crossing, photo ${k + 1} of ${clip.length}`; n.textContent = `${k + 1} of ${clip.length}`;
+        if(k === clip.length - 1 && ++loops >= 2){ clearInterval(t); play.disabled = false; play.textContent = '▶ Play again'; }
+      }, 380);
+    });
+  }
 })();
 </script>
 </body>

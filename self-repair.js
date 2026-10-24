@@ -51,14 +51,14 @@ const FORBIDDEN_CODE = /child_process|\beval\s*\(|new\s+Function\s*\(|process\.e
 const MAX_EDITS = 3, MAX_LINES = 40, AUTO_MAX_LINES = 20;
 const WATCH_MS = 30 * 60e3;
 const LINK_DAYS = 14;
-const FEATURES = { morning: 'Morning summary emails', 'self-test': 'Nightly AI self-test', weekly: 'Weekly self-check email', backup: 'Nightly emailed backup' };
+const FEATURES = { morning: 'Morning summary emails', nudge: '"Still waiting" reminder emails', 'self-test': 'Nightly AI self-test', weekly: 'Weekly self-check email', backup: 'Nightly emailed backup' };
 
 // What every code change starts from: how the product works and the rules.
 const BRIEF = `SecurityAI catches tailgating at 24-hour gym turnstiles. Pieces:
 - The website (Node/Express on Render, one instance, data on a disk in DATA_DIR): server.js (routes, admin, runners, reader API),
   gym-routes.js (the gym page API: activity, reviews, alerts, results), gym-store.js (gym data files), monitor.js (the analysis loop,
   log, photos, alerts), vision.js (the AI check), mailer.js (email), scheduler.js + report.js (monthly report), morning.js (morning
-  summary), self-review.js (health score), self-test.js (nightly AI self-test), self-repair.js (this repair system).
+  summary), nudge.js (one daytime reminder for unanswered flags), self-review.js (health score), self-test.js (nightly AI self-test), self-repair.js (this repair system).
 - Pages (vanilla JS, no frameworks, every value through esc() before it becomes HTML): securityai.html (public home),
   activity.html (the gym's page: staff check flagged entries on phones), admin.html (TJ's admin), checkout.html, monitor.html.
 - A camera computer (Pi or laptop) runs rtsp-run.js: watches the turnstile camera, sends a few photos per crossing to the website.

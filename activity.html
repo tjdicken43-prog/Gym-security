@@ -2591,7 +2591,7 @@ function renderSubs(list){
         <div class="choices3" role="group" aria-label="What ${esc(s.to)} gets">
           <label class="morning"><input type="checkbox" data-choice="tailgates" data-sub="${esc(s.id)}"${s.tailgates !== false ? ' checked' : ''}> Tailgate alerts</label>
           <label class="morning"><input type="checkbox" data-choice="camera" data-sub="${esc(s.id)}"${s.camera !== false ? ' checked' : ''}> Camera problems</label>
-          ${s.kind === 'email' ? `<label class="morning"><input type="checkbox" data-choice="morning" data-sub="${esc(s.id)}"${s.morning ? ' checked' : ''}> Morning summary</label>` : ''}
+          ${s.kind === 'email' ? `<label class="morning"><input type="checkbox" data-choice="morning" data-sub="${esc(s.id)}"${s.morning ? ' checked' : ''}> Morning summary + reminders</label>` : ''}
         </div>
         <button class="btn" type="button" data-test="${esc(s.id)}">Send test</button>
         <button class="btn" type="button" data-remove="${esc(s.id)}" aria-label="Remove ${esc(s.to)}">Remove</button></div>`).join('')
@@ -2610,7 +2610,7 @@ $('addForm').onsubmit = async ev => {
   renderSubs(r.body.subscribers);
   alertMsg(r.body.message, r.body.delivered !== false);
 };
-const CHOICE_WORDS = { tailgates: ['Tailgate alerts on.', 'Tailgate alerts off for this person.'], camera: ['Camera-problem warnings on.', 'Camera-problem warnings off for this person.'], morning: ['Morning summary on: one short email an hour after the watch hours.', 'Morning summary off.'] };
+const CHOICE_WORDS = { tailgates: ['Tailgate alerts on.', 'Tailgate alerts off for this person.'], camera: ['Camera-problem warnings on.', 'Camera-problem warnings off for this person.'], morning: ['Morning summary on: one short email an hour after the watch hours, plus one daytime reminder if a flagged entry is still unanswered.', 'Morning summary and reminders off.'] };
 $('subs').addEventListener('change', async ev => {
   const c = ev.target; if(!c || !c.dataset || !c.dataset.choice) return;
   c.disabled = true;

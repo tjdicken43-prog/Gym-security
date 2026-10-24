@@ -24,5 +24,7 @@ jobs:
         run: node qa_check.js
       - name: Smoke test
         run: node smoke-test.js
+      - name: Reminder email rules
+        run: node nudge-test.js
       - name: Known security holes in packages
         run: npm audit --omit=dev --audit-level=high

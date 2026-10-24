@@ -1202,6 +1202,8 @@ function mount(app, deps) {
       cameraClockNote: store.getSettings(s.code).cameraClockNote || null,
       // Photo URLs go through the token, never the gym's own frame route.
       event: Object.assign({}, g, { review: null, photos: g.photos.map((_, i) => `/gym/shared/${req.params.token}/photo/${i}`) }),
+        // The crossing photos in order (not the wide still), for the page's Play button.
+        clip: g.photos.map((f, i) => (/-main\.jpg$/.test(String(f)) ? -1 : i)).filter(i => i >= 0),
     });
   });
   app.get('/gym/shared/:token/photo/:n', (req, res) => {
@@ -1309,7 +1311,7 @@ function mount(app, deps) {
     res.set('Referrer-Policy', 'no-referrer');
     if (!sub) return res.send(unsubPage('You\'re not on the list', 'This address isn\'t getting SecurityAI alerts any more.'));
     const name = gyms.gymNameFor(t.c) || 'this gym';
-    if (req.query.only === 'morning') return res.send(unsubPage('Stop the morning summary?', `${escHtml(sub.to)} will stop getting the morning summary for ${escHtml(name)}. Alerts keep coming.`,
+    if (req.query.only === 'morning') return res.send(unsubPage('Stop the morning summary?', `${escHtml(sub.to)} will stop getting the morning summary and "still waiting" reminders for ${escHtml(name)}. Alerts keep coming.`,
       `<form method="POST" action="/gym/unsubscribe?t=${encodeURIComponent(req.query.t)}&only=morning"><button type="submit">Stop morning summaries</button></form>`));
     res.send(unsubPage('Stop these alerts?', `${escHtml(sub.to)} will stop getting alerts for ${escHtml(name)}.`,
       `<form method="POST" action="/gym/unsubscribe?t=${encodeURIComponent(req.query.t)}"><button type="submit">Stop alerts</button></form>`));
@@ -1318,7 +1320,7 @@ function mount(app, deps) {
     const t = store.readUnsubscribeToken(req.query.t);
     if (t && req.query.only === 'morning') {
       try { store.setSubscriberMorning(t.c, t.s, false); } catch (e) { /* gone already */ }
-      return res.send(unsubPage('Done', 'No more morning summaries. Alerts keep coming. The gym page can turn the summary back on.'));
+      return res.send(unsubPage('Done', 'No more morning summaries or reminders. Alerts keep coming. The gym page can turn the summary back on.'));
     }
     if (t) store.removeSubscriber(t.c, t.s);
     res.send(unsubPage('Done', 'You won\'t get any more alerts. If this was a mistake, ask the gym to add you again.'));
