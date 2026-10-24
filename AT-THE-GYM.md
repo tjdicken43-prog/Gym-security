@@ -329,6 +329,13 @@ ADMIN_EMAIL), each new browser also needs the **Approve** link emailed to you.
 If email ever breaks, set ADMIN_EMAIL_CONFIRM=off on Render to get in with the
 token alone.
 
+Stronger: an authenticator app (2FA). On any computer with this folder, run
+`node admin-totp.js`. Add the key it prints to Google Authenticator (+ → Enter
+a setup key, time based), then add it on Render as ADMIN_TOTP_SECRET. After
+that each new browser needs the token AND the 6-digit code from the app (once
+per 30 days), instead of the email. Lost the phone: delete ADMIN_TOTP_SECRET on
+Render (back to the email step) and make a new key.
+
 **With the reader running, scans are counted against people automatically**
 (scan times only; member numbers stay scrambled):
 - 1 person seen, 1 scan → cleared to Passed ("Scan ✓"), unless the camera
